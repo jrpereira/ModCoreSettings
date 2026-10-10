@@ -1,7 +1,7 @@
 -- DMM's state reads the MCS-owned file index; no category shared variables.
 local M={}
 function M.preferences(text)
-    local result={groupModules=true,preferredMinimum=2}
+    local result={groupModules=true,preferredMinimum=2,arrangement=1}
     local section=''
     for line in ((text or '')..'\n'):gmatch('([^\n]*)\n') do
         local header=line:match('^%s*%[([^%]]+)%]%s*$')
@@ -9,7 +9,12 @@ function M.preferences(text)
         if section=='Modules' then
             local key,value=line:match('^%s*([%w_]+)%s*=%s*(%d+)%s*[;#]?.*$')
             value=tonumber(value)
-            if key=='GroupModules' and (value==0 or value==1) then result.groupModules=value==1 end
+            -- 1 by category, 0 alphabetically, 2 by when each mod was added, 3 in load order.
+            if key=='GroupModules' and (value==0 or value==1 or value==2 or value==3) then
+                result.arrangement=value;result.groupModules=value==1
+                result.recentlyAdded=value==2 or nil;result.loadOrder=value==3 or nil
+            end
+            if key=='SingleCategory' and (value==0 or value==1) then result.singleCategory=value==1 or nil end
             if key=='PreferredCategoryMinimum' and (value==0 or value==2 or value==3) then result.preferredMinimum=value end
         end
     end
@@ -17,7 +22,6 @@ function M.preferences(text)
 end
 function M.reader(indexPath,configPath,read,dependencies)
     dependencies=dependencies or {}
-    local taxonomy=dependencies.taxonomy or require('mcs_taxonomy').new(require('mcs_taxonomy_data'))
     local json=dependencies.json or require('mcs_module_json')
     read=read or function(path)
         local file,err,code=io.open(path,'rb')
@@ -25,6 +29,12 @@ function M.reader(indexPath,configPath,read,dependencies)
         local text=file:read(1048577);file:close()
         assert(text and #text<=1048576,'module browser data exceeds 1 MiB')
         return text
+    end
+    local taxonomy=dependencies.taxonomy
+    if not taxonomy then
+        local source=assert(debug.getinfo(1,'S').source,'module category source unavailable'):gsub('^@','')
+        local scripts=assert(source:match('^(.*)[/\\][^/\\]+$'),'module category directory unavailable')
+        taxonomy=require('mcs_taxonomy').loadLua(scripts..'/../data/module_categories.lua')
     end
     local previous,index,lastError
     return function()
@@ -43,6 +53,13 @@ function M.reader(indexPath,configPath,read,dependencies)
         options.categoryRegister=index and index.modules or {}
         options.categoryDescriptions=taxonomy.descriptions
         options.taxonomy=taxonomy
+        -- When each folder was added (cache/folder_info.json), only for the Recently added list.
+        if options.recentlyAdded then
+            options.recentlyAdded=nil
+            local found,seen=pcall(read,dependencies.seenPath)
+            local decoded,data=pcall(json.decode,found and seen or '')
+            options.recent=decoded and type(data)=='table' and type(data.folders)=='table' and data.folders or {}
+        end
         return options
     end
 end

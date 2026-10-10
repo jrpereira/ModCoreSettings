@@ -56,8 +56,9 @@ extension={
         local presentation=module('presentation')
         local browserGroups=module('browser_groups')
         local moduleCategories=module('module_categories')
-        local taxonomy=module('mcs_taxonomy').new(module('mcs_taxonomy_data'))
+        local taxonomyModule=module('mcs_taxonomy')
         local indexJson=module('mcs_module_json')
+        local taxonomy=taxonomyModule.loadLua(directory..'../data/module_categories.lua')
         local config=module('init_config')
         local lifecycle=module('dmm_lifecycle')
         local menuPages=module('menu_pages')
@@ -85,6 +86,23 @@ extension={
             textTable=contributions.textTable,playerExists=playerExists})
         local mods=directory:match('^(.*[/\\])[^/\\]+[/\\]Scripts[/\\]$')
         local folderManifest=browserGroups.folderManifest(mods)
+        -- DMM's mod-list filter button becomes Sort by, saved in this mod's config.ini.
+        local sortButton=module('sort_button').install(require('nativeactions'),directory..'../config.ini',
+            function(path)
+                local file=io.open(path,'rb')
+                if not file then return nil end
+                local text=file:read('a');file:close()
+                return text
+            end,
+            function(path,text)
+                local temporary=path..'.tmp'
+                local file=assert(io.open(temporary,'wb'))
+                local written,why=file:write(text);local closed,closeWhy=file:close()
+                assert(written and closed,why or closeWhy)
+                if not os.rename(temporary,path) then
+                    os.remove(path);assert(os.rename(temporary,path),'cannot replace '..path)
+                end
+            end,report)
         local function read(path)
             local file=assert(io.open(path,'rb'))
             local content=file:read('a')
@@ -94,7 +112,8 @@ extension={
         browserGroups.install(dmm.pages,report,function(content) return dmm.choices.parse(content) end,
             browserGroups.folderVersion(mods),folderManifest,
             moduleCategories.reader(directory..'../cache/modules_register.json',directory..'../config.ini',nil,
-                {taxonomy=taxonomy,json=indexJson,report=report}),read)
+                {taxonomy=taxonomy,json=indexJson,report=report,
+                    seenPath=directory..'../cache/folder_info.json'}),read,sortButton)
         config.install(dmm.choices)
         assert(ModRef and type(ModRef.GetSharedVariable)=='function','DMM shared variables unavailable')
         -- Hooks storage sits inside the slot model, which must stay outermost.
@@ -121,6 +140,8 @@ extension={
         menuPages.install(dmm.pages,function(content) return dmm.choices.parse(content) end,
             menuPages.reader(contributions,ModRef,read,report),report,slots,read,hooked,compile)
         pageLinks.install(dmm.pages,slots)
+        -- Outermost: a rebuild after Apply runs every wrapper above with DMM's arguments.
+        module('index_refresh').install(dmm.pages,report)
         local publisher=lifecycle.publisher(report)
         for _,name in ipairs({'providerPrepared','providerRefreshed','hostClosing'}) do
             dmm.events:on(name,function(context) publisher:publish(name,context) end)

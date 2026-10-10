@@ -338,15 +338,26 @@ assert(allRooted(),'every grouped page starts in the list')
 -- The header: the icon in a box of its own, then the kind of group above the title,
 -- whose rule is centred on the title line and fills the rest of the width.
 assert(header.WidthOverride==584,'the header spans the list')
+assert(header.Slot.Padding.Top==-4 and header.Slot.Padding.Bottom==8,'the header sits raised with a gap below')
 local headerRow=header:GetContent()
 local iconBox,text=headerRow.children[1],headerRow.children[2]
-assert(#headerRow.children==2 and iconBox.WidthOverride==40 and iconBox:GetContent().text=='⁂'
+assert(#headerRow.children==2 and iconBox.WidthOverride==20 and iconBox:GetContent().text=='⁂'
     and iconBox:GetContent().Slot.HorizontalAlignment==2 and iconBox:GetContent().Slot.VerticalAlignment==2,
-    'the icon sits centred in its own box')
+    'the icon sits centred in a box as wide as the line bar, over its line')
+assert(iconBox.Slot.Padding.Right==8,'the title follows the icon closely')
+assert(iconBox:GetContent().Slot.Padding.Top==12,'the icon sits level with the title')
 assert(text.Slot.Size.SizeRule==1,'the text fills the rest of the header')
-local kind,titleLine=text.children[1],text.children[2]
-assert(kind.text=='Collection' and kind.Font.Size==11 and kind.color=='muted' and kind.visible==4,
-    'a small muted line names the kind of group')
+-- The title row (the highlight box) comes first; the kind line follows so it draws
+-- over the box, pulled up into it.
+local titleLine,kind=text.children[1],text.children[2]
+assert(titleLine.Slot.Padding.Top==20 and lineRows[2].wrapper.HeightOverride==34,'the highlight box starts 20 down, 34 tall')
+assert(titleLine.children[2].Slot.Padding.Top==6 and titleLine.children[2].Slot.Padding.Bottom==-2,'the rule sits with the title')
+local titlePadding=titleLine.children[1]:GetContent():GetContent().Slot.Padding
+assert(titlePadding.Left==-2 and titlePadding.Top==6 and titlePadding.Bottom==-1,'the title sits in its box')
+assert(kind.text=='Collection' and kind.Font.Size==10 and kind.color=='muted' and kind.visible==4
+    and kind.Slot.Padding.Top==-35 and kind.Slot.Padding.Left==10 and kind.opacity==0.6,
+    'a small faint line names the kind of group, drawn over the box')
+assert(math.abs(kind.Slot.Padding.Bottom-15.6)<0.01,'the kind line keeps the column as tall as the box')
 assert(#titleLine.children==2 and titleLine.children[1]==lineRows[2].wrapper and lineRows[2].wrapper.WidthOverride==nil
     and titleLine.children[2].HeightOverride==2 and titleLine.children[2]:GetContent()
     and titleLine.children[2].Slot.VerticalAlignment==2 and titleLine.children[2].Slot.Size.SizeRule==1,
@@ -382,6 +393,23 @@ local fourGroup=groupBox(pages.build(widget(),fourProviders,nil,api).allRows[1])
 assert(#fourGroup.children==4 and #fourGroup.children[3].children==4 and #fourGroup.children[4].children==2,
     'a fourth page starts the next grid row')
 assert(lineRows[3].widget:GetContent().text=='T  Templates','a short browser label replaces the page name')
+local cellLabel=lineRows[3].widget:GetContent()
+assert(cellLabel.LineHeightPercentage==0.8 and cellLabel.Slot.VerticalAlignment==2,
+    'a wrapped cell name sits tight and centred')
+-- The "… and N more" entry has no background and a smaller font than its mods.
+local moreProviders={
+    {name='Group',choices=items,mcBrowserLine='head',mcBrowserIcon='▶',mcBrowserKind='Gameplay'},
+    {name='Mod',choices=items,mcBrowserLine='row',mcBrowserLevel=4,mcBrowserIndent=20},
+    {name='… and 1 more with no settings',choices=items,mcBrowserLine='row',mcBrowserMore='g',
+        mcBrowserLevel=4,mcBrowserIndent=20},
+}
+local morePage=pages.build(widget(),moreProviders,nil,api)
+local modRow,moreRow=morePage.allRows[2],morePage.allRows[3]
+assert(moreRow.mcFrame.BrushColor.A==0 and modRow.mcFrame.BrushColor.A>0,'the folded entry has no background')
+assert(moreRow.widget:GetContent().Font.Size==12 and modRow.widget:GetContent().Font.Size==14,
+    'the folded entry is two sizes smaller')
+assert(modRow.mcFrame.Slot.Padding.Left==2 and modRow.mcFrame.Slot.Padding.Right==6
+    and modRow.widget:GetContent().Slot.Padding.Left==6,'a mod row box sits 2 right of its line, its text 6 in')
 -- A 'row' page takes a whole line of its own after the grid; each group has its own header.
 local mixedProviders={{name='Bob',choices=items,mcBrowserLine='head'},
     {name='Declared',choices=items,mcBrowserLine='cell'},

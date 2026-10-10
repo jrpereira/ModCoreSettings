@@ -19,6 +19,8 @@ local function settingIdentity(index,provider,setting)
     assert(#result<=16384,'setting identity exceeds 16 KiB')
     return result
 end
+-- A mod-list group title's padding in its highlight box (set live against the game).
+local HEADER_TITLE_PADDING={Left=-2,Top=6,Right=12,Bottom=-1}
 local styles={
     [1]={22,'title'},[2]={16,'muted'},[3]={15,'muted'},
     [4]={14,'body'},[5]={12,'muted'},[6]={11,'muted'},
@@ -1286,6 +1288,8 @@ function M.install(choices,controls,pages,options)
             filterStyle.NormalPadding={Left=0,Top=0,Right=0,Bottom=0}
             filterStyle.PressedPadding={Left=0,Top=0,Right=0,Bottom=0}
             page.filterLabel.Slot:SetVerticalAlignment(1)
+            -- The index has no filter: its button is a plain title that takes no input.
+            page.filterButton:SetVisibility(4)
             local header=assert(page.filterButton:GetParent(),'MCS mod-browser header')
             header:SetWidthOverride(572);header:ClearHeightOverride()
             local list=assert(header:GetParent(),'MCS mod-browser page')
@@ -1321,6 +1325,10 @@ function M.install(choices,controls,pages,options)
                         local indent=provider and provider.mcBrowserIndent or 0
                         if type(indent)~='number' or indent< -80 or indent>80 then indent=0 end
                         M.style(label,browserLevel,api)
+                        -- A group title is a size below its mods; its icon and rule mark it.
+                        if provider and provider.mcBrowserKind then api.Theme.font(label,api.theme,13) end
+                        -- The "… and N more" entry is a size smaller than the mods it folds.
+                        if provider and provider.mcBrowserMore then api.Theme.font(label,api.theme,12) end
                         if row.wrapper then
                             row.wrapper:SetWidthOverride(584-2*indent)
                             local slot=row.wrapper.Slot
@@ -1328,19 +1336,29 @@ function M.install(choices,controls,pages,options)
                             slot:SetPadding({Left=indent,Top=padding.Top,
                                 Right=padding.Right,Bottom=padding.Bottom})
                         end
-                        label.Slot:SetPadding({Left=row.wrapper and 0 or indent,
-                            Top=4,Right=12,Bottom=4})
+                        if provider and provider.mcBrowserKind then label.Slot:SetPadding(HEADER_TITLE_PADDING)
+                        else label.Slot:SetPadding({Left=row.wrapper and 0 or indent,Top=4,Right=12,Bottom=4}) end
                         if provider and provider.mcBrowserHeading then api.setText(label,provider.name) end
                         if provider and provider.mcBrowserLabel then api.setText(label,provider.mcBrowserLabel) end
                     end
                 end
             end
             -- Each browser group (mcBrowserLine) is a header row, its heading followed by a
-            -- horizontal line, then its pages: a 'cell' page in a three-column grid on a faint
+            -- horizontal line, then its pages: a 'cell' page in a grid (three columns, or its
+            -- heading's mcBrowserColumns) on a faint
             -- background, its name wrapping to two lines before it is cut off; a 'row' page on
             -- a line of its own. A thin vertical line marks each line on its left. Hidden
             -- pages keep their place in the list.
-            local ICON,ICON_HEIGHT,BAR,CELL,GAP,CELLS,WIDTH=40,56,20,180,8,3,584
+            local ICON,ICON_HEIGHT,BAR,CELL,GAP,CELLS,WIDTH=40,54,20,180,8,3,584
+            local KIND_INDENT,CELL_LINE_HEIGHT=10,0.8
+            -- Group header, tuned live: its highlight box (the title row) starts BOX_TOP
+            -- down and is BOX_HEIGHT tall; the kind line sits KIND_TOP down, drawn after
+            -- the box so its glow does not cover it. KIND_LINE is the kind text's height.
+            local BOX_TOP,BOX_HEIGHT,KIND_TOP,KIND_LINE=20,34,19,19.4
+            -- The header is drawn HEADER_RAISE up from its place in the group, with
+            -- HEADER_GAP of bottom padding; a mod row's box sits ROW_SHIFT right of the line bar.
+            -- HEADER_INDENT moves the header's icon and title right of the line bar's column.
+            local HEADER_RAISE,HEADER_GAP,ROW_SHIFT,HEADER_INDENT=4,8,2,2
             local function frame(row,width,height)
                 local box=api.construct('/Script/UMG.Border',tree)
                 box:SetBrushColor(cycleBackground)
@@ -1361,8 +1379,19 @@ function M.install(choices,controls,pages,options)
             local function bar(box,height)
                 local line=rule('vertical',height);line:SetWidthOverride(BAR);place(box,line)
             end
+            -- A group's grid columns: its heading's mcBrowserColumns (1-4), else CELLS. Cells
+            -- share the row's width: CELL wide at CELLS columns.
+            local function columnsOf(head)
+                local provider=head and providers[head.providerIndex]
+                local columns=provider and tonumber(provider.mcBrowserColumns)
+                return columns and columns>=1 and columns<=4 and math.floor(columns) or CELLS
+            end
+            local function cellWidth(columns)
+                return columns==CELLS and CELL or math.floor((WIDTH-BAR)/columns)-GAP
+            end
             local function groupLines(head,members)
                 local lines,grid={},nil
+                local columns=columnsOf(head)
                 local function line(height)
                     local box=api.construct('/Script/UMG.HorizontalBox',tree)
                     bar(box,height);lines[#lines+1]=box
@@ -1372,15 +1401,19 @@ function M.install(choices,controls,pages,options)
                     local label=row.widget:GetContent()
                     row.mcFrame:RemoveFromParent()
                     if providers[row.providerIndex].mcBrowserLine=='cell' then
-                        if not grid or grid.count==CELLS then grid={box=line(44),count=0} end
+                        if not grid or grid.count==columns then grid={box=line(44),count=0} end
                         grid.count=grid.count+1
                         label:SetJustification(1);label:SetAutoWrapText(true)
+                        -- A wrapped name sits tight and centred. Line height has no setter;
+                        -- the cell is re-placed below, which rebuilds the text from it.
+                        label.LineHeightPercentage=CELL_LINE_HEIGHT
                         label.Slot:SetPadding({Left=8,Top=2,Right=8,Bottom=2})
+                        label.Slot:SetVerticalAlignment(2)
                         place(grid.box,row.mcFrame,{Left=0,Top=0,Right=GAP,Bottom=GAP})
                     else
                         grid=nil
-                        label.Slot:SetPadding({Left=12,Top=4,Right=12,Bottom=4})
-                        place(line(40),row.mcFrame,{Left=0,Top=0,Right=GAP,Bottom=GAP})
+                        label.Slot:SetPadding({Left=6,Top=4,Right=12,Bottom=4})
+                        place(line(40),row.mcFrame,{Left=ROW_SHIFT,Top=0,Right=GAP-ROW_SHIFT,Bottom=GAP})
                     end
                 end
                 return lines
@@ -1400,7 +1433,8 @@ function M.install(choices,controls,pages,options)
                 local visible=shown(group.head)
                 group.box:SetVisibility(visible and 0 or 1)
                 if not visible then return end
-                group.header:RemoveFromParent();place(group.box,group.header)
+                group.header:RemoveFromParent()
+                place(group.box,group.header,{Left=0,Top=-HEADER_RAISE,Right=0,Bottom=HEADER_GAP})
                 local members={}
                 for _,row in ipairs(group.members) do
                     if shown(row) then members[#members+1]=row end
@@ -1436,7 +1470,11 @@ function M.install(choices,controls,pages,options)
                     for _,row in ipairs(group.members) do
                         moved[row.wrapper:GetFullName()]=true
                         local cell=providers[row.providerIndex].mcBrowserLine=='cell'
-                        row.mcFrame=frame(row,cell and CELL or WIDTH-BAR-GAP,cell and 44 or 40)
+                        row.mcFrame=frame(row,cell and cellWidth(columnsOf(group.head)) or WIDTH-BAR-GAP,cell and 44 or 40)
+                        -- The "… and N more" entry has no background of its own.
+                        if providers[row.providerIndex].mcBrowserMore then
+                            row.mcFrame:SetBrushColor({R=0,G=0,B=0,A=0})
+                        end
                     end
                     -- The header: the group's icon in a box of its own, then a small line
                     -- naming the kind of group above the title, whose rule is centred on
@@ -1444,24 +1482,38 @@ function M.install(choices,controls,pages,options)
                     local provider=providers[group.head.providerIndex]
                     local header=api.construct('/Script/UMG.HorizontalBox',tree)
                     local iconBox=api.construct('/Script/UMG.SizeBox',tree)
-                    iconBox:SetWidthOverride(ICON);iconBox:SetHeightOverride(ICON_HEIGHT)
+                    -- As wide as the line bar below, so the icon centres on its line; the
+                    -- title's text then lines up with its mods' names.
+                    iconBox:SetWidthOverride(BAR);iconBox:SetHeightOverride(ICON_HEIGHT)
                     local icon=api.caption(tree,provider.mcBrowserIcon or '')
-                    api.Theme.font(icon,api.theme,22);icon:SetFont(icon.Font);icon:SetJustification(1)
+                    api.Theme.font(icon,api.theme,20);icon:SetFont(icon.Font);icon:SetJustification(1)
                     local iconSlot=api.need(iconBox:SetContent(icon),'MCS mod-list group icon')
                     iconSlot:SetHorizontalAlignment(2);iconSlot:SetVerticalAlignment(2)
-                    place(header,iconBox,{Left=0,Top=0,Right=8,Bottom=0})
+                    -- Centred 6px below the box's middle, level with the title.
+                    iconSlot:SetPadding({Left=0,Top=12,Right=0,Bottom=0})
+                    place(header,iconBox,{Left=HEADER_INDENT,Top=0,Right=8,Bottom=0})
                     local text=api.construct('/Script/UMG.VerticalBox',tree)
                     local kind=api.caption(tree,provider.mcBrowserKind or '')
-                    api.Theme.font(kind,api.theme,11);kind:SetFont(kind.Font);api.Theme.textColor(kind,'muted')
+                    api.Theme.font(kind,api.theme,10);kind:SetFont(kind.Font);api.Theme.textColor(kind,'muted')
                     kind:SetVisibility((provider.mcBrowserKind or '')~='' and 4 or 1)
-                    place(text,kind,{Left=0,Top=4,Right=0,Bottom=0})
+                    kind:SetRenderOpacity(0.6)
+                    -- Left-aligned with the title's text, which sits inside its row's padding.
+                    kind:SetJustification(0)
                     local titleLine=api.construct('/Script/UMG.HorizontalBox',tree)
-                    group.head.wrapper:ClearWidthOverride();place(titleLine,group.head.wrapper)
+                    group.head.wrapper:ClearWidthOverride();group.head.wrapper:SetHeightOverride(BOX_HEIGHT)
+                    place(titleLine,group.head.wrapper)
                     local line=rule('horizontal',2)
                     local lineSlot=api.need(titleLine:AddChild(line),'MCS mod-list group header line')
                     lineSlot:SetVerticalAlignment(2);lineSlot:SetSize({SizeRule=1,Value=1})
-                    lineSlot:SetPadding({Left=8,Top=0,Right=0,Bottom=0})
-                    place(text,titleLine)
+                    lineSlot:SetPadding({Left=8,Top=6,Right=0,Bottom=-2})
+                    place(text,titleLine,{Left=0,Top=BOX_TOP,Right=0,Bottom=0})
+                    -- Added after the title row so it draws over the highlight box, then
+                    -- pulled up to KIND_TOP; its bottom padding keeps the column as tall as
+                    -- the box.
+                    local kindSlot=api.need(text:AddChild(kind),'MCS mod-list group kind')
+                    kindSlot:SetPadding({Left=KIND_INDENT,Top=KIND_TOP-BOX_TOP-BOX_HEIGHT,Right=0,
+                        Bottom=BOX_TOP+BOX_HEIGHT-KIND_TOP-KIND_LINE})
+                    kindSlot:SetHorizontalAlignment(0)
                     api.need(header:AddChild(text),'MCS mod-list group header text'):SetSize({SizeRule=1,Value=1})
                     local width=api.construct('/Script/UMG.SizeBox',tree)
                     width:SetWidthOverride(WIDTH)

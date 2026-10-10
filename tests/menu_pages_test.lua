@@ -155,9 +155,10 @@ current={{id='MCT',pages={{id='MCT.module.Visual',name='Visual Example',attach='
     manifest=manifest,configDirectory='/v'}}}}
 local menu={mod('ModCoreControls','Controls'),mod('ModCoreSettings','Visuals'),placeholder('Visual'),mod('Zeta')}
 local built=api.build({},menu,nil,{})
--- Without a shared group or author every page, ModCore's included, lists under Various Authors.
-expect(built,'ModCore.browser.group.various,ModCoreControls,MCT.module.Visual,ModCoreSettings,Zeta','grouped')
-assert(built[3].mcBrowserIndent==20 and built[3].mcBrowserLine=='row' and built[3].mcFolder=='Visual')
+-- Without a shared group or author every page, ModCore's included, lists under Various Authors,
+-- in load order: pages without a folder first, then mod folders by name.
+expect(built,'ModCore.browser.group.various,ModCoreControls,ModCoreSettings,Zeta,MCT.module.Visual','grouped')
+assert(built[5].mcBrowserIndent==20 and built[5].mcBrowserLine=='cell' and built[5].mcFolder=='Visual')
 local failing={build=function(_,items) return items end}
 logs={}
 Pages.install(failing,parse,function() error('index unreadable') end,report)

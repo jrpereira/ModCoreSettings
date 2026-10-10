@@ -1,87 +1,88 @@
 # Module categories
 
-MCS scans installed UE4SS mod folders once during startup and writes
-`cache/modules_register.json`. MCS's DMM extension reads that JSON file when
-building the browser. Category data does not use shared variables.
+MCS identifies installed UE4SS mod folders during startup and gives each one
+categories from, in order: the categories its `mod.json` declares, its normalized
+folder name in `data/folder_categories.lua`, or a purpose heuristic over its Lua files.
+The index is rebuilt on every boot and published to `cache/modules_register.json`
+for the DMM browser; nothing is cached between boots. Inspected files are read as
+data and never executed. Category data does not use shared variables.
 
-The authoritative taxonomy is `data/mod_categories.json`. Packaging generates
-`Scripts/mcs_taxonomy_data.lua`, the runtime fingerprint database and the Unicode
-normalizer with `tools/build_mod_fingerprints.py`. Development tools, research and
-tests stay outside the installed payload.
+The offline classifier stages the shared taxonomy in
+`work/classifier/taxonomy.json`. It generates `data/module_categories.lua` (C)
+from that taxonomy and `data/folder_categories.lua` (M→C) from classified sample
+folder names. Folder names are case-folded and normalized to alphanumeric
+characters; conflicting labels for one normalized name are omitted. The M→C
+data carries the taxonomy `version` and its own content `revision`. Classifier
+research files stay outside the installed payload.
 
 ## Author declarations
 
-Declare the browser metadata in a mod folder's `mod.txt`:
+Declare the listing fields at the top level of a mod folder's `mod.json`:
 
-```text
-author: 'Example Author',
-browser: {
-    preferred: author,
-    categories: {'gear', 'appearance'},
-    tags: {'fix', 'compatibility'},
-    icon: {utf8: '♞'}
+```json
+{
+  "author": "Example Author",
+  "icon": "♞",
+  "preferred": "author",
+  "categories": ["gear", "layout"],
+  "tags": ["fix"]
 }
 ```
 
-This is a data-only format: colon-separated fields, quoted strings, brace lists,
-nested objects, optional trailing commas and `--` line comments. Scripts and
-expressions are rejected. `preferred: author` needs a declared author. A quoted
-preferred value names a custom group or a canonical category. The equivalent
-`browser` object is also supported in `mod.json`; `mod.txt` takes precedence.
+`"preferred": "author"` uses the declared author. Any other preferred value names
+a custom group or a canonical category. Mod rows show no icon. `mod.json` is read
+as JSON data only.
 
-Select up to three substantial categories, in any combination. Selecting both a
-parent and its child does not consume two slots. Parent membership is derived;
-no primary category is needed. Tags are separate and do not consume category
-slots. Duplicate and unknown identifiers are rejected. There are no aliases:
-`transport` is canonical; `vehicles` and `combat` are not accepted categories.
+Select up to three top-level sections' worth of categories, in any combination.
+Selecting both a parent and its child does not consume two slots. Parent
+membership is derived; no primary category is needed. Tags are separate and do
+not consume category slots. There are no aliases.
 
-| Parent | Selectable children |
+| Section | Categories (children) |
 |---|---|
-| Gameplay (`gameplay`) | `action`, `progression`, `movement`, `economy`, `survival`, `behaviour` |
-| Content (`content`) | `gear`, `items`, `characters`, `world`, `quests`, `transport` |
-| Presentation (`presentation`) | `interface`, `appearance`, `visuals`, `audio`, `camera` |
-| Technical & Support (`support`) | `frameworks`, `performance`, `tools`, `translations` |
-| Other or Specialized (`other`) | Fallback with a specialized, insufficient-evidence or ambiguous reason |
+| Gameplay (`gameplay`) | `actions` (`combat`, `abilities`, `movement`); `progression` (`skills`, `levelling`, `access`, `research`); `systems` (`economy`, `survival`, `behaviour`, `services`, `stealth`, `social`) |
+| Content (`content`) | `items` (`weapons`, `armour`, `gear`, `consumables`, `utility`, `collectibles`); `characters` (`bodies`, `faces`, `hair`, `eyes`, `cosmetics`, `clothing`, `creatures`); `world` (`locations`, `structures`, `quests`, `transport`) |
+| Presentation (`presentation`) | `assets` (`models`, `textures`, `animations`, `effects`, `filters`); `interface` (`layout`, `style`, `features`, `camera`); `media` (`sounds`, `music`, `cues`, `voices`, `video`) |
+| Auxiliary (`auxiliary`) | `development` (`libraries`, `frameworks`, `shared`); `tools`; `adjustment` (`engine`, `translations`, `performance`, `compatibility`, `replacement`) |
+| Unclassified (`unclassified`) | `niche`; `ambiguous`; `other` |
 
-Tags: `experimental`, `broad`, `adult`, `accessibility`, `cheat`, `fix`,
-`compatibility`. An absent tag is not a verified negative. The classifier never
-assigns tags from uncertainty, body filenames or generic helper code.
+Tags: `experimental`, `broad`, `adult`, `accessibility`, `cheat`, `fix`, `ai`.
+An absent tag is not a verified negative.
 
 ## Identification and classification
 
-Declared categories take precedence. For undeclared modules, fingerprint
-matching records identity candidates separately: module links outrank structural
-clues and names, author alone is insufficient, and conflicting authors reject
-non-link candidates. A match can supply explicitly reviewed catalog categories;
-raw source-platform category labels are not automatically transferred.
+For each active mod folder (one UE4SS starts: it holds `enabled.txt`) with
+`Scripts/`, `dlls/` or a `mod.json`:
 
-If no reviewed assignment is available, the Lua source scanner supplies tentative
-category selections and retains evidence paths and terms. Its rules exclude
-setup UI and common settings helpers. Source text can contain comments or string
-literals, so these are clues rather than proof of behavior. More than three
-inferred categories abstain. With insufficient evidence the module uses `other`.
-No inspected module's code is executed. Shared-directory Pak installations are
-outside this folder scan.
+1. **Module:** categories declared in `mod.json`. Invalid ones are first passed
+   through the taxonomy's optional `remap(C)` function, then dropped; the valid
+   rest is used.
+2. **Data:** the normalized folder name is looked up in
+   `data/folder_categories.lua`.
+3. **Auto:** the purpose heuristic scans the folder's Lua files. It is tentative
+   and abstains to `other` when it finds no clue.
 
-## Index and migration
+A step that leaves no valid category passes to the next. Problems such as an
+unreadable `mod.json` are logged as `MODULE_IDENTIFICATION_SKIPPED` and never stop
+startup. Shared-directory Pak installations are outside this folder scan.
 
-The index uses `schema_version: 2`, `taxonomy_version: 2`, and a `modules` object
-keyed by installed folder. Each entry records `categories`, derived `parents`,
-`tags`, optional `preferred` and `icon`, classification `source` and `confidence`,
-and identity candidates/evidence where available. Fallback entries retain a
-`reason` of `specialized`, `insufficient_evidence` or `ambiguous`.
+## Index
 
-Successful entries remain cached, including `other`. Delete a specific entry to
-request classification again after changing author declarations. Malformed or
-unreadable declarations are logged and left uncached for the next startup.
-Legacy single-category caches are reclassified; their custom preferred group is
-preserved. Obsolete category labels are not converted through aliases.
-
-Writes use a temporary file followed by replacement. The DMM reader retains its
+`cache/modules_register.json` uses `schema_version: 2`, the taxonomy `version`,
+and a `modules` object keyed by installed folder. Each entry records
+`categories`, derived `parents`, `tags`, optional `preferred` and `icon`, its
+`source` (`module`, `data` or `auto`) and `confidence`. Nothing is carried
+over between boots; the file is rewritten only when its content changes, using a
+temporary file followed by replacement. The DMM reader retains its
 last valid snapshot if the index is temporarily absent or invalid. An index error
 does not prevent the settings integration from loading.
 
 ## Browser behavior
+
+MCS controls the index page, titled **Modules**. It lists MCS's modules: pages and
+detected mods whose folder is an active module in the index, MCS's own page and the
+developer tools. Disabled folders, their settings pages and packages outside `Mods/`
+are not listed. There is no compatible-only filter; the title takes no input.
 
 Every mod follows the same rules; ModCore's own modules group themselves through
 their `mod.json` like any other mod.
@@ -94,21 +95,24 @@ their `mod.json` like any other mod.
   distinct folders; `preferred: author` uses the declared author. A module in a
   valid collection is listed only there. A `preferred` value naming a category
   counts as that category declared first and forms no collection.
-- **Within a group**, modules are walked by category in taxonomy order, then load
-  order. Child pages stay with their parent. Modules with settings come first; the
+- **Within a group**, modules follow load order: UE4SS starts mod folders by name,
+  so numbered folders (`0_` … `9_`) keep their sequence. Child pages stay with their parent. Modules with settings come first; the
   rest fold into a final "… and X more with no settings" entry, which lists them
   when selected.
 - **Headers** show the group's icon in a box of its own, a small line naming the
   group (the top category, `Collection` or `Author`) and a title: the categories
   present, or the collection's name. Collections use ⁂.
 
-Module totals and collection thresholds count distinct folders, not placements or
-settings pages. Group modules and Preferred Category valid with # modules are saved
+Module totals, including the list's "N mods" count, and collection thresholds count
+distinct folders, not placements, headings or settings pages. Mods without settings
+are named without DMM's "No settings available" notice, dimmed to 50% (75% on hover,
+70% when selected) without the full highlight; "… and N more" entries likewise sit at 50%
+and 75% on hover. Group modules and Preferred Category valid with # modules are saved
 in `config.ini` under `[Modules]`; No disables collections, and disabling module
 grouping lists each page once.
 
 `page:setCategoryFilter(ids, 'any'|'all')` and
 `page:setTagFilter(ids, 'any'|'all')` filter independently. The two filters combine
-with AND and also respect the existing compatible-only filter. These are browser
+with AND. These are browser
 API methods; no additional filter controls or density thresholds are introduced.
 Parent sections are not subdivided automatically.

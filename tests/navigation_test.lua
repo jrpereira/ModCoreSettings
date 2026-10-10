@@ -97,29 +97,30 @@ assert(displayModel.pending[2]==7 and displayModel.pending[6]==0)
 local displayPlan=assert(InitConfig.plan(displayProvider,references,Choices,Choices.fs,displayItems))
 assert(not displayPlan.content:find('Reference',1,true),'references never receive persistent keys')
 
-local visualFile=assert(io.open('mod_settings.ini','rb'))
-local visuals=visualFile:read('*a');visualFile:close()
+-- MCS's own page, compiled from its menu data as menu_pages compiles it.
+local visuals=require('menu_data').manifest(require('mcs_page'))
 local visualItems=Choices.parse(visuals)
-assert(#visualItems==8)
+assert(#visualItems==4)
 local byId={}
 for index,item in ipairs(visualItems) do
     byId[item.id]=index
-    if item.id=='MCS_GroupModules' or item.id=='MCS_PreferredCategoryMinimum' then
+    if item.id=='GroupModules' or item.id=='PreferredCategoryMinimum' or item.id=='SingleCategory' then
         assert(not item.mcNavigation and item.file=='config.ini' and item.section=='Modules')
     else assert(item.mcNavigation and not item.file) end
 end
 local mcsPath='/mods/1_ModCore_Settings/config.ini'
-files[mcsPath]='[Modules]\nGroupModules=1\nPreferredCategoryMinimum=2\n'
+-- As init_config leaves it: every key the page stores (it adds missing ones on open).
+files[mcsPath]='[Modules]\nGroupModules=1\nPreferredCategoryMinimum=2\nSingleCategory=0\n'
 local visualProvider={id='ModCoreSettings',path='/mods/1_ModCore_Settings/mod_settings.ini',choices=visualItems}
 local visualModel=Choices.open(visualProvider)
 assert(not visualModel.error and not visualModel:dirty())
-visualModel:set(byId.MCS_Page,2);visualModel:set(byId.MCS_HighlightedModules,0)
-assert(not visualModel:dirty(),'page selection and preview settings remain transient')
-visualModel:set(byId.MCS_GroupModules,0)
+visualModel:set(byId.MCS_Page,3)
+assert(not visualModel:dirty(),'page selection remains transient')
+visualModel:set(byId.GroupModules,0)
 assert(visualModel:dirty() and visualModel:apply(),'grouping preference is applied durably')
 local reopened=Choices.open(visualProvider)
-assert(not reopened.error and reopened.pending[byId.MCS_Page]==0 and reopened.pending[byId.MCS_HighlightedModules]==1
-    and reopened.pending[byId.MCS_GroupModules]==0 and reopened.pending[byId.MCS_PreferredCategoryMinimum]==2)
-assert(not files[mcsPath]:find('MCS_Page',1,true) and not files[mcsPath]:find('Highlighted',1,true),
-    'navigation and preview keys are not written beside module preferences')
+assert(not reopened.error and reopened.pending[byId.MCS_Page]==0
+    and reopened.pending[byId.GroupModules]==0 and reopened.pending[byId.PreferredCategoryMinimum]==2)
+assert(not files[mcsPath]:find('MCS_Page',1,true),
+    'navigation keys are not written beside module preferences')
 print('PASS navigation remains transient and module grouping preferences persist after Apply')

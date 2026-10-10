@@ -1,94 +1,89 @@
 package.path='Scripts/?.lua;'..package.path
 local R=require('mcs_mod_registry')
-local T=require('mcs_fingerprint_text')
-assert(T.normalize('E\204\129 STRA\225\186\158E\t\234\176\128')=='é strasse 가')
-assert(T.anchor('É X²_１２')=='éx²１２')
-assert(R.key('settings-label-v1',{' Keep blood red ','KEEP BLOOD RED'})=='["settings-label-v1",["keep blood red"]]')
-local db=require('mod_fingerprints')
-local files={'mod_settings.ini','Scripts/main.lua','Scripts/dmm_api.lua','backup/main.lua','x.bak/main.lua'}
-local contents={['/mods/Renamed/mod_settings.ini']='[Mod]\nId=694\nName=ignored\nAuthor=oOCamilleOo\nUrl=ignored\n'
-    ..'PresetLabels=Radius|Fullscreen|Natural\nLabel=Keep blood red\n',
-    ['/mods/Renamed/Scripts/main.lua']='local AutoExposureBias=1',
-    ['/mods/Renamed/Scripts/dmm_api.lua']='unreadable excluded helper'}
-local read=function(path) assert(contents[path]~=nil,'unexpected read: '..path);return contents[path] end
-local tokens=R.tokens('/mods/Renamed',files,read,{ignoreFolderName=true})
-local category,ids,status=R.match(tokens,db)
-assert(category=='visuals' and #ids==1 and ids[1]==694 and status=='matched','distinctive controls beat the shared weak clue')
-assert(not tokens[R.key('lua-identifier-v1',{'unreadable'})],'helpers and backup files were not read')
-local synthetic=R.tokens('/mods/Random',{'zzz_FastTravelAnywhere_P.pak','zzz_FastTravelAnywhere_P.utoc'},read)
-assert(R.match(synthetic,db)=='other','title anchor remains a weak candidate')
-synthetic=R.tokens('/mods/Random',{'zzz_FastTravelAnywhere_P.pak','zzz_FastTravelAnywhere_P.utoc','zzz_FastTravelAnywhere_P.ucas'},read)
-local _,_,complete=R.match(synthetic,db);assert(complete=='matched')
-local ambiguous={categories={'other','gear','items'},modules={
-    {id=1,category=2,fingerprints={{kind='settings-label-v1',values={'shared'},group='x',strength='weak'}}},
-    {id=2,category=3,fingerprints={{kind='settings-label-v1',values={'shared'},group='x',strength='weak'}}}}}
-assert(R.match({[R.key('settings-label-v1',{'shared'})]=true},ambiguous)=='other')
-local skipped=setmetatable({__absolute_path='/mods/Known'}, {__pairs=function() error('registered folder traversed') end})
-local snapshot={__absolute_path='/mods',Known=skipped,New={Scripts={__files={{__name='main.lua'}}}}}
-local folders=R.folders(snapshot,'/mods',{Known={category='Utilities'}})
-assert(#folders==2 and #folders[1].files==0 and folders[2].files[1]=='Scripts/main.lua','known folders skip traversal')
-local authorOnly=R.tokens('/mods/Renamed',{'mod_settings.ini'},function()
-    return '[Mod]\nAuthor=oOCamilleOo\n'
-end,{ignoreFolderName=true})
-local _,_,authorStatus=R.match(authorOnly,db);assert(authorStatus=='unmatched','author alone is insufficient')
-local direct=R.tokens('/mods/Renamed',{'mod.json'},function()
-    return '{"author":"different","links":{"nexus":"http://nexusmods.com/thebloodofdawnwalker/mods/694?tab=files"}}'
-end,{ignoreFolderName=true})
-local _,directIds,directStatus=R.match(direct,db)
-assert(directStatus=='matched' and #directIds==1 and directIds[1]==694,'canonical direct link alone identifies a module')
-local relaxed=R.tokens('/mods/Renamed',{'mod_settings.ini','Scripts/main.lua'},function(path)
-    return path:match('%.ini$') and '[Mod]\nAuthor=oOCamilleOo\nLabel=Keep blood red\n' or ''
-end,{ignoreFolderName=true})
-local _,relaxedIds=R.match(relaxed,db);assert(#relaxedIds==1 and relaxedIds[1]==694,'author relaxes a compound group to one matching clue')
-local wrong=R.tokens('/mods/Renamed',{'mod_settings.ini','Scripts/main.lua'},function(path)
-    return path:match('%.ini$') and '[Mod]\nAuthor=unrelated author\n' or 'local AutoExposureBias=0'
-end,{ignoreFolderName=true})
-local _,_,wrongStatus=R.match(wrong,db);assert(wrongStatus=='unmatched','conflicting author rejects weak clues')
-local nested=R.tokens('/mods/Renamed',{'mod.json'},function()
-    return '{"dependencies":[{"links":{"nexus":"https://www.nexusmods.com/thebloodofdawnwalker/mods/694"}}]}'
-end,{ignoreFolderName=true})
-local _,_,nestedStatus=R.match(nested,db);assert(nestedStatus=='unmatched','dependency links are not identity')
-print('PASS category fingerprints, manifest priority, cache persistence, ambiguity and skipped folders')
+local J=require('mcs_module_json')
+local Tax=R.taxonomy
+local real=R.loadFolderCategories()
+assert(real.version==Tax.data.version and real.revision>=1 and real.folders['90days'][1]=='quests',
+    'runtime loads the generated normalized M-to-C data')
+assert(R.normalizeFolderName('90 Days')=='90days'
+    and R.normalizeFolderName('E\204\129 STRA\225\186\158E')=='éstrasse',
+    'folder normalization is case folded, Unicode aware, and separator independent')
+assert(R.tokens==nil and R.match==nil,'runtime registry does not compute fingerprints')
 
+-- Usable categories: remap fixes invalid data first, then unknown ids are dropped.
+assert(table.concat(Tax:usable({'quests','retired'}),',')=='quests','invalid categories are dropped')
+assert(Tax:usable({'retired'})==nil and Tax:usable({})==nil and Tax:usable('quests')==nil,
+    'nothing valid is a failed step')
+assert(table.concat(Tax:usable({'other','skills'}),',')=='skills','other gives way to substantive categories')
+local Taxonomy=require('mcs_taxonomy')
+local remapped=Taxonomy.new({version=1,remap=function(C)
+    for i,id in ipairs(C) do if id=='old' then C[i]='new' end end
+    return C
+end,sections={{id='s'}},categories={{id='new',parent='s'},{id='other',parent='s'}},tags={}})
+assert(remapped:usable({'old'})[1]=='new','remap(C) converts categories the taxonomy rejects')
+assert(Taxonomy.new({version=1,remap=function() error('broken') end,sections={{id='s'}},
+    categories={{id='new',parent='s'}},tags={}}):usable({'old','new'})[1]=='new','a failing remap is ignored')
 
-local Metadata=require('mcs_mod_metadata')
-local manifest=Metadata.decode([[-- Declarative author metadata
-browser: {preferred: author, categories: {'content','gear','appearance'}, tags: {'adult','fix'}, icon: {utf8: '♞'}},
-author: 'Example Author'
-]])
-assert(manifest.browser.categories[2]=='gear' and manifest.browser.preferred=='author')
-assert(not pcall(Metadata.decode,'browser: os.execute("anything")'),'metadata is never executable Lua')
-assert(not pcall(Metadata.decode,"browser: {tags: {'adult'}}, browser: {}"),'duplicate metadata fields rejected')
-local cache='/mods/1_ModCore_Settings/cache/modules_register.json'
-local bootDisk={
- ['/mods/New/mod.txt']=[[browser: {categories: {'gear','appearance'}, tags: {'fix'}, preferred: author, icon: {utf8: '♞'}}, author: 'Example Author']],
- ['/mods/Bad/mod.json']='{"browser":{"categories":["combat"]}}',
- ['/mods/Heuristic/Scripts/main.lua']='SkillTimeCost=0',
- ['/mods/Unknown/Scripts/main.lua']='local object={}',
- ['/mods/New/Scripts/main.lua']='error("never execute inspected scripts")',
+local folderData={version=Tax.data.version,revision=1,folders={
+    reviewedmod={'quests'},othertest={'other'},declared={'skills'},stale={'retired'},
+}}
+local path='/mods/MCS/cache/modules_register.json'
+local disk={
+    ['/mods/Declared/mod.json']='{"author":"Ann","categories":["combat","retired"],'
+        ..'"tags":["fix","unknown"],"preferred":"author","icon":"\226\153\158"}',
+    ['/mods/Undeclared/mod.json']='{"name":"No categories","preferred":"Group"}',
+    ['/mods/Broken/mod.json']='{"categories":["quests"],}',
+    ['/mods/Invalid/mod.json']='{"categories":["retired"]}',
+    ['/mods/Guess/Scripts/main.lua']='SkillTimeCost=0',
+    ['/mods/Unknown/Scripts/main.lua']='local object={}',
+    ['/mods/Stale/Scripts/main.lua']='',
 }
-local writes,enumerations,issues=0,0,0
-local opts={database=db,mkdir=function(path) assert(path=='/mods/1_ModCore_Settings/cache') end,
- read=function(path) return bootDisk[path] end,
- write=function(path,value) assert(path==cache);writes=writes+1;bootDisk[path]=value end,
- report=function(folder) assert(folder=='Bad');issues=issues+1 end}
+local writes,reports=0,{}
+local function scripts() return {__files={{__name='enabled.txt'}},Scripts={__files={{__name='main.lua'}}}} end
+local function manifest() return {__files={{__name='enabled.txt'},{__name='mod.json'}}} end
 local function enumerate()
- enumerations=enumerations+1
- return {__absolute_path='/mods',New={__files={{__name='mod.txt'}},Scripts={__files={{__name='main.lua'}}}},
- Bad={__files={{__name='mod.json'}}},Heuristic={Scripts={__files={{__name='main.lua'}}}},
- Unknown={Scripts={__files={{__name='main.lua'}}}}}
+    return {__absolute_path='/mods',['Reviewed Mod']=scripts(),OtherTest=scripts(),
+        Declared=manifest(),Undeclared=manifest(),Broken=manifest(),Invalid=manifest(),
+        Guess=scripts(),Unknown=scripts(),Stale=scripts(),Empty={__files={{__name='enabled.txt'}}},
+        Disabled={Scripts={__files={{__name='main.lua'}}}}}
 end
-local index=R.boot('/mods/1_ModCore_Settings','/mods',enumerate,opts)
-assert(writes==1 and issues==1 and enumerations==1)
-assert(index.modules.New.parents[1]=='content' and index.modules.New.parents[2]=='presentation')
-assert(index.modules.New.preferred=='Example Author' and index.modules.New.icon=='♞')
-assert(index.modules.New.tags[1]=='fix' and index.modules.Heuristic.categories[1]=='progression')
-assert(index.modules.Unknown.reason=='insufficient_evidence' and not index.modules.Bad)
-local before=writes;R.boot('/mods/1_ModCore_Settings','/mods',enumerate,opts)
-assert(writes==before and issues==2,'cache entries persist and malformed declarations retry')
-bootDisk[cache]='{"Heuristic":{"category":"combat","preferred":"Old custom group"}}'
-index=R.boot('/mods/1_ModCore_Settings','/mods',enumerate,opts)
-assert(index.schema_version==2 and index.modules.Heuristic.categories[1]=='progression')
-assert(index.modules.Heuristic.preferred=='Old custom group','migration preserves a custom preferred group')
-assert(R.decode(bootDisk[cache]).modules.New.categories[1]=='gear')
-print('PASS data-only mod.txt, author preference, canonical metadata, multi-category cache, heuristics, retries and legacy reclassification')
+local options={database=folderData,mkdir=function(dir) assert(dir=='/mods/MCS/cache') end,
+    read=function(file) return disk[file] end,
+    write=function(file,value) assert(file==path);disk[file]=value;writes=writes+1 end,
+    report=function(folder,why) reports[folder]=why end}
+local index=R.boot('/mods/MCS','/mods',enumerate,options)
+local m=index.modules
+
+local d=m.Declared
+assert(d.source=='module' and table.concat(d.categories,',')=='combat',
+    'mod.json categories win; invalid ones are dropped')
+assert(d.tags[1]=='fix' and #d.tags==1 and d.preferred=='Ann' and d.icon=='♞','module presentation fields')
+assert(m.Undeclared.source=='auto' and m.Undeclared.preferred=='Group',
+    'a mod.json without categories still names its preferred group')
+assert(m.Broken.source=='auto' and reports.Broken,'an unreadable mod.json is reported and skipped')
+assert(m.Invalid.source=='auto' and reports.Invalid,'declared categories with nothing valid fall through')
+
+assert(m['Reviewed Mod'].source=='data' and m['Reviewed Mod'].categories[1]=='quests',
+    'normalized folder name resolves through folder_categories')
+assert(m.OtherTest.categories[1]=='other' and m.OtherTest.reason=='specialized','folder_categories other is specialized')
+assert(m.Stale.source=='auto' and reports.Stale,'a folder_categories row the taxonomy rejects falls through')
+
+assert(m.Guess.source=='auto' and m.Guess.confidence=='tentative' and m.Guess.categories[1]=='skills',
+    'the heuristic classifies what neither mod.json nor folder_categories does')
+assert(m.Unknown.categories[1]=='other' and m.Unknown.reason=='insufficient_evidence'
+    and m.Unknown.confidence=='abstained','heuristic abstention is other')
+assert(m.Empty==nil,'folders without scripts, dlls or mod.json are not modules')
+assert(m.Disabled==nil,'only active modules, with enabled.txt, are considered')
+
+assert(writes==1 and J.decode(disk[path]).modules.Declared.categories[1]=='combat',
+    'the browser handoff is written')
+index=R.boot('/mods/MCS','/mods',enumerate,options)
+assert(writes==1,'an unchanged index is not rewritten')
+disk['/mods/Undeclared/mod.json']='{"categories":["skills"]}'
+index=R.boot('/mods/MCS','/mods',enumerate,options)
+assert(writes==2 and index.modules.Undeclared.source=='module','mod.json changes apply on the next boot')
+folderData.revision=2;folderData.folders.unknown={'quests'}
+index=R.boot('/mods/MCS','/mods',enumerate,options)
+assert(index.modules.Unknown.source=='data','nothing is cached: a folder_categories addition applies at once')
+
+print('PASS mod.json, folder_categories and heuristic steps, remap and invalid categories, uncached rebuild')

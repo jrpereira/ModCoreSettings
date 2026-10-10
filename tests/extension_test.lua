@@ -47,7 +47,15 @@ loadfile=function(path)
                 return function() return {categoryRegister={}} end
             end}
         end
-        if name=='mcs_taxonomy' then return {new=function(data) return {data=data} end} end
+        if name=='mcs_taxonomy' then return {loadLua=function(path)
+            assert(path=='C:/Mods/1_ModCore_Settings/Scripts/../data/module_categories.lua')
+            return {version=3,data={version=3}}
+        end} end
+        if name=='mcs_module_json' then return {decode=function() return {} end} end
+        if name=='sort_button' then return {install=function(native,path)
+            assert(native==package.loaded.nativeactions and path=='C:/Mods/1_ModCore_Settings/Scripts/../config.ini')
+            return 'sort button'
+        end} end
         if name=='menu_contributions' then return {textTable='table decoder'} end
         if name=='error_log' then
             return {reader=function(path) return {path=path} end,text=function() return 'text' end}
@@ -60,6 +68,7 @@ loadfile=function(path)
         end}
     end
 end
+package.loaded.nativeactions={new=function() end}
 local extension=assert(originalLoadfile('Scripts/dmm_extension.lua'))()
 assert(extension.id=='ModCoreSettings' and extension.apiVersion==1 and type(extension.install)=='function')
 local choices,controls,pages={},{},{}
@@ -67,9 +76,9 @@ local callbacks={}
 local events={on=function(_,name,callback) callbacks[name]=callback end}
 local settingsApi={}
 extension.install({version=1,choices=choices,controls=controls,pages=pages,events=events,settingsApi=settingsApi})
-local order={'mcs_manifest','navigation','mapped_presets','menu_contributions','presentation','browser_groups','module_categories','mcs_taxonomy','mcs_taxonomy_data','mcs_module_json',
+local order={'mcs_manifest','navigation','mapped_presets','menu_contributions','presentation','browser_groups','module_categories','mcs_taxonomy','mcs_module_json',
  'init_config','dmm_lifecycle','menu_pages','page_links','menu_slots','page_hooks','field_types','keybind_editor','standard_controls',
- 'error_log','menu_data'}
+ 'error_log','sort_button','menu_data','index_refresh'}
 assert(#loaded==#order)
 for n,name in ipairs(order) do assert(loaded[n]:match(name..'%.lua$'),'load '..n) end
 -- Copied files load from Scripts/vendor; the extension's own modules from Scripts.
@@ -99,6 +108,7 @@ FindFirstOf=nil
 assert(installs[4].args[1]==pages and type(installs[4].args[3])=='function'
     and installs[4].args[4]=='versions in C:/Mods/' and installs[4].args[5]=='manifests in C:/Mods/','browser groups get the parser and the Mods folder')
 assert(type(installs[4].args[6])=='function','browser groups read category and grouping preferences')
+assert(installs[4].args[8]=='sort button','the filter button sorts')
 assert(installs[5].args[1]==choices)
 assert(installs[6].name=='page_hooks' and installs[6].args[1]==choices,
  'hooks storage wraps open before the slot model')
@@ -111,6 +121,8 @@ local hooks,manifest,context=installs[8].args[7]({id='MCC',hooks='/m/hooks.lua'}
 assert(hooks=='hooks' and manifest=='manifest for MCC' and context.page=='MCC',
  'menu pages receive a hooks resolver for hooks pages')
 assert(installs[9].name=='page_links' and installs[9].args[1]==pages)
+assert(installs[10].name=='index_refresh' and installs[10].args[1]==pages
+ and type(installs[10].args[2])=='function','the index refresh wraps outermost')
 for _,name in ipairs({'providerPrepared','providerRefreshed','hostClosing'}) do
  assert(type(callbacks[name])=='function');callbacks[name]({});assert(installs[#installs].event==name)
 end

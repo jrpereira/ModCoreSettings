@@ -38,8 +38,7 @@ contributor) or `attach` (a mod folder name). `link` makes a
 [slot link](#slot-rows) entry. `group='tool'` lists the page only on the ModCore
 Settings page's Developer Tools tab, which opens it; the mod list does not show it.
 A tool page needs settings, as any page DMM opens does. `group='module'` is accepted
-and has no effect: the Installed tab lists every mod whose `mod.json` depends on
-ModCoreSettings.
+and has no effect.
 
 Placement on every menu build:
 
@@ -547,8 +546,10 @@ preserves its keys and changes the pending picker to Custom.
 
 ## Module categories
 
-The Settings page's Modules tab provides Group modules (Yes/No) and Preferred Category valid with # modules (No/2/3). Apply saves [Modules] GroupModules (1/0) and PreferredCategoryMinimum (0/2/3) in config.ini. Defaults are Yes and 2. The next module browser build uses the applied values.
+The Settings page's Modules tab provides Sort by (Recently Added/Categories/Alphabetical/Load Order) and, with Categories, Collections valid with # modules (No/2/3) and Modules appear in a single category (Off/On), all under a Listing heading. Apply saves [Modules] GroupModules (2/1/0/3), PreferredCategoryMinimum (0/2/3) and SingleCategory (0/1) in config.ini. Defaults are Categories, 2 and Off. With a single category, a mod whose categories span several top categories is listed only under the one holding most of them; a tie goes to the one declared first, a preferred category counting as declared first. The mod list's title line carries settings and controls links, top right, opening ModCore Settings and ModCore Controls when they are listed. The mod list's footer button (DMM's Filter Mods, Backspace) is Sort by: each press moves to the next way, saves it the same way and re-sorts the list. Inside every group mods follow load order (in Recently added, newest first), those with settings first. Load Order lists mods in load order, each with its load-order number; mods without settings fold to the end as in every list, so the numbers shown skip them.
+
+Recently added lists mods by their latest install or update, newest first, under Last 24 hours, Last 7 days, Last 30 days and Earlier. On each boot MCS records every active mod folder's top level in `cache/folder_info.json`: its files (name, size and, with the file bridge, creation and modification times) and folders, when the folder was added and when it was last updated. A folder it has not seen is added at the boot time; one whose top-level files or folders changed is updated at the boot time. Settings files (`.ini` other than `mod_settings.ini`), logs and `cache/` or `logs/` folders written while playing are ignored. Removed folders are forgotten, so a reinstall counts as new. Folders present when the record was first made are listed as Earlier. With [UE4SSLuaFileBridge](https://github.com/jrpereira/UE4SSLuaFileBridge) installed, the file is written atomically and a folder seen for the first time takes the newest creation time of its top-level files instead, so nothing is left as Earlier only because it was already installed; an update in place keeps old creation times, so it is still dated by the boot that noticed it. Deleting the file loses only those update dates. The module browser is rebuilt with the applied values when you return to it; so it is after any page's Apply.
 
 Browser grouping is described in [Module categories](MODULE_CATEGORIES.md#browser-behavior). Every mod, ModCore's own included, groups by the same rules. Unregistered folders and conflicting matches use Other or Specialized.
 
-ModCore Settings' own page also carries three generated tabs, rebuilt with the mod list: Installed (ModCore Settings and every mod whose `mod.json` depends on it, each opening its page or showing No settings), Errors, and Developer Tools (the `group='tool'` pages).
+ModCore Settings' own page also carries two generated tabs, rebuilt with the mod list: Errors, and Developer Tools (the `group='tool'` pages).

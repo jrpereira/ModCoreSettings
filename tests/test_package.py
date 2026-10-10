@@ -33,14 +33,18 @@ class PackageTests(unittest.TestCase):
                 declared = json.loads((ROOT / 'release-manifest.json').read_text())['files']
                 self.assertEqual({n for n in names if '/Scripts/' in n},
                                  {pack.MODULE + '/' + n for n in declared if n.startswith('Scripts/')})
-                self.assertIn(pack.MODULE + '/Scripts/module_categories.lua', names)
+                self.assertIn(pack.MODULE + '/data/module_categories.lua', names)
+                self.assertIn(pack.MODULE + '/data/folder_categories.lua', names)
+                self.assertNotIn(pack.MODULE + '/data/module_fingerprints.lua', names)
                 # The shared manifest reader is loaded by the DMM extension.
                 self.assertIn('1_ModCore_Settings/Scripts/mcs_manifest.lua', names)
                 self.assertIn('1_ModCore_Settings/Scripts/dmm_extension.lua', names)
                 self.assertIn('1_ModCore_Settings/Scripts/navigation.lua', names)
                 self.assertIn('1_ModCore_Settings/Scripts/browser_groups.lua', names)
                 self.assertIn('1_ModCore_Settings/Scripts/error_log.lua', names)
-                self.assertIn('1_ModCore_Settings/mod_settings.ini', names)
+                # MCS's own page is contributed menu data, not a DMM manifest on disk.
+                self.assertNotIn('1_ModCore_Settings/mod_settings.ini', names)
+                self.assertIn('1_ModCore_Settings/Scripts/mcs_page.lua', names)
                 # Documents in docs/ are published at the module root.
                 for doc in ('README.md', 'CHANGELOG.md', 'BUILD.md', 'DEVELOPERS.md'):
                     self.assertIn('1_ModCore_Settings/' + doc, names)

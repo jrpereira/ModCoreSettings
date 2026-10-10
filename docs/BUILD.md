@@ -35,11 +35,12 @@ behavior or compatibility with a different DMM layout.
 
 ## Module identification
 
-`python3 tools/build_mod_fingerprints.py` generates the runtime identity database,
-expanded JSON catalog, taxonomy tables and Unicode normalizer from `data/mod_fingerprints.json`
-and `data/mod_categories.json`. Packaging regenerates these outputs automatically.
+`python3 work/classifier/build_catalog_data.py` generates the shared category tree
+and normalized folder-to-category map from `work/classifier/taxonomy.json` and
+the reviewed training records. Packaging regenerates these two data files
+automatically; runtime classification does not compute fingerprints.
 
 The `mod_registry_test.lua`, `module_patterns_test.lua` and `startup_test.lua`
-suites cover matching, boot cache ownership, file index handoff and failure
-isolation. See [Module categories](MODULE_CATEGORIES.md) for cache and
-matching behavior. Verify the first scan, cached restart and browser grouping in game.
+suites cover normalized folder lookup, boot cache ownership, file index handoff
+and failure isolation. See [Module categories](MODULE_CATEGORIES.md) for cache
+and lookup behavior. Verify the first scan, cached restart and browser grouping in game.

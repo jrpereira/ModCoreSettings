@@ -20,9 +20,22 @@
 - Group headers show the icon in a box of their own, a small line naming the group
   (top category, Collection or Author) and the title, with a rule that fills the
   rest of the width.
-- The ModCore page is gone. Its Installed (formerly Modules), Errors and Developer
-  Tools tabs are on ModCore Settings' own page. Installed lists every mod that
-  depends on ModCoreSettings.
+- The ModCore page is gone. Its Errors and Developer Tools tabs are on ModCore
+  Settings' own page. The Installed, Highlighted Modules and Core Functionality tabs
+  are gone, with their settings.
+- ModCore Settings' own page is contributed menu data (`Scripts/mcs_page.lua`), like
+  every other ModCore page, and takes its name and icon from `mod.json`. The mod no
+  longer ships a `mod_settings.ini`. Its Modules tab settings keep their
+  `config.ini` keys.
+- Group modules is now Sort by: Recently Added, Categories, Alphabetical or Load Order
+  (numbered). The mod list's Filter Mods button (Backspace) is now Sort by and cycles
+  them. Inside every group, mods follow load order (Recently added: newest
+  first), those with settings first. Recently added lists mods newest first by when each was installed or last
+  updated, as MCS saw its folder's top level (`cache/folder_info.json`, which also lists each folder's top-level files).
+- With UE4SSLuaFileBridge installed (optional), Recently added uses each mod's real
+  install date and MCS's cache files are written atomically. Without it, nothing changes.
+- After any page's changes are applied, the mod browser is rebuilt when you return to
+  it, as if the menu had been closed and opened again.
 - A level-one setting takes the page title row on every page, and never shows a
   dirty star there; ModCoreSettings no longer treats ModCore Templates pages
   differently.
