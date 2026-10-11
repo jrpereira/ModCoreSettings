@@ -47,6 +47,6 @@ debug.getinfo=getinfo
 local page=published and published.pages[1]
 assert(made=='C:/Mods/1_ModCore_Settings/cache' and #published.pages==1 and page.id=='ModCoreSettings'
     and page.attach=='1_ModCore_Settings' and page.configDirectory=='C:/Mods/1_ModCore_Settings'
-    and page.menu==require('mcs_page') and page.version=='1.0.2' and #captured==0,
+    and page.menu==require('mcs_page') and page.version=='1.1.0' and #captured==0,
     'MCS publishes its own page as menu data attached to its folder')
 print('PASS MCS publishes its own page')

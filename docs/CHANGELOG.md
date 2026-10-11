@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.0.2
+## v1.1.0
 
 - A key row's `DefaultControl` keys come from `Scripts/vendor/standard_keys.lua`, which
   mods vendor to bind the same keys. Like ModCore Controls, it prefers the game's own

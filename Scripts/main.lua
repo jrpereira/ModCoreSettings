@@ -1,4 +1,4 @@
-local VERSION='1.0.2'
+local VERSION='1.1.0'
 local source=debug.getinfo(1,'S').source:gsub('^@','')
 -- Files shared with other modules, unchanged, keep their own module names. Searched first,
 -- so a copy left in Scripts by an earlier release is never loaded instead.
