@@ -37,8 +37,9 @@ behavior or compatibility with a different DMM layout.
 
 `python3 work/classifier/build_catalog_data.py` generates the shared category tree
 and normalized folder-to-category map from `work/classifier/taxonomy.json` and
-the reviewed training records. Packaging regenerates these two data files
-automatically; runtime classification does not compute fingerprints.
+the reviewed training records. `work/` is not in the repository, so run it after
+changing that data and commit the two files; packaging ships the committed files
+as they are. Runtime classification does not compute fingerprints.
 
 The `mod_registry_test.lua`, `module_patterns_test.lua` and `startup_test.lua`
 suites cover normalized folder lookup, boot cache ownership, file index handoff

@@ -36,9 +36,6 @@ def build(root, out=None, expected=None):
     if expected is not None and expected != value:
         raise ValueError('Release version does not match source version')
     module = spec['module']
-    if module == '1_ModCore_Settings':
-        import runpy
-        runpy.run_path(str(root / 'work/classifier/build_catalog_data.py'))['build']()
     if not re.fullmatch(r'[A-Za-z0-9_][A-Za-z0-9_-]*', module):
         raise ValueError('Invalid module name')
     payload = {}
