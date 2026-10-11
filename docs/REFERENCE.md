@@ -8,7 +8,7 @@ means an INI string; replace example paths with absolute paths on the game host.
 - [Page hooks](#page-hooks) and [page links](#page-links)
 - [Apply notifications](#apply-notifications)
 - [Presentation metadata](#presentation-metadata)
-- [Migrating missing defaults](#migrating-missing-defaults)
+- [Missing defaults](#missing-defaults)
 - [Mapped presets](#mapped-presets)
 
 ## Menu pages
@@ -462,60 +462,18 @@ categories remain in their original positions. Rows retain their setting IDs,
 config keys and children. Reordering occurs on a relevant value change, using
 DMM's existing menu refresh; no additional timer is created.
 
-## Migrating missing defaults
+## Missing defaults
 
-`DefaultFrom=OldConfigKey` copies an existing value in the same `ConfigFile` and
-explicit `ConfigSection` only when the destination key is absent. The source
-must satisfy the destination range/choices and step. An invalid source prevents
-initialization instead of silently overwriting it. An explicit destination value
-always wins; an absent source uses the ordinary `Default`. Migration reads only
-existing values, so it does not depend on setting order or follow default chains.
-
-`DefaultFromMap=0:1;1:2` optionally converts the copied number through a finite
-map. An existing source must have a mapped entry. No expressions are evaluated.
-
-For cross-section or conditional copies, use ordered sections:
-
-```ini
-[DefaultRule.PositionFromLegacy]
-Target = Position
-SourceSection = Legacy Layout
-SourceKey = UpperX
-SourceDefault = 40
-WhenAbsent = General/Role
-WhenZero = Legacy Layout/Swap
-
-[DefaultRule.PositionFallback]
-Target = Position
-SourceSection = Legacy Layout
-SourceKey = LowerX
-SourceDefault = 20
-```
-
-`Target` is a setting ID with an explicit `ConfigSection`. Rule section names
-must be unique. Rules run in manifest order, at most 32 per target; the first
-matching rule with an available source supplies the missing value. A rule without
-`SourceDefault` is skipped when its source is absent. If no rule supplies a value,
-the setting's ordinary `Default` applies. A target cannot also use `DefaultFrom`.
-
-Both optional conditions must match. `WhenAbsent=Section/Key` tests whether the
-key existed in the original file. `WhenZero=Section/Key` accepts finite integers;
-zero or an absent key matches, while any nonzero integer does not. It is evaluated
-only after `WhenAbsent` matches. References are exact and case-sensitive, and
-read only the same configuration file's original snapshot. Explicit destination
-values bypass all source and condition evaluation. Consumed source values must
-satisfy the destination range, choices and step; malformed values fail instead
-of being clamped or replaced. Duplicate config sections/keys are rejected.
-
-Migration retains original bytes and unknown keys, adding only missing declared
-destinations in one file transaction. This runs whenever a page with stored
-settings opens, with or without migrations; for a page without them it adds
-missing keys with their `Default`. A failed initialization sets DMM's normal
-error state and disables editing/Apply until the problem is corrected. No DMM
-source files are modified. If a crash interrupts the transaction, the next open
-restores a moved-aside original and removes leftover `.mc-init.tmp`/`.mc-init.bak`
-files that are provably redundant; any other leftover file is named in the page
-error for you to review and delete.
+DMM opens a page only when its config file holds every key. Whenever a page with
+stored settings opens, ModCoreSettings adds each missing declared key with its
+`Default`, in one file transaction, and keeps every other byte and unknown key.
+There is no migration: values under retired keys are ignored, never converted. A
+config that cannot be completed (for example a duplicated key) sets DMM's normal
+error state and disables editing and Apply until it is corrected. No DMM source
+files are modified. If a crash interrupts the transaction, the next open restores a
+moved-aside original and removes leftover `.mc-init.tmp`/`.mc-init.bak` files that
+are provably redundant; any other leftover file is named in the page error for you
+to review and delete.
 
 ## Mapped presets
 
@@ -546,7 +504,7 @@ preserves its keys and changes the pending picker to Custom.
 
 ## Module categories
 
-The Settings page's Modules tab provides Sort by (Recently Added/Categories/Alphabetical/Load Order) and, with Categories, Collections valid with # modules (No/2/3) and Modules appear in a single category (Off/On), all under a Listing heading. Apply saves [Modules] GroupModules (2/1/0/3), PreferredCategoryMinimum (0/2/3) and SingleCategory (0/1) in config.ini. Defaults are Categories, 2 and Off. With a single category, a mod whose categories span several top categories is listed only under the one holding most of them; a tie goes to the one declared first, a preferred category counting as declared first. The mod list's title line carries settings and controls links, top right, opening ModCore Settings and ModCore Controls when they are listed. The mod list's footer button (DMM's Filter Mods, Backspace) is Sort by: each press moves to the next way, saves it the same way and re-sorts the list. Inside every group mods follow load order (in Recently added, newest first), those with settings first. Load Order lists mods in load order, each with its load-order number; mods without settings fold to the end as in every list, so the numbers shown skip them.
+The Settings page's Modules tab provides Sort by (Recently Added/Categories/Alphabetical/Load Order) and, with Categories, Collections valid with # modules (No/2/3) and Modules appear in a single category (Off/On), and, with Categories or Recently Added, Modules per row (1/2/3), all under a Listing heading. Apply saves [Modules] SortBy (2/1/0/3), PreferredCategoryMinimum (0/2/3), SingleCategory (0/1) and ModulesPerRow (1/2/3) in config.ini. Defaults are Categories, 2, Off and 2. Modules per row sets the columns of every group's grid; mod names are left-aligned in every layout. With a single category, a mod whose categories span several top categories is listed only under the one holding most of them; a tie goes to the one declared first, a preferred category counting as declared first. The mod list's title line carries settings and controls links, top right, opening ModCore Settings and ModCore Controls when they are listed. The mod list's footer button (DMM's Filter Mods, Backspace) is Sort by: each press moves to the next way, saves it the same way and re-sorts the list. Inside every group mods follow load order (in Recently added, newest first), those with settings first. Load Order lists mods in load order, each with its load-order number; mods without settings fold to the end as in every list, so the numbers shown skip them.
 
 Recently added lists mods by their latest install or update, newest first, under Last 24 hours, Last 7 days, Last 30 days and Earlier. On each boot MCS records every active mod folder's top level in `cache/folder_info.json`: its files (name, size and, with the file bridge, creation and modification times) and folders, when the folder was added and when it was last updated. A folder it has not seen is added at the boot time; one whose top-level files or folders changed is updated at the boot time. Settings files (`.ini` other than `mod_settings.ini`), logs and `cache/` or `logs/` folders written while playing are ignored. Removed folders are forgotten, so a reinstall counts as new. Folders present when the record was first made are listed as Earlier. With [UE4SSLuaFileBridge](https://github.com/jrpereira/UE4SSLuaFileBridge) installed, the file is written atomically and a folder seen for the first time takes the newest creation time of its top-level files instead, so nothing is left as Earlier only because it was already installed; an update in place keeps old creation times, so it is still dated by the boot that noticed it. Deleting the file loses only those update dates. The module browser is rebuilt with the applied values when you return to it; so it is after any page's Apply.
 

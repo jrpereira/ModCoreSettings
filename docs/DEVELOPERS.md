@@ -88,7 +88,10 @@ The stored value is `none` or `<FKey>|<trigger>`: `K|Tap`, `LeftAlt|Hold`, or
 names what the Mode control shows for each listed trigger, in order; it is display only,
 so the stored value keeps `Tap` or `Hold`. `Optional=1` adds a
 clear button; `DefaultControl=IA_Name` displays the player's native keys while
-unbound. Your input code implements any inheritance and Tap/Hold timing.
+unbound. Your input code implements any inheritance and Tap/Hold timing. To bind the
+same keys the row shows, copy `Scripts/vendor/standard_keys.lua` unchanged into your
+mod's `Scripts/vendor` and call `resolve(environment, 'IA_Name')`; its header lists the
+helpers the environment supplies.
 
 `mcConflictScope=<name>` (letters, digits and `_`, at most 64) groups keybind rows
 that must not share a binding. On every edit, rows on the page with the same scope,
@@ -123,7 +126,7 @@ gamepad capture are unsupported.
 | Shared page area | `mcSlot` | Let MCT contribute visual settings to Controls |
 
 See the [integration reference](REFERENCE.md) for complete metadata, generated
-pages, links, presets and migration contracts. Use MCS metadata and the two
+pages, links, presets and missing defaults. Use MCS metadata and the two
 vendored clients; internal UI modules are not a provider API.
 
 ## Check your integration

@@ -289,12 +289,18 @@ function M.new(report)
                     end
                 end
             end
-            local function each(callback)
+            -- shown: only rows on screen, as the per-frame tick needs; a row hidden by
+            -- its page's navigation has nothing to read until it shows again.
+            local function each(callback,shown)
                 local list=ui.active and instances[ui.active]
                 if not list or not ui.model then return end
+                local panel=ui.panels[ui.active]
                 for i,instance in pairs(list) do
-                    local ok,err=pcall(callback,i,instance)
-                    if not ok then report('FIELD_EDITOR_FAILED',tostring(err)) end
+                    local row=shown and panel and panel.rows[i]
+                    if not (row and row.visible==false) then
+                        local ok,err=pcall(callback,i,instance)
+                        if not ok then report('FIELD_EDITOR_FAILED',tostring(err)) end
+                    end
                 end
             end
             local prepare,show,refresh,tick=ui.prepare,ui.show,ui.refresh,ui.tick
@@ -333,7 +339,7 @@ function M.new(report)
                         model:set(i,value)
                         changed=true
                     end
-                end)
+                end,true)
                 if changed then self:refresh() end
                 return table.unpack(results,1,results.n)
             end

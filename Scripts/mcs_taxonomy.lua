@@ -1,6 +1,12 @@
 -- Validate taxonomy selections and the file index in both Lua states.
 local M={}
-local MAX_CATEGORY_BRANCHES=3
+-- A selection names at most this many main categories (the categories a top category
+-- holds); every other category counts as its main category.
+local MAX_MAIN_CATEGORIES=3
+-- The top category whose main categories stand alone: niche, ambiguous and other.
+local UNCLASSIFIED='unclassified'
+-- Only the classifier may say it cannot tell what a mod does.
+local CLASSIFIER_ONLY={ambiguous=true}
 local function array(values)
     assert(type(values)=='table','expected a category/tag list')
     local n=0
@@ -29,11 +35,24 @@ function M.new(data)
     end
     for _,definition in ipairs(data.tags) do T.tagDefinitions[definition.id]=definition end
     assert(data.remap==nil or type(data.remap)=='function','invalid category remap')
+    -- A category's main category: itself when its parent is a top category.
+    local function main(id)
+        local current=id
+        while T.definitions[current] and not T.sections[T.definitions[current].parent] do
+            current=T.definitions[current].parent
+        end
+        return current
+    end
     -- Usable categories from a list that may hold invalid ones: the data's optional
-    -- remap(C) fixes it first, then unknown and duplicate ids are dropped. Returns
-    -- the canonical selection, or nil when nothing valid remains.
-    function T:usable(values)
+    -- remap(C) fixes it first, then unknown and duplicate ids are dropped. Only the first
+    -- MAX_MAIN_CATEGORIES main categories, in declaration order, are kept; the rest are
+    -- dropped and named through options.report. With options.author, classifier-only ids
+    -- are dropped too. An Unclassified main category beside any other rejects the whole
+    -- selection. Returns the canonical selection, or nil when nothing valid remains.
+    function T:usable(values,options)
         if type(values)~='table' then return nil end
+        options=options or {}
+        local report=options.report or function() end
         local list={}
         for _,id in ipairs(values) do list[#list+1]=id end
         local invalid=false
@@ -42,16 +61,33 @@ function M.new(data)
             local ok,remapped=pcall(data.remap,list)
             if ok and type(remapped)=='table' then list=remapped end
         end
-        local seen,valid={},{}
+        local seen,kept,mains,dropped={},{},{},{}
         for _,id in ipairs(list) do
-            if type(id)=='string' and self.definitions[id] and not seen[id] then seen[id]=true;valid[#valid+1]=id end
+            if type(id)=='string' and self.definitions[id] and not seen[id] then
+                seen[id]=true
+                local owner=main(id)
+                if options.author and CLASSIFIER_ONLY[id] then
+                    report(id..' is set by the classifier only; dropped')
+                elseif mains[owner] or #mains<MAX_MAIN_CATEGORIES then
+                    if not mains[owner] then mains[owner]=true;mains[#mains+1]=owner end
+                    kept[#kept+1]=id
+                else dropped[#dropped+1]=id end
+            end
         end
-        if seen.other and #valid>1 then
-            local substantive={};for _,id in ipairs(valid) do if id~='other' then substantive[#substantive+1]=id end end
-            valid=substantive
+        if #dropped>0 then
+            report('only the first '..MAX_MAIN_CATEGORIES..' main categories are kept; dropped '
+                ..table.concat(dropped,', '))
         end
-        if #valid==0 then return nil end
-        local ok,canonical=pcall(self.categories,self,valid)
+        if #mains>1 then
+            for _,owner in ipairs(mains) do
+                if self.definitions[owner].parent==UNCLASSIFIED then
+                    report(owner..' cannot be combined with other categories; selection rejected')
+                    return nil
+                end
+            end
+        end
+        if #kept==0 then return nil end
+        local ok,canonical=pcall(self.categories,self,kept)
         return ok and canonical or nil
     end
     function T:categories(values)
@@ -69,18 +105,16 @@ function M.new(data)
         for _,definition in ipairs(data.categories) do
             if seen[definition.id] then result[#result+1]=definition.id end
         end
-        local branches={}
-        for id in pairs(seen) do
-            local current=id
-            while self.definitions[current] and self.definitions[current].parent
-                and not self.sections[self.definitions[current].parent] do
-                current=self.definitions[current].parent
+        local mains,count,unclassified={},0,false
+        for _,id in ipairs(result) do
+            local owner=main(id)
+            if not mains[owner] then
+                mains[owner]=true;count=count+1
+                unclassified=unclassified or self.definitions[owner].parent==UNCLASSIFIED
             end
-            branches[self.definitions[current] and self.definitions[current].parent or current]=true
         end
-        local branchCount=0;for _ in pairs(branches) do branchCount=branchCount+1 end
-        assert(branchCount<=MAX_CATEGORY_BRANCHES,'too many category branches')
-        assert(not seen.other or #result==1,'other cannot accompany a substantive category')
+        assert(count<=MAX_MAIN_CATEGORIES,'too many main categories')
+        assert(not unclassified or count==1,'an unclassified category cannot accompany another')
         if #result==0 then result={'other'} end
         return result
     end

@@ -1,4 +1,6 @@
-local D=require('mcs_fingerprint_unicode')
+-- Unicode normalisation of folder names (NFC, case folding, alphanumerics only): the
+-- key both the boot index and the offline folder map use.
+local D=require('mcs_unicode_data')
 local M={unicodeVersion=D.version}
 local function decompose(cp,out)
     if cp>=0xAC00 and cp<=0xD7A3 then
@@ -40,7 +42,7 @@ local function nfc(value)
     return out
 end
 function M.normalize(value)
-    assert(type(value)=='string' and utf8.len(value),'invalid fingerprint UTF-8')
+    assert(type(value)=='string' and utf8.len(value),'invalid UTF-8')
     local out,pending={},false
     for _,cp in ipairs(nfc(value)) do
         for _,folded in ipairs(D.folding[cp] or {cp}) do

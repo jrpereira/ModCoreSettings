@@ -6,7 +6,7 @@ local M = {}
 local GROUP_PREFIX = 'ModCore.browser.group.'
 local VARIOUS = 'Various Authors'
 local TITLE = 'Modules'
--- Opacity of quiet rows (mods without settings, "… and N more" entries): at rest,
+-- Opacity of quiet rows (mods without settings, "and N more" entries): at rest,
 -- hovered, and, for a mod, selected (keyboard selection or the mod described).
 local QUIET_OPACITY, QUIET_HOVER_OPACITY, QUIET_SELECTED_OPACITY = 0.5, 0.75, 0.7
 -- The page that carries the index tabs (Errors, Developer Tools): MCS's own.
@@ -14,7 +14,8 @@ local HOST = 'ModCoreSettings'
 -- The MCS_Page values of those tabs, after the page's own three.
 local TABS = {errors=4, tools=5}
 local COLLECTION_ICON = '⁂'
--- Every group is a grid of this many columns; an ungrouped list is one mod per line.
+-- Every group is a grid of this many columns unless options.columns (1-3, [Modules]
+-- ModulesPerRow) says otherwise; an ungrouped list is one mod per line.
 local GROUP_COLUMNS = 2
 -- The Recently added list's sections, newest first: key, title, and the age in seconds a
 -- mod's added time must be under (the last section takes the rest).
@@ -29,22 +30,18 @@ local LINK_SIZE, LINK_GAP, LINK_END = 12, 7, 5
 -- Box and gap fill the row's left margin (20 in a plain list), so names start where they
 -- do in Alphabetical. Numbers are right-aligned in their box.
 local LOAD_NUMBER_WIDTH, LOAD_NUMBER_SIZE, LOAD_NUMBER_OPACITY, LOAD_NUMBER_GAP = 16, 12, 0.7, 4
--- Top category icons by id, until the taxonomy data carries them.
-local TOP_ICONS = {gameplay='▶', content='◆', presentation='○', support='□', auxiliary='□',
-    other='…', unclassified='…'}
-
 -- A group heading: its icon, a small line naming the kind of group, and its title.
-local function heading(key, title, kind, icon)
+local function heading(key, title, kind, icon, columns)
     return {id=GROUP_PREFIX .. key, name=title, author='', version='',
         description=kind and kind ~= '' and kind .. ': ' .. title or title,
         choices={}, settingsCount=0, testOnly=false, noSettings=true, mcBrowserHeading=true,
         mcBrowserKind=kind, mcBrowserIcon=icon, mcBrowserLevel=3, mcBrowserIndent=0,
-        mcBrowserColumns=GROUP_COLUMNS}
+        mcBrowserColumns=columns or GROUP_COLUMNS}
 end
 
 -- The entry that folds a group's mods without settings; selecting it lists them.
 local function more(key, count)
-    return {id=GROUP_PREFIX .. key .. '.more', name='… and ' .. count .. ' more with no settings',
+    return {id=GROUP_PREFIX .. key .. '.more', name='and ' .. count .. ' more with no settings',
         author='', version='', description='Show the ' .. count .. ' mods in this group that have no settings.',
         choices={}, settingsCount=0, choicesLoaded=true, deferred=false, testOnly=false,
         mcBrowserMore=key}
@@ -130,30 +127,41 @@ end
 
 -- A reader for a mod folder's mod.json fields under mods (the Mods folder, ending in a
 -- separator): preferred, its collection; settings, false when the mod has none to show;
--- name, author, version, icon and description, read before any dependencies list; and
--- requires, the set of dependency ids. open defaults to io.open.
+-- name, author, version, icon and description; and requires, the set of dependency ids.
+-- mod.json is decoded as JSON, as the boot index decodes it; an unreadable one gives no
+-- fields. Each folder is read once: mod.json changes need a restart, like the index.
+-- open defaults to io.open.
 function M.folderManifest(mods, open)
     if type(mods) ~= 'string' then return nil end
     open = open or io.open
-    return function(folder)
-        assert(type(folder) == 'string' and not folder:find('[/\\]') and folder ~= '..' and folder ~= '.',
-            'invalid mod folder')
+    local Json = require('mcs_module_json')
+    local cache = {}
+    local function read(folder)
         local file = open(mods .. folder .. '/mod.json', 'rb')
         if not file then return {} end
         local json = file:read(65536) or ''
         file:close()
-        local top = json:match('^(.-)"dependencies"') or json
+        local ok, manifest = pcall(Json.decode, (json:gsub('^\239\187\191', '')))
+        if not ok or type(manifest) ~= 'table' then return {} end
         local function text(key, limit)
-            local value = top:match('"' .. key .. '"%s*:%s*"([^"\\%c]+)"')
-            return value and #value <= limit and value or nil
+            local value = manifest[key]
+            return type(value) == 'string' and value ~= '' and #value <= limit
+                and not value:find('%c') and value or nil
         end
         local fields = {preferred=text('preferred', 120), name=text('name', 200), author=text('author', 120),
             version=text('version', 64), icon=text('icon', 16), description=text('description', 4096),
             requires={}}
-        if json:match('"settings"%s*:%s*false') then fields.settings = false end
-        local dependencies = json:match('"dependencies"%s*:%s*(%b[])')
-        for id in (dependencies or ''):gmatch('"id"%s*:%s*"([^"\\%c]+)"') do fields.requires[id] = true end
+        if manifest.settings == false then fields.settings = false end
+        for _, dependency in ipairs(type(manifest.dependencies) == 'table' and manifest.dependencies or {}) do
+            if type(dependency) == 'table' and type(dependency.id) == 'string' then fields.requires[dependency.id] = true end
+        end
         return fields
+    end
+    return function(folder)
+        assert(type(folder) == 'string' and not folder:find('[/\\]') and folder ~= '..' and folder ~= '.',
+            'invalid mod folder')
+        if not cache[folder] then cache[folder] = read(folder) end
+        return cache[folder]
     end
 end
 
@@ -206,7 +214,7 @@ end
 -- or update, newest first, in sections by age; a mod with neither known is Earlier), now (the
 -- time to measure age from), loadOrder (list ungrouped mods in load order), singleCategory
 -- (list each mod only under the top category holding most of its categories, ties to the
--- first declared).
+-- first declared), columns (each group's grid columns, 1-3; default 2).
 function M.arrange(providers, parse, report, options)
     options = options or {}
     local listed, tools, seen = {}, {}, {}
@@ -314,11 +322,13 @@ function M.arrange(providers, parse, report, options)
         end
     end
     local minimum = options.preferredMinimum or 2
+    local columns = tonumber(options.columns)
+    if not (columns == 1 or columns == 2 or columns == 3) then columns = GROUP_COLUMNS end
     local groups, byKey = {}, {}
-    local function group(key, title, kind, icon, cells)
+    local function group(key, title, kind, icon)
         local found = byKey[key]
         if not found then
-            found = {key=key, title=title, kind=kind, icon=icon, cells=cells, members={}, has={}}
+            found = {key=key, title=title, kind=kind, icon=icon, members={}, has={}}
             byKey[key] = found
             groups[#groups + 1] = found
         end
@@ -342,7 +352,7 @@ function M.arrange(providers, parse, report, options)
             elseif preferred and not taxonomy.definitions[preferred] and minimum > 0
                 and (preferredCounts[preferred] or 0) >= minimum then
                 local kind = preferred == provider.mcFolderAuthor and 'Author' or 'Collection'
-                local found = group('preferred:' .. preferred, preferred, kind, COLLECTION_ICON, true)
+                local found = group('preferred:' .. preferred, preferred, kind, COLLECTION_ICON)
                 collections[found] = true
                 join(found, provider)
             else
@@ -360,7 +370,7 @@ function M.arrange(providers, parse, report, options)
                         if candidate.id == section then definition = candidate; break end
                     end
                     group('section:' .. section, nil, definition.description or section,
-                        TOP_ICONS[section] or '…', true)
+                        definition.icon or '…')
                 end
             end
         else
@@ -368,7 +378,7 @@ function M.arrange(providers, parse, report, options)
             local key = own or not provider.detectedKind and trimmed(provider.author) or nil
             if options.groupModules == false or not key then plain[#plain + 1] = provider
             else
-                local found = group('list:' .. key, key, own and 'Collection' or 'Author', COLLECTION_ICON, own ~= nil)
+                local found = group('list:' .. key, key, own and 'Collection' or 'Author', COLLECTION_ICON)
                 join(found, provider)
             end
         end
@@ -502,11 +512,12 @@ function M.arrange(providers, parse, report, options)
         if #without > 0 then
             local entry = more(found and found.key or 'plain', #without)
             folded[#folded + 1] = entry
-            add(entry, 'row')
+            -- In a grid it fills a place like any mod; in a plain list it is a line.
+            add(entry, line)
         end
     end
     for _, found in ipairs(kept) do
-        add(heading(found.key, found.title, found.kind, found.icon), 'head')
+        add(heading(found.key, found.title, found.kind, found.icon, columns), 'head')
         members(found, found.members, 'cell')
     end
     local function byName(a, b)
@@ -541,7 +552,7 @@ function M.arrange(providers, parse, report, options)
             end
             if #list > 0 then
                 -- Unlike other groups, a section keeps its mods newest first.
-                add(heading(section[1], section[2], 'Added', RECENT_ICON), 'head')
+                add(heading(section[1], section[2], 'Added', RECENT_ICON, columns), 'head')
                 members({key=section[1]}, list, 'cell')
             end
         end
@@ -554,7 +565,7 @@ function M.arrange(providers, parse, report, options)
             return loaded[a] < loaded[b]
         end)
         local found = headed and {key='various'} or nil
-        if headed then add(heading('various', register and 'Other' or VARIOUS, '', '…'), 'head') end
+        if headed then add(heading('various', register and 'Other' or VARIOUS, '', '…', columns), 'head') end
         -- In load order every mod with a folder keeps its number, so the numbers shown skip
         -- the mods folded away; unfolding them shows theirs.
         local number = 0
@@ -706,7 +717,7 @@ function M.install(pages, report, parse, folderVersion, folderManifest, grouping
                 end)
                 if not ok then report('BROWSER_GROUPS_FAILED', err) end
             end
-            -- Selecting a group's "… and X more" entry lists its mods without settings.
+            -- Selecting a group's "and X more" entry lists its mods without settings.
             if type(page.showDetail)=='function' then
                 local showDetail=page.showDetail
                 function page:showDetail(rowIndex)
@@ -769,7 +780,7 @@ function M.install(pages, report, parse, folderVersion, folderManifest, grouping
                     if not ok then report('BROWSER_GROUPS_FAILED',err) end
                 end
             end
-            -- Quiet rows (mods without settings, "… and N more" entries) are dimmed and
+            -- Quiet rows (mods without settings, "and N more" entries) are dimmed and
             -- never get the highlight pattern a page that opens gets: hovering or
             -- selecting one only brightens it.
             local function quiet(provider)

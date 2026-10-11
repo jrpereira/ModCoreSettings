@@ -1,7 +1,7 @@
 -- MCS-owned module index: each installed folder's categories come from its mod.json,
 -- else data/folder_categories.lua by folder name, else the purpose heuristic. Inspected files are data
 -- only and never executed. Nothing is cached between boots; the index is rebuilt.
-local Text=require('mcs_fingerprint_text')
+local Text=require('mcs_text_normalize')
 local Json=require('mcs_module_json')
 local source=assert(debug.getinfo(1,'S').source,'registry source unavailable'):gsub('^@','')
 local scripts=assert(source:match('^(.*)[/\\][^/\\]+$'),'registry directory unavailable')
@@ -32,15 +32,15 @@ function M.loadFolderCategories(path)
     return data
 end
 
+-- A relative path that stays inside its folder; .bak copies are skipped. Folder names are
+-- otherwise never judged by their words: any mod may be called anything.
 local function safe(path)
     if type(path)~='string' or path=='' or path:find('[%z\r\n]') then return false end
     path=path:gsub('\\','/')
     if path:match('^/') or path:find(':',1,true) then return false end
     for part in (path..'/'):gmatch('(.-)/') do
         local lower=part:lower()
-        if part=='' or part=='.' or part=='..' or lower:find('backup',1,true)
-            or lower:find('continuity',1,true) or lower:find('audit',1,true)
-            or lower:find('archive',1,true) or lower:match('%.bak$') or lower:find('%.bak%.') then return false end
+        if part=='' or part=='.' or part=='..' or lower:match('%.bak$') or lower:find('%.bak%.') then return false end
     end
     return true
 end
@@ -90,6 +90,7 @@ end
 local function classify(folder,database,read,report)
     local ok,manifest=pcall(manifestOf,folder.path,read)
     if not ok then report(folder.name,tostring(manifest));manifest=nil end
+    local function note(message) report(folder.name,message) end
     manifest=manifest or {}
     -- Tags, preferred group and icon are the module's own, whichever step supplies categories.
     local tags,seen={},{}
@@ -100,7 +101,7 @@ local function classify(folder,database,read,report)
     if preferred=='author' then preferred=manifest.author end
     local entry={tags=Taxonomy:tags(tags),preferred=text(preferred,120),icon=text(manifest.icon,16)}
     if manifest.categories~=nil then
-        local declared=Taxonomy:usable(manifest.categories)
+        local declared=Taxonomy:usable(manifest.categories,{author=true,report=note})
         if declared then
             entry.categories,entry.source,entry.confidence=declared,'module','declared'
             entry.reason=declared[1]=='other' and 'specialized' or nil
@@ -110,7 +111,7 @@ local function classify(folder,database,read,report)
     end
     local listed=database.folders[M.normalizeFolderName(folder.name)]
     if listed then
-        local categories=Taxonomy:usable(listed)
+        local categories=Taxonomy:usable(listed,{report=note})
         if categories then
             entry.categories,entry.source,entry.confidence=categories,'data','reviewed'
             entry.reason=categories[1]=='other' and 'specialized' or nil
@@ -122,7 +123,7 @@ local function classify(folder,database,read,report)
     local scanned,prediction=pcall(require('mcs_module_patterns').scan,folder.path,folder.files,read)
     if not scanned then report(folder.name,tostring(prediction));prediction={} end
     entry.evidence=prediction.evidence
-    local guessed=Taxonomy:usable(prediction.categories)
+    local guessed=Taxonomy:usable(prediction.categories,{report=note})
     if guessed and guessed[1]~='other' then entry.categories,entry.confidence=guessed,'tentative'
     else
         entry.categories,entry.confidence={'other'},'abstained'
@@ -214,7 +215,12 @@ function M.folders(snapshot,mods)
     return folders
 end
 
+-- Creates a folder when it is missing. A probe file shows an existing one without starting
+-- a shell, which on Windows is a cmd.exe process (and possibly a console window) per boot.
 local function mkdir(path)
+    local probe=path..'/.mcs-probe'
+    local file=io.open(probe,'wb')
+    if file then file:close();os.remove(probe);return end
     local command
     if package.config:sub(1,1)=='\\' then
         assert(not path:find('["%%!\r\n]'),'unsupported cache directory path')

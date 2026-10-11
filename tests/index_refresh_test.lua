@@ -79,10 +79,11 @@ assert(builds==2,'one rebuild per apply')
 page.mode='newfield'
 assert(rawget(page,'mode')==nil,'writes reach the current page')
 page.mode='browser'
--- A second apply stacks the next build in the same holder.
+-- A second apply puts the next build in the same holder and keeps one page parked.
 page:showDetail();page.api.applied('X','applied');page:showBrowser()
 page:setInputMode('xbox')
-assert(builds==3 and #holder.children==3 and holder.children[2].visibility==1 and holder.children[3].name=='switcher3')
+assert(builds==3 and #holder.children==2 and holder.children[1].name=='switcher2' and holder.children[1].visibility==1
+    and holder.children[2].name=='switcher3','the page before the replaced one is released')
 -- A failed rebuild is reported; the current page stays and still takes the tick.
 page:showDetail();page.api.applied('X','applied');page:showBrowser()
 local current=page.n

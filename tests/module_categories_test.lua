@@ -18,7 +18,7 @@ assert(not pcall(T.categories,T,{'gear','gear'}))
 assert(not pcall(T.tags,T,{'unstable'}))
 local index={schema_version=2,taxonomy_version=T.data.version,modules={
  A=entry({'gear','models'},{'fix'},'Custom'),B=entry({'interface'},{},'Custom')}}
-local files={index=J.encode(index),config='[Modules]\nGroupModules=1\nPreferredCategoryMinimum=0\n'}
+local files={index=J.encode(index),config='[Modules]\nSortBy=1\nPreferredCategoryMinimum=0\n'}
 local errors=0
 local reader=C.reader('index','config',function(path) return files[path] end,{taxonomy=T,report=function() errors=errors+1 end})
 local function providers()
@@ -40,8 +40,17 @@ for _,p in ipairs(list) do
  elseif not p.mcBrowserMore then assert(p.mcBrowserLine=='cell','a cell: '..p.id) end
 end
 local first=#list;G.arrange(list,nil,nil,options);assert(#list==first,'rebuild does not multiply placements')
+-- Modules per row sets every group's columns; an unknown value keeps the default.
+for _,case in ipairs({{'1',1},{'3',3},{'4',2},{'0',2}}) do
+ files.config='[Modules]\nSortBy=1\nModulesPerRow='..case[1]..'\n'
+ local chosen=reader();list=providers();G.arrange(list,nil,nil,chosen)
+ for _,p in ipairs(list) do
+  if p.mcBrowserHeading then assert(p.mcBrowserColumns==case[2],'ModulesPerRow='..case[1]..': '..p.name) end
+ end
+end
+files.config='[Modules]\nSortBy=1\nPreferredCategoryMinimum=0\n'
 -- In a single category, a mod spanning several top categories is listed only under its first.
-files.config='[Modules]\nGroupModules=1\nPreferredCategoryMinimum=0\nSingleCategory=1\n'
+files.config='[Modules]\nSortBy=1\nPreferredCategoryMinimum=0\nSingleCategory=1\n'
 local single=reader();assert(single.singleCategory)
 list=providers();G.arrange(list,nil,nil,single)
 local once,singleHeadings={},{}
@@ -58,9 +67,9 @@ local most={}
 for _,p in ipairs(list) do if p.mcBrowserHeading then most[#most+1]=p.mcBrowserKind end end
 assert(table.concat(most,'|')=='Presentation|Unclassified','models and textures outweigh gear: A and B under Presentation')
 files.index=J.encode(index)
-files.config='[Modules]\nGroupModules=1\nPreferredCategoryMinimum=0\n'
+files.config='[Modules]\nSortBy=1\nPreferredCategoryMinimum=0\n'
 assert(reader().singleCategory==nil,'off by default')
-files.config='[Modules]\nGroupModules=1\nPreferredCategoryMinimum=2\n'
+files.config='[Modules]\nSortBy=1\nPreferredCategoryMinimum=2\n'
 list=providers();G.arrange(list,nil,nil,reader())
 -- Top categories come first, then collections.
 assert(list[1].mcBrowserKind=='Unclassified' and list[2].id=='U'
@@ -68,11 +77,11 @@ assert(list[1].mcBrowserKind=='Unclassified' and list[2].id=='U'
  and list[4].id=='A' and list[5].id=='A.child' and list[6].id=='B')
 local one={{id='A',name='A',mcFolder='A'},{id='A.child',name='Child',mcBrowserLevel=4,mcFolder='A'}}
 G.arrange(one,nil,nil,reader());assert(one[1].mcBrowserKind=='Content','children do not meet the preferred-group threshold')
-files.config='[Modules]\nGroupModules=0\n'
+files.config='[Modules]\nSortBy=0\n'
 list=providers();G.arrange(list,nil,nil,reader());assert(#list==4 and list.mcModuleCount==3)
 -- Recently added: newest first, in sections by age; baseline and unrecorded mods are Earlier.
 local now=10*86400
-files.config='[Modules]\nGroupModules=2\n'
+files.config='[Modules]\nSortBy=2\n'
 files.seen=J.encode({schema=2,folders={A={added=now-40*86400,updated=now-3600},B={added=now-3*86400},
  Unregistered={added=now-1,baseline=true}}})
 local recentReader=C.reader('index','config',function(path) return files[path] end,{taxonomy=T,seenPath='seen'})
@@ -92,9 +101,9 @@ for _,p in ipairs(list) do arranged[#arranged+1]=p.mcBrowserHeading and p.name o
 assert(table.concat(arranged,','):find('^Last 24 hours,B,A,'),table.concat(arranged,','))
 files.seen=nil
 assert(next(recentReader().recent)==nil,'without a record every mod is Earlier')
-files.config='[Modules]\nGroupModules=1\n'
+files.config='[Modules]\nSortBy=1\n'
 assert(reader().recent==nil and reader().groupModules==true and reader().arrangement==1,'the record is read only for Recently added')
-files.config='[Modules]\nGroupModules=3\n'
+files.config='[Modules]\nSortBy=3\n'
 assert(reader().loadOrder and reader().groupModules==false and reader().arrangement==3,'load order')
 files.index='{invalid';local retained=reader();assert(retained.categoryRegister.A.categories[1]=='gear' and errors==1)
 reader();assert(errors==1)

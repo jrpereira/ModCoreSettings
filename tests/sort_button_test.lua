@@ -5,13 +5,13 @@ local Sort=require('sort_button')
 assert(Sort.next(2)==1 and Sort.next(1)==0 and Sort.next(0)==3 and Sort.next(3)==2 and Sort.next(9)==2)
 assert(Sort.text(1)=='CATEGORIES' and Sort.text(3)=='LOAD ORDER' and Sort.text(9)=='RECENTLY ADDED')
 
--- config.ini keeps every other line; GroupModules is replaced, added to [Modules], or [Modules] is added.
-assert(Sort.config('[Modules]\nGroupModules=1\nPreferredCategoryMinimum=2\n',3)
-    =='[Modules]\nGroupModules=3\nPreferredCategoryMinimum=2\n')
+-- config.ini keeps every other line; SortBy is replaced, added to [Modules], or [Modules] is added.
+assert(Sort.config('[Modules]\nSortBy=1\nPreferredCategoryMinimum=2\n',3)
+    =='[Modules]\nSortBy=3\nPreferredCategoryMinimum=2\n')
 assert(Sort.config('[Other]\nA=1\n\n[Modules]\nPreferredCategoryMinimum=2\n\n[Last]\nB=2\n',2)
-    =='[Other]\nA=1\n\n[Modules]\nPreferredCategoryMinimum=2\nGroupModules=2\n\n[Last]\nB=2\n')
-assert(Sort.config('[Other]\r\nA=1\r\n',0)=='[Other]\r\nA=1\r\n\r\n[Modules]\r\nGroupModules=0\r\n','line endings kept')
-assert(Sort.config(nil,1)=='[Modules]\nGroupModules=1\n','no config.ini yet')
+    =='[Other]\nA=1\n\n[Modules]\nPreferredCategoryMinimum=2\nSortBy=2\n\n[Last]\nB=2\n')
+assert(Sort.config('[Other]\r\nA=1\r\n',0)=='[Other]\r\nA=1\r\n\r\n[Modules]\r\nSortBy=0\r\n','line endings kept')
+assert(Sort.config(nil,1)=='[Modules]\nSortBy=1\n','no config.ini yet')
 
 -- The label is found from the filter glyph: icon -> box -> row -> second child. Once per
 -- menu "sort by" goes over it and the button moves from the footer to DMM's overlay.
@@ -52,7 +52,7 @@ local icon=chain(box,widget('icon'))
 local label=chain(row,widget('label'))
 label.Slot.Padding={Left=12,Top=0,Right=28,Bottom=0}
 local native={new=function() return {records={filter={icon=icon}}} end}
-local files={config='[Modules]\nGroupModules=1\n'}
+local files={config='[Modules]\nSortBy=1\n'}
 local reports={}
 local button=Sort.install(native,'config',function(path) return files[path] end,
     function(path,text) files[path]=text end,function(event,detail) reports[#reports+1]=event..' '..detail end)
@@ -79,7 +79,7 @@ assert(buttonWidget.Slot.horizontal==1 and buttonWidget.Slot.padding.Left==480 a
     'a quarter of the way across, at the footer\'s height')
 button:show(2,api,'tree')
 assert(#texts==2 and texts[2].text=='RECENTLY ADDED' and #row.children==2,'placed once, relabelled')
-assert(button:press(1)==0 and files.config=='[Modules]\nGroupModules=0\n','a press saves the next way')
+assert(button:press(1)==0 and files.config=='[Modules]\nSortBy=0\n','a press saves the next way')
 local failing=Sort.install({new=function() return {} end},'config',function() return '' end,
     function() error('disk full') end,function(event,detail) reports[#reports+1]=event..' '..detail end)
 assert(failing:press(1)==nil and reports[#reports]:find('disk full',1,true),'a failed save is reported')

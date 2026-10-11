@@ -100,27 +100,29 @@ assert(not displayPlan.content:find('Reference',1,true),'references never receiv
 -- MCS's own page, compiled from its menu data as menu_pages compiles it.
 local visuals=require('menu_data').manifest(require('mcs_page'))
 local visualItems=Choices.parse(visuals)
-assert(#visualItems==4)
+assert(#visualItems==5)
 local byId={}
 for index,item in ipairs(visualItems) do
     byId[item.id]=index
-    if item.id=='GroupModules' or item.id=='PreferredCategoryMinimum' or item.id=='SingleCategory' then
+    if item.id=='SortBy' or item.id=='PreferredCategoryMinimum' or item.id=='SingleCategory'
+        or item.id=='ModulesPerRow' then
         assert(not item.mcNavigation and item.file=='config.ini' and item.section=='Modules')
     else assert(item.mcNavigation and not item.file) end
 end
 local mcsPath='/mods/1_ModCore_Settings/config.ini'
 -- As init_config leaves it: every key the page stores (it adds missing ones on open).
-files[mcsPath]='[Modules]\nGroupModules=1\nPreferredCategoryMinimum=2\nSingleCategory=0\n'
+files[mcsPath]='[Modules]\nSortBy=1\nPreferredCategoryMinimum=2\nSingleCategory=0\nModulesPerRow=2\n'
 local visualProvider={id='ModCoreSettings',path='/mods/1_ModCore_Settings/mod_settings.ini',choices=visualItems}
 local visualModel=Choices.open(visualProvider)
 assert(not visualModel.error and not visualModel:dirty())
 visualModel:set(byId.MCS_Page,3)
 assert(not visualModel:dirty(),'page selection remains transient')
-visualModel:set(byId.GroupModules,0)
+visualModel:set(byId.SortBy,0)
 assert(visualModel:dirty() and visualModel:apply(),'grouping preference is applied durably')
 local reopened=Choices.open(visualProvider)
 assert(not reopened.error and reopened.pending[byId.MCS_Page]==0
-    and reopened.pending[byId.GroupModules]==0 and reopened.pending[byId.PreferredCategoryMinimum]==2)
+    and reopened.pending[byId.SortBy]==0 and reopened.pending[byId.PreferredCategoryMinimum]==2
+    and reopened.pending[byId.ModulesPerRow]==2)
 assert(not files[mcsPath]:find('MCS_Page',1,true),
     'navigation keys are not written beside module preferences')
 print('PASS navigation remains transient and module grouping preferences persist after Apply')

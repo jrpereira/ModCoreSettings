@@ -1,6 +1,6 @@
 -- The mod list's footer button (DMM's Filter Mods, Backspace) sorts the list instead: each
 -- press moves to the next way of listing mods and saves it as the Settings page's Sort by
--- ([Modules] GroupModules in config.ini). The button is found by its glyph: DMM asks its
+-- ([Modules] SortBy in config.ini). The button is found by its glyph: DMM asks its
 -- native actions for the filter icon, which sits beside the button's label. It shows a
 -- small, faded "sort by" over the current way, and moves from DMM's footer to under the
 -- mod list, a quarter of the way across the screen.
@@ -11,7 +11,7 @@ local M={version=1}
 local CAPTION_SIZE,CAPTION_OPACITY,LABEL_SIZE,TEXT_RAISE=11,0.75,12,2
 local LEFT,BOTTOM=480,84
 
--- In the order a press cycles through: GroupModules value and label.
+-- In the order a press cycles through: SortBy value and label.
 M.MODES={{value=2,label='Recently Added'},{value=1,label='Categories'},{value=0,label='Alphabetical'},
     {value=3,label='Load Order'}}
 
@@ -31,7 +31,7 @@ function M.text(value)
     return (n and M.MODES[n].label or M.MODES[1].label):upper()
 end
 
--- config.ini text with [Modules] GroupModules set to value; other lines are kept as they are.
+-- config.ini text with [Modules] SortBy set to value; other lines are kept as they are.
 function M.config(text,value)
     text=text or ''
     local newline=text:find('\r\n',1,true) and '\r\n' or '\n'
@@ -40,18 +40,18 @@ function M.config(text,value)
     for line in body:gmatch('([^\n]*)\n') do
         local header=line:match('^%s*%[([^%]]+)%]%s*$')
         if header then
-            if inModules and not done then table.insert(lines,last+1,'GroupModules='..value);done=true end
+            if inModules and not done then table.insert(lines,last+1,'SortBy='..value);done=true end
             section=header;inModules=header=='Modules'
-        elseif inModules and line:match('^%s*GroupModules%s*=') then
-            line='GroupModules='..value;done=true
+        elseif inModules and line:match('^%s*SortBy%s*=') then
+            line='SortBy='..value;done=true
         end
         lines[#lines+1]=line
         if inModules and line:match('%S') then last=#lines end
     end
-    if inModules and not done then table.insert(lines,last+1,'GroupModules='..value);done=true end
+    if inModules and not done then table.insert(lines,last+1,'SortBy='..value);done=true end
     if not done then
         if #lines>0 and lines[#lines]~='' then lines[#lines+1]='' end
-        lines[#lines+1]='[Modules]';lines[#lines+1]='GroupModules='..value
+        lines[#lines+1]='[Modules]';lines[#lines+1]='SortBy='..value
     end
     while #lines>0 and lines[#lines]=='' do lines[#lines]=nil end
     return table.concat(lines,newline)..newline
@@ -117,9 +117,16 @@ function M.install(native,configPath,read,write,report)
             if not placed then
                 local line=row()
                 if not line then return end
+                -- A failed move puts the label back and is not retried: one report per menu.
+                local moved,why=pcall(place,line,api,tree)
+                if not moved then
+                    placed='failed'
+                    if valid(label) and not valid(label:GetParent()) then pcall(line.AddChild,line,label) end
+                    error(why,0)
+                end
                 placed=true
-                place(line,api,tree)
             end
+            if placed~=true then return end
             if not valid(label) then return end
             api.setText(label,M.text(value))
             shown=value

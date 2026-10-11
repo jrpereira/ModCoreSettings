@@ -1,4 +1,5 @@
 -- Resolve the keyboard keys the player assigned to a standard Enhanced Input action.
+local Keys=require('standard_keys')
 local M={}
 
 local function unwrap(value)
@@ -46,69 +47,51 @@ local function name(value)
     return ok and tostring(result) or tostring(value)
 end
 
--- Returns the sorted keyboard keys the player bound to the action in the Settings
--- key profile. The profile holds them whether or not an applied context maps the
--- action, as for the combat toggle outside combat or in the pause menu.
+-- The global object scans behind a lookup, shared by every row that asks within the same
+-- second: a page of keybind rows costs one scan, not one per row.
+local shared={}
+local function sharedScan(name,scan)
+    local now=os.time()
+    if shared.time~=now then shared={time=now} end
+    if shared[name]==nil then shared[name]=scan() end
+    return shared[name]
+end
+
+-- Returns the sorted keyboard keys the player bound to the action in the Settings key
+-- profile, by the rule ModCore Controls binds them with (vendor/standard_keys.lua). Without
+-- keys it returns nil and why: 'key profile unavailable' (worth asking again later) or
+-- 'standard control unavailable' (the profile is there and does not map the action).
 function M.resolve(actionId,environment)
     assert(type(actionId)=='string' and actionId:match('%S'),'standard control ID required')
     local e=environment or {unwrap=unwrap,valid=valid,full=full,path=path,property=property,
         each=each,name=name,
         subsystems=function()
-            local ok,items=pcall(FindAllOf,'EnhancedInputLocalPlayerSubsystem')
-            return ok and type(items)=='table' and items or {}
+            return sharedScan('subsystems',function()
+                local ok,items=pcall(FindAllOf,'EnhancedInputLocalPlayerSubsystem')
+                return ok and type(items)=='table' and items or {}
+            end)
         end,
         actions=function()
-            local ok,items=pcall(FindAllOf,'InputAction')
-            return ok and type(items)=='table' and items or {}
+            return sharedScan('actions',function()
+                local ok,items=pcall(FindAllOf,'InputAction')
+                return ok and type(items)=='table' and items or {}
+            end)
         end,
         call=function(object,method) return object[method](object) end}
-    local function shortName(object) return (e.full(object) or ''):match('([^%.:/%s]+)$') end
-    local profile
-    for _,subsystem in ipairs(e.subsystems()) do
-        if e.valid(subsystem) then
-            local ok,candidate=pcall(function()
-                local settings=e.unwrap(e.call(subsystem,'GetUserSettings'))
-                return e.valid(settings) and e.unwrap(e.call(settings,'GetCurrentKeyProfile')) or nil
-            end)
-            if ok and e.valid(candidate) then profile=candidate;break end
-        end
-    end
-    if not profile then return nil,'key profile unavailable: '..actionId end
-    local function collect(matches)
-        local found={}
-        e.each(e.property(profile,'PlayerMappedKeys') or {},function(_,row)
-            e.each(e.property(row,'Mappings') or {},function(entry)
-                if matches(entry) then
-                    local keyName=e.name(e.property(e.property(entry,'CurrentKey'),'KeyName'))
-                    if keyName and keyName~='' and keyName~='None' and not keyName:find('^Gamepad_') then
-                        found[keyName]=true
-                    end
-                end
-            end)
-        end)
-        local result={}
-        for keyName in pairs(found) do result[#result+1]=keyName end
-        table.sort(result)
-        return result
-    end
-    local result=collect(function(entry)
-        return shortName(e.property(entry,'AssociatedInputAction'))==actionId
-    end)
-    if #result==0 then
-        -- Profile rows may name the action only through its mappable key settings.
-        local mappingName
-        for _,action in ipairs(e.actions()) do
-            if e.valid(action) and shortName(action)==actionId then
-                mappingName=e.name(e.property(e.property(action,'PlayerMappableKeySettings'),'Name'))
-                break
+    -- The first player subsystem with a loaded key profile.
+    local function profile()
+        for _,subsystem in ipairs(e.subsystems()) do
+            if e.valid(subsystem) then
+                local ok,candidate=pcall(function()
+                    local settings=e.unwrap(e.call(subsystem,'GetUserSettings'))
+                    return e.valid(settings) and e.unwrap(e.call(settings,'GetCurrentKeyProfile')) or nil
+                end)
+                if ok and e.valid(candidate) then return candidate end
             end
         end
-        if mappingName and mappingName~='' then
-            result=collect(function(entry) return e.name(e.property(entry,'MappingName'))==mappingName end)
-        end
     end
-    if #result>0 then return result end
-    return nil,'standard control unavailable: '..actionId
+    local keys,why=Keys.resolve(setmetatable({profile=e.profile or profile},{__index=e}),actionId)
+    return keys,why
 end
 
 return M

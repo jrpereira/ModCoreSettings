@@ -9,6 +9,8 @@
 -- Default=none|<FKey>|<FKey>|<trigger>, Optional=1, DefaultControl=IA_*,
 -- mcConflictScope=<name> (rows on a page sharing it must not bind the same key and trigger).
 local M={}
+-- An unbound row retries its default keys once a second for at most this many seconds.
+local DEFAULT_TRIES=30
 local function trim(s) return (s or ''):match('^%s*(.-)%s*$') end
 local function split(s)
     local out={};for part in ((s or '')..'|'):gmatch('(.-)|') do out[#out+1]=trim(part) end
@@ -238,7 +240,11 @@ function M.build(row,setting,context)
         if instance.defaults==nil then
             local controls=context.modules.standardControls
             if setting.defaultControl and controls then
-                local ok,names=pcall(controls.resolve,setting.defaultControl)
+                local ok,names,why=pcall(controls.resolve,setting.defaultControl)
+                -- A loaded profile that does not map the action will not start to.
+                if ok and names==nil and tostring(why):find('^standard control unavailable') then
+                    instance.defaultTries=DEFAULT_TRIES
+                end
                 if ok and type(names)=='table' and #names>0 then
                     local shown={}
                     for _,name in ipairs(names) do shown[#shown+1]=displayName(name) end
@@ -317,7 +323,7 @@ function M.build(row,setting,context)
         end
         -- A key profile that loads after the row was drawn still shows the default
         -- keys: retry once a second, for at most 30 seconds of an open page.
-        if not bound and setting.defaultControl and self.defaults==nil and (self.defaultTries or 0)<30 then
+        if not bound and setting.defaultControl and self.defaults==nil and (self.defaultTries or 0)<DEFAULT_TRIES then
             local now=os.time()
             if now~=self.defaultTried then
                 self.defaultTried=now;self.defaultTries=(self.defaultTries or 0)+1

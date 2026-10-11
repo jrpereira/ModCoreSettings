@@ -33,10 +33,15 @@ Declare the listing fields at the top level of a mod folder's `mod.json`:
 a custom group or a canonical category. Mod rows show no icon. `mod.json` is read
 as JSON data only.
 
-Select up to three top-level sections' worth of categories, in any combination.
-Selecting both a parent and its child does not consume two slots. Parent
-membership is derived; no primary category is needed. Tags are separate and do
-not consume category slots. There are no aliases.
+Declare main categories (the ids before the brackets below), categories, or both.
+Each category counts as its main category, and selecting both a main category and
+one of its categories does not consume two slots. Only the first three distinct
+main categories, in declaration order, are kept; the rest are dropped and named in
+a WARN line (`MODULE_IDENTIFICATION_SKIPPED`). An Unclassified main category
+(`niche`, `other`) cannot be combined with any other: such a declaration is
+rejected and the next step classifies the mod. `ambiguous` is set by the classifier
+only; a mod cannot declare it. Parent membership is derived; no primary category is
+needed. Tags are separate and do not consume category slots. There are no aliases.
 
 | Section | Categories (children) |
 |---|---|
@@ -56,7 +61,7 @@ For each active mod folder (one UE4SS starts: it holds `enabled.txt`) with
 
 1. **Module:** categories declared in `mod.json`. Invalid ones are first passed
    through the taxonomy's optional `remap(C)` function, then dropped; the valid
-   rest is used.
+   rest is used, within the main-category rules above.
 2. **Data:** the normalized folder name is looked up in
    `data/folder_categories.lua`.
 3. **Auto:** the purpose heuristic scans the folder's Lua files. It is tentative
@@ -97,7 +102,7 @@ their `mod.json` like any other mod.
   counts as that category declared first and forms no collection.
 - **Within a group**, modules follow load order: UE4SS starts mod folders by name,
   so numbered folders (`0_` … `9_`) keep their sequence. Child pages stay with their parent. Modules with settings come first; the
-  rest fold into a final "… and X more with no settings" entry, which lists them
+  rest fold into a final "and X more with no settings" entry, which lists them
   when selected.
 - **Headers** show the group's icon in a box of its own, a small line naming the
   group (the top category, `Collection` or `Author`) and a title: the categories
@@ -106,7 +111,7 @@ their `mod.json` like any other mod.
 Module totals, including the list's "N mods" count, and collection thresholds count
 distinct folders, not placements, headings or settings pages. Mods without settings
 are named without DMM's "No settings available" notice, dimmed to 50% (75% on hover,
-70% when selected) without the full highlight; "… and N more" entries likewise sit at 50%
+70% when selected) without the full highlight; "and N more" entries likewise sit at 50%
 and 75% on hover. Group modules and Preferred Category valid with # modules are saved
 in `config.ini` under `[Modules]`; No disables collections, and disabling module
 grouping lists each page once.

@@ -1,7 +1,9 @@
 -- The latest error lines of UE4SS.log, which every mod writes to: the ModCore page's Errors
 -- tab shows them. Each mod runs in its own Lua state, so the shared log is the one place
 -- all their errors meet. Reading is incremental and never fails its caller.
-local M={version=1,limit=100,width=300,window=1048576}
+-- window: how much of a large log the first look reads, from its end; enough for
+-- the last limit error lines without stalling the menu tick that opens the tab.
+local M={version=1,limit=100,width=300,window=262144}
 
 -- UE4SS prints its engine offsets at startup (FArchiveState::ArIsCriticalError = 0x29);
 -- those name errors without being any.

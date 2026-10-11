@@ -11,13 +11,6 @@ local emptyPath=os.getenv('TMPDIR') and (os.getenv('TMPDIR'):gsub('/+$','')..'/m
 local emptyFile=assert(io.open(emptyPath,'wb'));assert(emptyFile:close())
 assert(Config.fs.read(emptyPath)=='','empty files must be valid configuration metadata')
 assert(os.remove(emptyPath))
-local migrated={{id='Primary',key='Primary',section='General',default=200},{id='Secondary',key='Secondary',section='General',default=200}}
-Config.defaultSources('[Setting.Primary]\nId=Primary\nDefaultFrom=Legacy\n[Setting.Secondary]\nId=Secondary\nDefaultFrom=Legacy',migrated)
-local migrationChoices={index=function(_,value) return type(value)=='number' and value>=50 and value<=1000 end}
-assert(Config.merge('[General]\nLegacy=375\n',migrated,migrationChoices)=='[General]\nLegacy=375\nPrimary=375\nSecondary=375\n')
-assert(Config.merge('[General]\nLegacy=375\nPrimary=250\n',migrated,migrationChoices)=='[General]\nLegacy=375\nPrimary=250\nSecondary=375\n')
-assert(Config.merge(nil,migrated,migrationChoices)=='[General]\nPrimary=200\nSecondary=200\n')
-fails(function() Config.merge('[General]\nLegacy=9999\n',migrated,migrationChoices) end,'outside destination')
 local settings={
     {key='Key',section='Bindings',default=82,file='config.ini'},
     {key='Mode',section='Bindings',default=1,file='config.ini'},

@@ -1,10 +1,11 @@
 package.path='Scripts/?.lua;Scripts/vendor/?.lua;'..package.path
 -- Dirty labels are the work that keeps a page's updates scheduled.
 local binds,refreshes,usable=0,0,1
+local changing
 local bound
 package.loaded.dirty_labels={new=function() return {open=function() end,close=function() end,
     bind=function(_,rows) binds=binds+1;bound=rows end,
-    refresh=function() refreshes=refreshes+1;return usable end} end}
+    refresh=function(self) refreshes=refreshes+1;self.changed=changing and 1 or 0;return usable end} end}
 local queue,now={},0
 local objects={}
 local lifecycle
@@ -77,7 +78,12 @@ lifecycle.open();untilTime(now)
 assert(binds==1 and #bound==2 and scans==0,'the selected ScrollBox binds without a tree scan')
 local firstFinds=finds
 untilTime(now+900)
-assert(binds==1 and scans==0 and finds-firstFinds==18,'50 ms steady updates resolve one host, never rescan')
+-- The binding tick counts as the first quiet one: 9 more 50 ms apart, then 250 ms.
+assert(binds==1 and scans==0 and finds-firstFinds==10,'quiet updates back off, resolve one host, never rescan')
+changing=true;local busyFinds=finds
+untilTime(now+1000)
+assert(finds-busyFinds>=16,'a changing page is observed every 50 ms again')
+changing=false
 print('PASS page selection binds the exact list once; steady updates resolve only the host')
 
 -- Same-stack DMM callbacks share one deferred discovery.

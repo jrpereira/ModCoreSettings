@@ -25,33 +25,36 @@ function M.signal(text,setting)
     if value~=text and clean(value) then return true,value end
     return false,text -- Unknown/unavailable/localized text is never guessed dirty.
 end
-local function readMarker(shell)
+local function parseMarker(text)
+    local fields={}
+    for line in text:sub(#PREFIX+1):gmatch('([^\n]*)\n') do fields[#fields+1]=line end
+    assert(#fields==10 or #fields==11,'invalid dirty-label state')
+    return {dirty=fields[1]=='1',base=decode(fields[2]),face=decode(fields[3]),
+        skew=assert(tonumber(fields[4])),italic=decode(fields[5]),italicSkew=assert(tonumber(fields[6])),suppressed=fields[7]=='1',pending=decode(fields[8]),lastValue=decode(fields[9]),rendered=fields[10],signal=decode(fields[11] or '')}
+end
+local function parseSignal(raw)
+    local flag,clean=raw:sub(#SIGNAL+1):match('^([01])\n(.*)$')
+    assert(flag,'invalid dirty-value signal')
+    return {dirty=flag=='1',clean=clean,raw=raw}
+end
+-- The shell's dirty-state marker and DMM's value signal, read in one pass over its
+-- children: marker widget, its state, then the signal (each nil when absent).
+local function readShell(shell)
+    local marker,state,signal
     for i=0,Discovery.childCount(shell)-1 do
         local child=Discovery.childAt(shell,i)
         if Discovery.isTextBlock(child) then
             local text=Discovery.textOf(child) or ''
-            if text:sub(1,#PREFIX)==PREFIX then
-                local fields={}
-                for line in text:sub(#PREFIX+1):gmatch('([^\n]*)\n') do fields[#fields+1]=line end
-                assert(#fields==10 or #fields==11,'invalid dirty-label state')
-                return child,{dirty=fields[1]=='1',base=decode(fields[2]),face=decode(fields[3]),
-                    skew=assert(tonumber(fields[4])),italic=decode(fields[5]),italicSkew=assert(tonumber(fields[6])),suppressed=fields[7]=='1',pending=decode(fields[8]),lastValue=decode(fields[9]),rendered=fields[10],signal=decode(fields[11] or '')}
-            end
+            if not marker and text:sub(1,#PREFIX)==PREFIX then marker,state=child,parseMarker(text)
+            elseif not signal and text:sub(1,#SIGNAL)==SIGNAL then signal=parseSignal(text) end
+            if marker and signal then break end
         end
     end
+    return marker,state,signal
 end
-local function readSignal(shell)
-    for i=0,Discovery.childCount(shell)-1 do
-        local child=Discovery.childAt(shell,i)
-        if Discovery.isTextBlock(child) then
-            local raw=Discovery.textOf(child) or ''
-            if raw:sub(1,#SIGNAL)==SIGNAL then
-                local flag,clean=raw:sub(#SIGNAL+1):match('^([01])\n(.*)$')
-                assert(flag,'invalid dirty-value signal')
-                return {dirty=flag=='1',clean=clean,raw=raw}
-            end
-        end
-    end
+local function readMarker(shell)
+    local marker,state=readShell(shell)
+    return marker,state
 end
 -- ModCoreSettings' presentation places the star right after the label text, in
 -- the box both share. A row without one shows only the italic label.
@@ -163,8 +166,7 @@ function M.new(log)
                     local record={value=routes[valueId],label=routes[Discovery.address(row.labelWidget)],
                         shell=routes[Discovery.address(shell)],setting=row.dmmSetting}
                     if record.value and record.label and record.shell then
-                        local marker,state=readMarker(shell)
-                        local signal=readSignal(shell)
+                        local marker,state,signal=readShell(shell)
                         local dirty,clean
                         if signal then dirty,clean=signal.dirty,signal.clean
                         else dirty,clean=M.signal(Discovery.textOf(row.valueWidget) or '',row.dmmSetting) end
@@ -199,21 +201,22 @@ function M.new(log)
     end
     -- DMM encodes dirty state in the value text. Observe only the rows already
     -- bound on the active settings page; never hook the process-wide SetText path.
+    -- Returns how many rows were observed; self.changed is how many of them changed.
     function controller:refresh(host)
+        self.changed=0
         if not self.bound or not self.allowed or self.busy then return 0 end
         local ok,count=protected(function()
             if not self.allowed() or (self.live and not self.live()) then return 0 end
             local resolve=Discovery.routeResolver(host,self.allowed)
             if not resolve then return 0 end
-            local refreshed=0
+            local refreshed,changed=0,0
             for _,record in pairs(self.records) do
-                if not self.allowed() then return refreshed end
+                if not self.allowed() then self.changed=changed;return refreshed end
                 local widget=resolve(record.value)
                 local shell=resolve(record.shell)
                 if widget and shell then
-                    local marker,state=readMarker(shell)
+                    local marker,state,signal=readShell(shell)
                     if marker and state then
-                        local signal=readSignal(shell)
                         local raw=Discovery.textOf(widget) or ''
                         local dirty,clean
                         if signal then dirty,clean=signal.dirty,signal.clean
@@ -227,11 +230,13 @@ function M.new(log)
                             state.pending='';state.lastValue=clean;state.signal=signal and signal.raw or ''
                             setText(marker,serialized(state));setText(widget,clean)
                             renderRecord(resolve,record)
+                            changed=changed+1
                         end
                         refreshed=refreshed+1
                     end
                 end
             end
+            self.changed=changed
             return refreshed
         end)
         return ok and count or 0

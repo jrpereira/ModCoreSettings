@@ -19,8 +19,11 @@ edits and Apply; your mod applies the saved values to gameplay.
   declared slot while retaining ownership of storage and Apply.
 - **React to saved changes:** receive numeric Apply notifications after a
   successful save, without watching or polling configuration files.
-- **Preserve configuration:** initialize missing numeric defaults and migrate
-  declared legacy values while keeping existing choices and unrelated content.
+- **Preserve configuration:** add missing numeric defaults while keeping existing
+  choices and unrelated content.
+- **Browse your mods:** the Modules page lists every installed mod, sorted by
+  category, by when it was added, alphabetically or in load order, with collections
+  and an Errors tab that gathers error lines from `UE4SS.log`.
 
 ## Choose the right module
 
@@ -37,13 +40,15 @@ DMM's numeric INI writer directly.
 ## Requirements and installation
 
 Use Dawnwalker, UE4SS with Lua 5.4, and DMM 1.0.7.1 (the declared minimum).
-Install and enable MCS under `Mods/1_ModCore_Settings`; disable the old
-`AdaptiveModMenu` installation. MCS itself does not require UE4SSLuaEventBridge.
+Install and enable MCS under `Mods/1_ModCore_Settings`. MCS itself does not
+require UE4SSLuaEventBridge.
 
 MCS renames DMM's `Scripts/main.lua` to `main.dmm.lua` and installs a launcher
 as `main.lua`. The launcher loads MCS inside DMM's Lua state, then runs DMM's
 original entry point. If DMM already started, restart when
-`DMM_RESTART_REQUIRED` is reported. Restart after metadata changes too.
+`DMM_RESTART_REQUIRED` is reported. Restart after metadata changes too. Reloading
+UE4SS mods without restarting the game leaves MCS's menu integration off until the
+next restart.
 
 ## Behavior and limits
 
@@ -54,6 +59,25 @@ original entry point. If DMM already started, restart when
 - Key capture excludes modifier chords, Escape, wheel directions and gamepads.
 - MCS depends on DMM's widget layout; offline tests do not prove live UI compatibility.
 
+## The Modules page
+
+Open **Mod Settings** to see the Modules page. Its **Sort by** button (DMM's Filter
+Mods, Backspace) cycles through four ways to list your mods, and the ModCore
+Settings page sets the rest:
+
+- **Categories:** mods are grouped under Gameplay, Content, Presentation, Auxiliary
+  and Unclassified, from each mod's `mod.json` or MCS's own classification. Mods
+  that share a collection, named in their `mod.json`, are listed together once
+  enough of them are installed (Collections valid with # modules: No, 2 or 3).
+  Modules appear in a single category lists a mod under one top category only.
+- **Recently Added:** newest first, in sections from the last 24 hours to earlier.
+- **Alphabetical** and **Load Order** (numbered) list one mod per line.
+- **Modules per row** sets 1, 2 or 3 mods per row in Categories and Recently Added.
+
+Mods without settings fold into a final "and N more" entry in each group. The
+**Errors** tab shows the latest error lines from `UE4SS.log`; **Developer Tools**
+lists tool pages.
+
 ## Logging
 
 Logs appear in `UE4SS.log`. The default level is WARN. For more detail, put
@@ -63,6 +87,6 @@ Logs appear in `UE4SS.log`. The default level is WARN. For more detail, put
 
 - [Nexus description](https://github.com/jrpereira/ModCoreSettings/blob/main/docs/NEXUS.bb): condensed, paste-ready module description in BBCode.
 - [Developer guide](DEVELOPERS.md): first setting, Apply and keybinds.
-- [Integration reference](REFERENCE.md): metadata, pages, slots and migrations.
+- [Integration reference](REFERENCE.md): metadata, pages, slots and the Modules page.
 - [Build guide](BUILD.md): offline tests and in-game checks.
 - [Changelog](CHANGELOG.md): version history.

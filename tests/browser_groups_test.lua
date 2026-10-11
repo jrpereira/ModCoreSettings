@@ -46,8 +46,8 @@ end
 assert(foldOf(providers,'Quiet')=='list:alpha' and foldOf(providers,'Detected')=='various'
     and not foldOf(providers,'Declared'),'mods without settings fold')
 local more=byId['ModCore.browser.group.list:alpha.more']
-assert(more.mcBrowserMore=='list:alpha' and more.name=='… and 1 more with no settings' and not more.noSettings
-    and more.mcBrowserLine=='row','the folded entry closes its group')
+assert(more.mcBrowserMore=='list:alpha' and more.name=='and 1 more with no settings' and not more.noSettings
+    and more.mcBrowserLine=='cell','the folded entry closes its group, filling a grid place like a mod')
 assert(byId['ModCore.browser.group.various'].name=='Various Authors' and providers.mcModuleCount==8)
 Groups.arrange(providers)
 expect(providers,listed,'arranging again is stable')
@@ -82,7 +82,8 @@ print('PASS mods group by collection or author, with no ModCore special case')
 local manifests={['Mods/Grouped/mod.json']='{"id":"G","name":"Grouped Mod","author":"Ann","version":"2.0",'
         ..'"preferred":"ModCore","icon":"⟴","dependencies":[{"id":"ModCoreSettings","name":"MCS","version":"9"},'
         ..'{"id":"Other"}]}',
-    ['Mods/Quiet/mod.json']='{"id":"Q","settings": false}'}
+    ['Mods/Quiet/mod.json']='{"id":"Q","settings": false}',
+    ['Mods/Escaped/mod.json']='{"dependencies":[{"id":"X"}],"name":"The \\"Quoted\\" Mod \\u2014 Two"}'}
 local function openManifest(path)
     local content=manifests[path]
     return content and {read=function() return content end,close=function() end} or nil
@@ -93,6 +94,8 @@ assert(grouped.preferred=='ModCore' and grouped.settings==nil and grouped.name==
     and grouped.icon=='⟴' and grouped.requires.ModCoreSettings and grouped.requires.Other
     and folderManifest('Quiet').settings==false and folderManifest('Quiet').preferred==nil
     and next(folderManifest('Missing'))==nil and not pcall(folderManifest,'../x'))
+assert(folderManifest('Escaped').name=='The "Quoted" Mod \u{2014} Two' and folderManifest('Escaped').requires.X,
+    'mod.json is decoded as JSON: escapes and key order do not matter')
 local folders={
     {id='detected:grouped',name='Grouped',detectedKind='ue4ss',noSettings=true,author='Unknown'},
     {id='detected:quiet',name='Quiet',detectedKind='ue4ss',noSettings=true,author='Unknown'},
@@ -455,7 +458,7 @@ Contributions.validate('ModCoreSettings',{pages={{id='ModCoreSettings',name='Mod
     attach='1_ModCore_Settings',configDirectory='/x',menu=mcsMenu}}})
 local base=require('menu_data').manifest(mcsMenu)
 assert(base:find('[Category.Listing]\nVisibleWhen=MCS_Page\nVisibleValues=0\n\n',1,true)
-    and base:find('Id=GroupModules\nLabel=Sort by\nGroup=Listing',1,true),'the Modules tab lists its settings under Listing')
+    and base:find('Id=SortBy\nLabel=Sort by\nGroup=Listing',1,true),'the Modules tab lists its settings under Listing')
 local hostPage={{id='ModCoreSettings',name='Settings',path='/x/mod_settings.ini',mcManifest=base},
     {id='ModCoreControls',name='Controls',path='/m/2_Controls/mod_settings.ini'},
     {id='Tool',name='Sounds Explorer',mcBrowserGroup='tool'}}
@@ -466,6 +469,6 @@ for _,provider in ipairs(hostPage) do if provider.id=='ModCoreSettings' then pag
 local items={};for _,item in ipairs(page.choices) do items[item.id]=item end
 assert(items.MCS_Page and #items.MCS_Page.values==3 and items.MCS_Page.labels[2]=='Errors'
     and items.MCS_Index_Errors.mcText=='errors' and items.MCS_Index_1.mcLinkPage
-    and items.GroupModules.file=='config.ini' and items.GroupModules.section=='Modules',
+    and items.SortBy.file=='config.ini' and items.SortBy.section=='Modules',
     'the tabs parse through DMM beside the page\'s own settings')
 print('PASS the index tabs parse through DMM')

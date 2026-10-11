@@ -2,6 +2,12 @@
 
 ## v1.0.2
 
+- A key row's `DefaultControl` keys come from `Scripts/vendor/standard_keys.lua`, which
+  mods vendor to bind the same keys. Like ModCore Controls, it prefers the game's own
+  action over a same-named one elsewhere and shows nothing when that is ambiguous, and it
+  reads profile entries naming the action and its mapping name together.
+- Field-type editors such as the key editor are read on each menu frame only while
+  their row is shown.
 - Contributed pages can describe their settings as `menu` data (groups, fields with
   choices or a range, visibility and label rules, storage) instead of a DMM
   manifest; ModCoreSettings builds the page. Descriptor contract 4, client
@@ -13,7 +19,7 @@
   `group='module'`. `mod.json` `icon` is shown for detected mods too.
 - `mcLabel=<text>` names a category heading in place of its category name.
 - The mod browser has no ModCore special case. ModCore's modules group through
-  their `mod.json` (`browser.preferred: "ModCore"`) like any other mod.
+  their `mod.json` (`"preferred": "ModCore"`) like any other mod.
   Top categories come first, then collections. Within a group, mods walk by
   category then load order, and mods without settings fold into a final
   "… and X more with no settings" entry.
@@ -32,6 +38,27 @@
   them. Inside every group, mods follow load order (Recently added: newest
   first), those with settings first. Recently added lists mods newest first by when each was installed or last
   updated, as MCS saw its folder's top level (`cache/folder_info.json`, which also lists each folder's top-level files).
+- Modules per row (1, 2 or 3; default 2) sets how many mods each group shows per row
+  in the Categories and Recently Added views. Mod names are left-aligned in every layout.
+  Grid cells are 7 px shorter, and a group's "and N more with no settings" entry
+  (no leading ellipsis) takes a grid place like a mod.
+- Sort by is saved as `[Modules] SortBy`; `GroupModules` is no longer read.
+- Declared categories follow taxonomy v3: the first three main categories in
+  declaration order are kept and the rest are named in a warning; `niche` or `other`
+  beside another category rejects the declaration; `ambiguous` is the classifier's
+  alone. Top category icons come from the taxonomy data.
+- Mod folders are listed whatever their names hold; only `.bak` copies are skipped.
+- The browser reads each mod's `mod.json` as JSON, once per session.
+- Missing config keys are still added with their defaults; the unused migration
+  rules (`DefaultFrom`, `DefaultFromMap`, `ValueMap`, `DefaultRule`) are removed.
+- Lighter on an open menu: dirty labels are checked every 250 ms once a page is
+  quiet (50 ms while it changes), a page's default-key lookups share one scan per
+  second and stop when the game has no mapping, the player check is kept for a
+  second, Apply and Sort by keep at most one previous browser page, and controller
+  input no longer polls tab hover. The Errors tab first reads the last 256 KiB of
+  `UE4SS.log` instead of 1 MiB.
+- The cache folder is created without starting a shell when it already exists.
+- A Sort by button that fails to move puts its label back and is reported once.
 - With UE4SSLuaFileBridge installed (optional), Recently added uses each mod's real
   install date and MCS's cache files are written atomically. Without it, nothing changes.
 - After any page's changes are applied, the mod browser is rebuilt when you return to

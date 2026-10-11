@@ -14,7 +14,15 @@ assert(R.tokens==nil and R.match==nil,'runtime registry does not compute fingerp
 assert(table.concat(Tax:usable({'quests','retired'}),',')=='quests','invalid categories are dropped')
 assert(Tax:usable({'retired'})==nil and Tax:usable({})==nil and Tax:usable('quests')==nil,
     'nothing valid is a failed step')
-assert(table.concat(Tax:usable({'other','skills'}),',')=='skills','other gives way to substantive categories')
+assert(Tax:usable({'other','skills'})==nil and Tax:usable({'niche','combat'})==nil,
+    'an unclassified category beside another rejects the selection')
+-- Taxonomy v3: the first 3 main categories in declaration order are kept, the rest named.
+local notes={}
+local kept=Tax:usable({'combat','sounds','weapons','research','movement'},{report=function(m) notes[#notes+1]=m end})
+assert(table.concat(kept,',')=='combat,movement,weapons,sounds' and #notes==1 and notes[1]:find('research',1,true),
+    'Actions, Media and Items are kept; research is dropped and reported')
+assert(Tax:usable({'ambiguous'},{author=true})==nil and Tax:usable({'ambiguous'})[1]=='ambiguous',
+    'only the classifier declares ambiguous')
 local Taxonomy=require('mcs_taxonomy')
 local remapped=Taxonomy.new({version=1,remap=function(C)
     for i,id in ipairs(C) do if id=='old' then C[i]='new' end end
@@ -85,5 +93,22 @@ assert(writes==2 and index.modules.Undeclared.source=='module','mod.json changes
 folderData.revision=2;folderData.folders.unknown={'quests'}
 index=R.boot('/mods/MCS','/mods',enumerate,options)
 assert(index.modules.Unknown.source=='data','nothing is cached: a folder_categories addition applies at once')
+
+-- A folder is listed whatever words its name holds; only .bak copies are skipped.
+local function folder(...) return {__files={{__name='enabled.txt'},{__name='mod.json'}},...} end
+local named={}
+for _,found in ipairs(R.folders({__absolute_path='/mods',SaveBackupManager=folder(),ArchiveOfLore=folder(),
+    AuditTrail=folder(),['Old.bak']=folder()},'/mods')) do named[#named+1]=found.name end
+assert(table.concat(named,',')=='ArchiveOfLore,AuditTrail,SaveBackupManager','mod folder names are not filtered by word')
+
+-- An existing cache folder is found by its probe, without a shell; a missing one is made.
+local temp=(os.getenv('TMPDIR') or '/tmp')..'/mcs_mkdir_'..tostring(os.time())..'_'..math.random(1e6)
+local execute=os.execute
+local shells=0
+os.execute=function(...) shells=shells+1;return execute(...) end
+R.mkdir(temp);R.mkdir(temp)
+os.execute=execute
+assert(shells==1 and io.open(temp..'/.mcs-probe','rb')==nil,'one shell for a missing folder, none once it exists')
+os.remove(temp)
 
 print('PASS mod.json, folder_categories and heuristic steps, remap and invalid categories, uncached rebuild')

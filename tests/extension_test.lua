@@ -77,13 +77,13 @@ local events={on=function(_,name,callback) callbacks[name]=callback end}
 local settingsApi={}
 extension.install({version=1,choices=choices,controls=controls,pages=pages,events=events,settingsApi=settingsApi})
 local order={'mcs_manifest','navigation','mapped_presets','menu_contributions','presentation','browser_groups','module_categories','mcs_taxonomy','mcs_module_json',
- 'init_config','dmm_lifecycle','menu_pages','page_links','menu_slots','page_hooks','field_types','keybind_editor','standard_controls',
+ 'init_config','dmm_lifecycle','menu_pages','page_links','menu_slots','page_hooks','field_types','keybind_editor','standard_keys','standard_controls',
  'error_log','sort_button','menu_data','index_refresh'}
 assert(#loaded==#order)
 for n,name in ipairs(order) do assert(loaded[n]:match(name..'%.lua$'),'load '..n) end
 -- Copied files load from Scripts/vendor; the extension's own modules from Scripts.
 for n,name in ipairs(order) do
-    assert((loaded[n]:find('/Scripts/vendor/',1,true)~=nil)==(name=='menu_contributions'),'folder of '..name)
+    assert((loaded[n]:find('/Scripts/vendor/',1,true)~=nil)==(name=='menu_contributions' or name=='standard_keys'),'folder of '..name)
 end
 -- Field types install innermost, before any other wrapper.
 assert(fieldTypes.order==0 and fieldTypes.registered.keybind and fieldTypes.modules.choices==choices
@@ -98,13 +98,21 @@ assert(installs[3].args[4].textSources.errors.path=='C:/UE4SS.log' and installs[
 local playerExists=installs[3].args[4].playerExists
 local function object(fields) fields.IsValid=function() return true end;return fields end
 local pawn
-FindFirstOf=function(class) assert(class=='PlayerController');return object({K2_GetPawn=function() return pawn end}) end
+-- The answer is kept for a second: each step moves the clock past it.
+local clock,seconds=os.clock,0
+os.clock=function() return seconds end
+local finds=0
+FindFirstOf=function(class) assert(class=='PlayerController');finds=finds+1
+    return object({K2_GetPawn=function() return pawn end}) end
 assert(playerExists()==false,'a controller without a pawn is no player')
 pawn=object({})
+assert(playerExists()==false and finds==1,'within the second the kept answer is used')
+seconds=2
 assert(playerExists()==true,'a controller with a pawn is a player')
 FindFirstOf=function() return nil end
+seconds=4
 assert(playerExists()==false,'no controller is no player')
-FindFirstOf=nil
+FindFirstOf=nil;os.clock=clock
 assert(installs[4].args[1]==pages and type(installs[4].args[3])=='function'
     and installs[4].args[4]=='versions in C:/Mods/' and installs[4].args[5]=='manifests in C:/Mods/','browser groups get the parser and the Mods folder')
 assert(type(installs[4].args[6])=='function','browser groups read category and grouping preferences')

@@ -1171,7 +1171,10 @@ function M.install(choices,controls,pages,options)
                                 area.shown=true
                             end
                         end
-                        for _,tab in ipairs(row.mcTabs or {}) do tab.hovered=tab.widget:IsHovered()==true end
+                        -- A controller has no pointer to hover with; its presses come through focus.
+                        for _,tab in ipairs(row.mcTabs or {}) do
+                            tab.hovered=not controller and tab.widget:IsHovered()==true
+                        end
                         for _,tab in ipairs(row.mcTabs or {}) do
                             local clicked
                             clicked,tab.pressed,tab.pointer=released(tab.widget,tab.pressed,tab.pointer,tab.hovered)
@@ -1327,7 +1330,7 @@ function M.install(choices,controls,pages,options)
                         M.style(label,browserLevel,api)
                         -- A group title is a size below its mods; its icon and rule mark it.
                         if provider and provider.mcBrowserKind then api.Theme.font(label,api.theme,13) end
-                        -- The "… and N more" entry is a size smaller than the mods it folds.
+                        -- The "and N more" entry is a size smaller than the mods it folds.
                         if provider and provider.mcBrowserMore then api.Theme.font(label,api.theme,12) end
                         if row.wrapper then
                             row.wrapper:SetWidthOverride(584-2*indent)
@@ -1345,12 +1348,19 @@ function M.install(choices,controls,pages,options)
             end
             -- Each browser group (mcBrowserLine) is a header row, its heading followed by a
             -- horizontal line, then its pages: a 'cell' page in a grid (three columns, or its
-            -- heading's mcBrowserColumns) on a faint
-            -- background, its name wrapping to two lines before it is cut off; a 'row' page on
-            -- a line of its own. A thin vertical line marks each line on its left. Hidden
+            -- heading's mcBrowserColumns) on a faint background, its name left-aligned and
+            -- wrapping to two lines before it is cut off; a 'row' page on a line of its own,
+            -- also left-aligned. A thin vertical line marks each line on its left. Hidden
             -- pages keep their place in the list.
             local ICON,ICON_HEIGHT,BAR,CELL,GAP,CELLS,WIDTH=40,54,20,180,8,3,584
             local KIND_INDENT,CELL_LINE_HEIGHT=10,0.8
+            -- A grid cell's height and its name's padding above and below: the name sits
+            -- 5 px higher than centred in 44 and the cell ends 2 px under it. The "and N
+            -- more" cell takes a grid place like a mod; starting a row, its smaller text sits
+            -- MORE_RAISE higher.
+            local CELL_HEIGHT,CELL_TOP,CELL_BOTTOM,MORE_RAISE=37,0,3,4
+            -- Space between one row of grid cells and the next; GAP stays between columns.
+            local CELL_ROW_GAP=4
             -- Group header, tuned live: its highlight box (the title row) starts BOX_TOP
             -- down and is BOX_HEIGHT tall; the kind line sits KIND_TOP down, drawn after
             -- the box so its glow does not cover it. KIND_LINE is the kind text's height.
@@ -1401,18 +1411,24 @@ function M.install(choices,controls,pages,options)
                     local label=row.widget:GetContent()
                     row.mcFrame:RemoveFromParent()
                     if providers[row.providerIndex].mcBrowserLine=='cell' then
-                        if not grid or grid.count==columns then grid={box=line(44),count=0} end
+                        if not grid or grid.count==columns then grid={box=line(CELL_HEIGHT),count=0} end
                         grid.count=grid.count+1
-                        label:SetJustification(1);label:SetAutoWrapText(true)
-                        -- A wrapped name sits tight and centred. Line height has no setter;
-                        -- the cell is re-placed below, which rebuilds the text from it.
+                        label:SetJustification(0);label:SetAutoWrapText(true)
+                        -- A wrapped name sits tight, left-aligned and centred vertically. Line
+                        -- height has no setter; the cell is re-placed below, which rebuilds
+                        -- the text from it.
                         label.LineHeightPercentage=CELL_LINE_HEIGHT
-                        label.Slot:SetPadding({Left=8,Top=2,Right=8,Bottom=2})
-                        label.Slot:SetVerticalAlignment(2)
-                        place(grid.box,row.mcFrame,{Left=0,Top=0,Right=GAP,Bottom=GAP})
+                        -- Raised only when it starts a row; beside mods it lines up with them.
+                        local raise=providers[row.providerIndex].mcBrowserMore and grid.count==1
+                            and 2*MORE_RAISE or 0
+                        label.Slot:SetPadding({Left=8,Top=CELL_TOP,Right=8,Bottom=CELL_BOTTOM+raise})
+                        label.Slot:SetHorizontalAlignment(0);label.Slot:SetVerticalAlignment(2)
+                        place(grid.box,row.mcFrame,{Left=0,Top=0,Right=GAP,Bottom=CELL_ROW_GAP})
                     else
                         grid=nil
+                        label:SetJustification(0)
                         label.Slot:SetPadding({Left=6,Top=4,Right=12,Bottom=4})
+                        label.Slot:SetHorizontalAlignment(0)
                         place(line(40),row.mcFrame,{Left=ROW_SHIFT,Top=0,Right=GAP-ROW_SHIFT,Bottom=GAP})
                     end
                 end
@@ -1470,8 +1486,8 @@ function M.install(choices,controls,pages,options)
                     for _,row in ipairs(group.members) do
                         moved[row.wrapper:GetFullName()]=true
                         local cell=providers[row.providerIndex].mcBrowserLine=='cell'
-                        row.mcFrame=frame(row,cell and cellWidth(columnsOf(group.head)) or WIDTH-BAR-GAP,cell and 44 or 40)
-                        -- The "… and N more" entry has no background of its own.
+                        row.mcFrame=frame(row,cell and cellWidth(columnsOf(group.head)) or WIDTH-BAR-GAP,cell and CELL_HEIGHT or 40)
+                        -- The "and N more" entry has no background of its own.
                         if providers[row.providerIndex].mcBrowserMore then
                             row.mcFrame:SetBrushColor({R=0,G=0,B=0,A=0})
                         end

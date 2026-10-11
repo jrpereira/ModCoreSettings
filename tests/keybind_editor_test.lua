@@ -162,6 +162,16 @@ do
     available=true
     assert(idleEditor:tick()==nil and find(idleLine.children[3],function(w) return w.text=='Q' and w.visibility==3 end),
         'an idle row shows the default once the key profile loads')
+    -- A loaded profile that does not map the action is not asked again.
+    local asked=0
+    local unmapped={resolve=function() asked=asked+1;return nil,'standard control unavailable: IA_X' end}
+    local unmappedEditor=Keybind.build(toggleRow(),setting,{api=api,tree={},modules={standardControls=unmapped}})
+    unmappedEditor:set('none','none')
+    local before=asked
+    local time=os.time
+    for second=1,5 do os.time=function() return time()+second end;unmappedEditor:tick() end
+    os.time=time
+    assert(before>=1 and asked==before,'an unmapped default control is not retried')
 end
 print('PASS a failed default lookup is retried')
 

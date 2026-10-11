@@ -10,12 +10,13 @@ function M.preferences(text)
             local key,value=line:match('^%s*([%w_]+)%s*=%s*(%d+)%s*[;#]?.*$')
             value=tonumber(value)
             -- 1 by category, 0 alphabetically, 2 by when each mod was added, 3 in load order.
-            if key=='GroupModules' and (value==0 or value==1 or value==2 or value==3) then
+            if key=='SortBy' and (value==0 or value==1 or value==2 or value==3) then
                 result.arrangement=value;result.groupModules=value==1
                 result.recentlyAdded=value==2 or nil;result.loadOrder=value==3 or nil
             end
             if key=='SingleCategory' and (value==0 or value==1) then result.singleCategory=value==1 or nil end
             if key=='PreferredCategoryMinimum' and (value==0 or value==2 or value==3) then result.preferredMinimum=value end
+            if key=='ModulesPerRow' and (value==1 or value==2 or value==3) then result.columns=value end
         end
     end
     return result

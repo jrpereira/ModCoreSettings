@@ -49,7 +49,9 @@ function M.scan(folder,files,read)
     end)
     for _,entry in ipairs(ordered) do
         local path=type(entry)=='table' and entry.relative_path or entry
-        if Registry.safePath(path) and not (type(entry)=='table' and entry.is_symlink) then
+        -- A mod's own backup copies of its code are not evidence of what it does.
+        if Registry.safePath(path) and not path:lower():find('backup',1,true)
+            and not (type(entry)=='table' and entry.is_symlink) then
             local name=path:match('([^/\\]+)$')
             if path:lower():match('%.lua$') and not ignored[name] and not path:find('/vendor/',1,true) and not path:match('^Scripts/mcs_') then
                 local text=assert(read(folder..'/'..path),'unreadable source: '..path)
@@ -79,14 +81,5 @@ function M.scan(folder,files,read)
     local purpose=classified and #categories==1 and categories[1] or nil
     return {category=purpose or 'other',categories=classified and categories or {'other'},purpose=purpose,reason=reason,
         classified=classified,source_files=sourceCount,evidence=hits,version=2}
-end
--- Independent live experiment. Do not modify the category register or grouping.
-function M.live(snapshot,mods,read)
-    local results={}
-    for _,folder in ipairs(Registry.folders(snapshot,mods)) do
-        local ok,result=pcall(M.scan,folder.path,folder.files,read)
-        results[folder.name]=ok and result or {category='other',classified=false,reason='read_error',error=tostring(result)}
-    end
-    return results
 end
 return M

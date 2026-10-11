@@ -3,7 +3,9 @@ local Lifecycle=require('dmm_lifecycle')
 local DirtyLabels=require('dirty_labels')
 local RowError=require('row_error')
 local M={}
-local UPDATE_MS=50
+-- Dirty labels are observed every UPDATE_MS while rows change. After QUIET_TICKS ticks
+-- without a change the page is observed every QUIET_MS instead, until the next change.
+local UPDATE_MS,QUIET_MS,QUIET_TICKS=50,250,10
 
 function M.install(log)
     log=log or function() end
@@ -15,6 +17,7 @@ function M.install(log)
     local active=nil
     local pending={}
     local eventTicket=nil
+    local quiet=0
     -- An entry is fully functional or shows only its label and an error; never partly working.
     local function fail(row,message)
         local ok,err=pcall(RowError.mark,row,message)
@@ -59,7 +62,7 @@ function M.install(log)
             scope:invalidate();return
         end
         if not active then
-            active=true
+            active=true;quiet=0
             -- One event-driven discovery, after DMM finishes its synchronous row build.
             local snapshots={}
             if selections and #selections>0 then
@@ -121,7 +124,8 @@ function M.install(log)
             end
         end
         if dirty:refresh(host)==0 then return end
-        if allowed() then schedule(path,epoch,UPDATE_MS) end
+        quiet=(dirty.changed or 0)>0 and 0 or quiet+1
+        if allowed() then schedule(path,epoch,quiet>=QUIET_TICKS and QUIET_MS or UPDATE_MS) end
     end
     local function abandon(path,epoch,event,err)
         pending[epoch]=nil

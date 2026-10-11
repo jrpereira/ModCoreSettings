@@ -84,6 +84,14 @@ assert(ui.model.pending[1]=='b' and refreshes==before+1 and set[#set]=='b/a','a 
 row.next='zzz'
 ui:tick()
 assert(ui.model.pending[1]=='b','DMM model validation still applies')
+-- A row hidden by its page's navigation is not read on each frame.
+row.visible=false
+row.next='a'
+ui:tick()
+assert(ui.model.pending[1]=='b','a hidden row is not ticked')
+row.visible=true
+ui:tick()
+assert(ui.model.pending[1]=='a','it is ticked again once shown')
 print('PASS refresh sets each editor and tick hands finished edits to the model')
 
 -- A failing editor is reported; the page keeps working.

@@ -5,7 +5,8 @@
 --
 -- DMM keeps the page it was given for the whole menu, so it gets a stand-in that forwards
 -- to the current build. A rebuilt page's switcher takes the old one's place; the old one
--- stays parented, collapsed, so no widget a closure may still hold is collected.
+-- stays parented, collapsed, until the next rebuild, so no widget input queued for it this
+-- tick is collected. Older pages are released.
 local M={version=1}
 
 local COLLAPSED,FILL=1,0
@@ -46,6 +47,10 @@ function M.install(pages,report)
             fresh.switcher:RemoveFromParent()
             place(state.holder,fresh.switcher,'rebuilt mod browser')
             old.switcher:SetVisibility(COLLAPSED)
+            -- Only the page just replaced can still be reached, by input queued this tick;
+            -- any older one is released, so repeated rebuilds keep at most two pages.
+            if state.parked then state.parked:RemoveFromParent() end
+            state.parked=old.switcher
             fresh.root=state.root
             -- Input queued for the old rows is dropped, and DMM re-selects a row.
             fresh.revision=math.max(fresh.revision or 0,(old.revision or 0)+1)

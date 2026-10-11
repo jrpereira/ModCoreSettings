@@ -21,12 +21,17 @@ local report=(function()
 end)()
 
 -- Whether a player is in the world: a player controller possessing a pawn. The main menu
--- has none.
+-- has none. DMM asks on every visibility check of a gated page; FindFirstOf searches the
+-- object array, so the answer is kept for a second, far shorter than any menu visit.
+local PLAYER_CHECK_SECONDS=1
+local playerChecked,playerFound
 local function playerExists()
+    local now=os.clock()
+    if playerChecked and now-playerChecked<PLAYER_CHECK_SECONDS then return playerFound end
     local controller=FindFirstOf('PlayerController')
-    if not controller or not controller:IsValid() then return false end
-    local pawn=controller:K2_GetPawn()
-    return pawn~=nil and pawn:IsValid()
+    local pawn=controller and controller:IsValid() and controller:K2_GetPawn()
+    playerChecked,playerFound=now,pawn~=nil and pawn~=false and pawn:IsValid()==true
+    return playerFound
 end
 
 local extension
@@ -58,6 +63,8 @@ extension={
         local moduleCategories=module('module_categories')
         local taxonomyModule=module('mcs_taxonomy')
         local indexJson=module('mcs_module_json')
+        -- The browser decodes each mod.json with the same reader as the boot index.
+        package.loaded.mcs_module_json=indexJson
         local taxonomy=taxonomyModule.loadLua(directory..'../data/module_categories.lua')
         local config=module('init_config')
         local lifecycle=module('dmm_lifecycle')
@@ -75,7 +82,12 @@ extension={
         local keybind=module('keybind_editor')
         fieldTypes:register('keybind',keybind)
         fieldTypes:install({choices=dmm.choices,controls=dmm.controls,settingsApi=dmm.settingsApi,
-            standardControls=module('standard_controls')})
+            standardControls=(function()
+                -- The shared key rule, vendored like menu_contributions; DMM's require
+                -- resolves in DMM's folder, so standard_controls finds it here.
+                package.loaded.standard_keys=module('vendor/standard_keys')
+                return module('standard_controls')
+            end)()})
         navigation.install(dmm.choices)
         mapped.install(dmm.choices,dmm.controls)
         -- UE4SS.log sits in the ue4ss folder, above Mods/<this mod>/Scripts/.

@@ -362,13 +362,14 @@ assert(#titleLine.children==2 and titleLine.children[1]==lineRows[2].wrapper and
     and titleLine.children[2].HeightOverride==2 and titleLine.children[2]:GetContent()
     and titleLine.children[2].Slot.VerticalAlignment==2 and titleLine.children[2].Slot.Size.SizeRule==1,
     'the title keeps its own width and its rule is centred on it, filling the rest')
-assert(#grid.children==4 and grid.children[1].HeightOverride==44 and grid.children[1].WidthOverride==20
+assert(#grid.children==4 and grid.children[1].HeightOverride==37 and grid.children[1].WidthOverride==20
     and grid.children[1]:GetContent(),'a grid row starts with its vertical line')
 for n,index in ipairs({3,5,6}) do
     local frame=grid.children[n+1]
     assert(frame:GetContent()==lineRows[index].wrapper and frame.BrushColor and frame.BrushColor.A<0.2
-        and lineRows[index].wrapper.WidthOverride==180 and lineRows[index].wrapper.HeightOverride==44
-        and frame.Slot.Padding.Right==8,'pages fill three columns in order, each on a faint background')
+        and lineRows[index].wrapper.WidthOverride==180 and lineRows[index].wrapper.HeightOverride==37
+        and frame.Slot.Padding.Right==8 and frame.Slot.Padding.Bottom==4,
+        'pages fill three columns in order, each on a faint background, rows 4 px apart')
     local label=lineRows[index].widget:GetContent()
     assert(label.AutoWrapText==true,'a grid name wraps to a second line before it is cut off')
 end
@@ -396,11 +397,11 @@ assert(lineRows[3].widget:GetContent().text=='T  Templates','a short browser lab
 local cellLabel=lineRows[3].widget:GetContent()
 assert(cellLabel.LineHeightPercentage==0.8 and cellLabel.Slot.VerticalAlignment==2,
     'a wrapped cell name sits tight and centred')
--- The "… and N more" entry has no background and a smaller font than its mods.
+-- The "and N more" entry has no background and a smaller font than its mods.
 local moreProviders={
     {name='Group',choices=items,mcBrowserLine='head',mcBrowserIcon='▶',mcBrowserKind='Gameplay'},
     {name='Mod',choices=items,mcBrowserLine='row',mcBrowserLevel=4,mcBrowserIndent=20},
-    {name='… and 1 more with no settings',choices=items,mcBrowserLine='row',mcBrowserMore='g',
+    {name='and 1 more with no settings',choices=items,mcBrowserLine='row',mcBrowserMore='g',
         mcBrowserLevel=4,mcBrowserIndent=20},
 }
 local morePage=pages.build(widget(),moreProviders,nil,api)
@@ -410,6 +411,24 @@ assert(moreRow.widget:GetContent().Font.Size==12 and modRow.widget:GetContent().
     'the folded entry is two sizes smaller')
 assert(modRow.mcFrame.Slot.Padding.Left==2 and modRow.mcFrame.Slot.Padding.Right==6
     and modRow.widget:GetContent().Slot.Padding.Left==6,'a mod row box sits 2 right of its line, its text 6 in')
+-- In a grid the folded entry takes the next place beside the mods.
+local gridMore=pages.build(widget(),{
+    {name='Group',choices=items,mcBrowserLine='head'},
+    {name='Mod',choices=items,mcBrowserLine='cell'},
+    {name='and 1 more with no settings',choices=items,mcBrowserLine='cell',mcBrowserMore='g'},
+},nil,api).allRows
+local modCell,moreCell=gridMore[2],gridMore[3]
+assert(modCell.mcFrame.parent and modCell.mcFrame.parent==moreCell.mcFrame.parent,'the folded entry fills a column like a mod')
+assert(modCell.widget:GetContent().Slot.Padding.Top==0 and modCell.widget:GetContent().Slot.Padding.Bottom==3
+    and moreCell.widget:GetContent().Slot.Padding.Bottom==3,'cells sit 5 px higher, 2 px shorter; beside a mod the entry lines up')
+-- Starting a row of its own, the entry sits 4 px higher.
+local alone=pages.build(widget(),{
+    {name='Group',choices=items,mcBrowserLine='head',mcBrowserColumns=2},
+    {name='A',choices=items,mcBrowserLine='cell'},{name='B',choices=items,mcBrowserLine='cell'},
+    {name='and 1 more with no settings',choices=items,mcBrowserLine='cell',mcBrowserMore='g'},
+},nil,api).allRows
+assert(alone[4].widget:GetContent().Slot.Padding.Bottom==11 and alone[4].mcFrame.parent~=alone[2].mcFrame.parent,
+    'in the first column the entry is raised')
 -- A 'row' page takes a whole line of its own after the grid; each group has its own header.
 local mixedProviders={{name='Bob',choices=items,mcBrowserLine='head'},
     {name='Declared',choices=items,mcBrowserLine='cell'},

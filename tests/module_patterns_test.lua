@@ -17,7 +17,12 @@ assert(result.category=='consumables' and result.classified and #result.evidence
 result=P.scan('/renamed',{'mod.dll'},function() error('binary should not be read') end)
 assert(result.reason=='no_source' and not result.classified)
 local snapshot={__absolute_path='/mods',Renamed={__files={{__name='enabled.txt'}},Scripts={__files={{__name='main.lua'}}}}}
-local live=P.live(snapshot,'/mods',function() return 'EquipItem()' end)
+-- Every active folder scanned, as the offline comparison does.
+local Registry=require('mcs_mod_registry')
+local live={}
+for _,folder in ipairs(Registry.folders(snapshot,'/mods')) do
+    live[folder.name]=P.scan(folder.path,folder.files,function() return 'EquipItem()' end)
+end
 local offline=P.scan('/mods/Renamed',{'Scripts/main.lua'},function() return 'EquipItem()' end)
 assert(live.Renamed.category==offline.category and live.Renamed.purpose==offline.purpose
     and live.Renamed.evidence[1].rule==offline.evidence[1].rule,'snapshot and offline scanners use identical rules')
