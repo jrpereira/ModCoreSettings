@@ -1,7 +1,25 @@
 # Changelog
 
-## Unreleased
+## v1.2.0
 
+- The browser's title-line links are declared by the mods themselves: a `mod.json`
+  `title_link` gives the link text (ModCore Settings and ModCore Controls declare theirs),
+  where the browser used to name those two pages itself.
+- One crash-safe file reader and replacer, `safe_file.lua`, shared with the other ModCore
+  modules, serves the configuration initializer, the module registry, the module browser
+  data, the Sort by button and published page descriptors. A crash mid-write leaves the
+  previous file in place; a `.old` copy of each replaced file is kept beside it.
+- INI text is read and edited through one shared module, `mc_ini.lua`, also used by ModCore
+  Templates: manifests, the configuration initializer, the Sort by button and the module
+  browser preferences. Edits splice the original text, so every other byte stays as it was.
+- The release version lives in a `VERSION` file at the mod root, like the other ModCore
+  modules, instead of in `Scripts/main.lua`.
+- The repository tools and their shared tests are owned here and listed as vendored copies
+  in the other ModCore repositories, so a drifted copy is reported.
+- The hidden-widget text formats MCS's two Lua states exchange are named in one file,
+  `mcs_protocols.lua`.
+- The player check and the text-area poll measure wall-clock time (`os.time`) instead of CPU
+  time.
 - Clicking the outer 40% of a picker's value, either side, steps like the arrow on that side;
   the middle 20% selects the row as before. The choice indicator under the value spans 75% of
   its width, its pips sharing it evenly.

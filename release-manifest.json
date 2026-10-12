@@ -1,9 +1,10 @@
 {
   "module": "1_ModCore_Settings",
-  "version_file": "Scripts/main.lua",
-  "version_pattern": "local VERSION\\s*=\\s*[\\\"\\x27]([^\\\"\\x27]+)",
+  "version_file": "VERSION",
+  "version_pattern": "^\\s*([^\\s]+)",
   "files": {
     "mod.json": "mod.json",
+    "VERSION": "VERSION",
     "enabled.txt": "enabled.txt",
     "data/module_categories.lua": "data/module_categories.lua",
     "data/folder_categories.lua": "data/folder_categories.lua",
@@ -26,7 +27,10 @@
     "Scripts/mcs_page.lua": "Scripts/mcs_page.lua",
     "Scripts/mcs_folder_info.lua": "Scripts/mcs_folder_info.lua",
     "Scripts/mcs_files.lua": "Scripts/mcs_files.lua",
+    "Scripts/mcs_protocols.lua": "Scripts/mcs_protocols.lua",
+    "Scripts/vendor/mc_ini.lua": "Scripts/vendor/mc_ini.lua",
     "Scripts/vendor/mc_log.lua": "Scripts/vendor/mc_log.lua",
+    "Scripts/vendor/safe_file.lua": "Scripts/vendor/safe_file.lua",
     "Scripts/log_events.lua": "Scripts/log_events.lua",
     "Scripts/dmm_lifecycle.lua": "Scripts/dmm_lifecycle.lua",
     "Scripts/vendor/menu_contributions.lua": "Scripts/vendor/menu_contributions.lua",

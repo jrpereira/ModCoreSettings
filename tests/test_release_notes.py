@@ -1,6 +1,8 @@
+# Vendored from ModCoreSettings (owner). Do not edit copies; change the source and re-vendor.
 """Ensure release notes cannot accidentally include another version's history."""
 import importlib.util
 from pathlib import Path
+import re
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -33,11 +35,11 @@ class ReleaseNotesTests(unittest.TestCase):
     def test_historical_prerelease_and_crlf(self):
         self.assertEqual(extract_notes('## v0.3.4-rc.3\r\n\r\nHistorical.\r\n', 'v0.3.4-rc.3'), 'Historical.\n')
 
-    def test_repository_sections_are_extractable(self):
-        text = (ROOT / 'docs/CHANGELOG.md').read_text(encoding='utf-8')
-        for tag in ['v0.3.0', 'v0.2.25', 'v0.1.31-rc.2', 'v0.1.24', 'v0.1.22']:
-            with self.subTest(tag=tag):
-                self.assertTrue(extract_notes(text, tag).strip())
+    def test_current_version_has_release_notes(self):
+        # The release workflow publishes the section named after VERSION.
+        version = re.match(r'\s*(\S+)', (ROOT / 'VERSION').read_text(encoding='utf-8'))[1]
+        text = release_notes.default_changelog(ROOT).read_text(encoding='utf-8')
+        self.assertTrue(extract_notes(text, 'v' + version).strip())
 
 
 if __name__ == '__main__':

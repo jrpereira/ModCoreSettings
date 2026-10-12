@@ -1,4 +1,4 @@
-package.path='Scripts/?.lua;'..package.path
+package.path='Scripts/?.lua;Scripts/vendor/?.lua;'..package.path
 local R=require('mcs_mod_registry')
 local J=require('mcs_module_json')
 local Tax=R.taxonomy

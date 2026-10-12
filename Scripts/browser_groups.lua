@@ -22,9 +22,9 @@ local GROUP_COLUMNS = 2
 local RECENT = {{'recent:day', 'Last 24 hours', 86400}, {'recent:week', 'Last 7 days', 7 * 86400},
     {'recent:month', 'Last 30 days', 30 * 86400}, {'recent:earlier', 'Earlier'}}
 local RECENT_ICON = '○'
--- Links to ModCore's own pages, top right on the title's line: text and page id. Their
--- text size, the gap between them, and the space after the last.
-local LINKS = {{'settings', 'ModCoreSettings'}, {'controls', 'ModCoreControls'}}
+-- Links to pages that ask for one, top right on the title's line: a mod's mod.json names
+-- the link's text in title_link. Their text size, the gap between them, and the space
+-- after the last.
 local LINK_SIZE, LINK_GAP, LINK_END = 12, 7, 5
 -- Load order numbers: their box width, text size, opacity and the gap before the name.
 -- Box and gap fill the row's left margin (20 in a plain list), so names start where they
@@ -55,6 +55,7 @@ end
 -- tools lists the developer tool pages (group='tool'), which open only from here.
 function M.manifest(openable, versions, tools)
     versions = versions or {}
+    tools = tools or {}
     local lines = {}
     local function block(section, fields)
         lines[#lines + 1] = '[' .. section .. ']'
@@ -62,36 +63,31 @@ function M.manifest(openable, versions, tools)
         lines[#lines + 1] = ''
     end
     local function label(text) return (tostring(text):gsub('[|;%c%[%]]', ' ')) end
-    local count = 0
-    local function section(group, list, tab, empty)
-        block('Category.' .. group, {{'VisibleWhen', 'MCS_Page'}, {'VisibleValues', tab}, {'mcHeading', 0}})
-        if #list == 0 then
-            block('Setting.MCS_Index_Empty_' .. tab, {{'Id', 'MCS_Index_Empty_' .. tab}, {'Label', group},
-                {'Group', group}, {'Type', 'picker'}, {'Default', 0}, {'PresetValues', '0|1'},
-                {'PresetLabels', empty .. '|' .. empty}, {'mcReadOnly', 1}, {'mcType', 'tab'}})
-            return
-        end
-        for _, entry in ipairs(list) do
-            count = count + 1
-            local id = 'MCS_Index_' .. count
-            local version = versions[entry.id]
-            local name = version and entry.name .. ' v' .. version or entry.name
-            local fields = {{'Id', id}, {'Label', label(name)}, {'Group', group},
-                {'Type', 'picker'}, {'Default', 0}, {'PresetValues', '0|1'}}
-            if openable[entry.id] then
-                for _, field in ipairs({{'PresetLabels', 'Open|Open'}, {'mcNavigation', 1}, {'mcType', 'tab'},
-                    {'mcLinkPage', type(openable[entry.id]) == 'string' and openable[entry.id] or entry.id}}) do
-                    fields[#fields + 1] = field
-                end
-            else
-                for _, field in ipairs({{'PresetLabels', 'No settings|No settings'}, {'mcReadOnly', 1}, {'mcType', 'tab'}}) do
-                    fields[#fields + 1] = field
-                end
-            end
-            block('Setting.' .. id, fields)
-        end
+    local group, tab = 'Developer Tools', TABS.tools
+    block('Category.' .. group, {{'VisibleWhen', 'MCS_Page'}, {'VisibleValues', tab}, {'mcHeading', 0}})
+    if #tools == 0 then
+        block('Setting.MCS_Index_Empty_' .. tab, {{'Id', 'MCS_Index_Empty_' .. tab}, {'Label', group},
+            {'Group', group}, {'Type', 'picker'}, {'Default', 0}, {'PresetValues', '0|1'},
+            {'PresetLabels', 'None installed|None installed'}, {'mcReadOnly', 1}, {'mcType', 'tab'}})
     end
-    section('Developer Tools', tools or {}, TABS.tools, 'None installed')
+    for count, entry in ipairs(tools) do
+        local id = 'MCS_Index_' .. count
+        local version = versions[entry.id]
+        local name = version and entry.name .. ' v' .. version or entry.name
+        local fields = {{'Id', id}, {'Label', label(name)}, {'Group', group},
+            {'Type', 'picker'}, {'Default', 0}, {'PresetValues', '0|1'}}
+        if openable[entry.id] then
+            for _, field in ipairs({{'PresetLabels', 'Open|Open'}, {'mcNavigation', 1}, {'mcType', 'tab'},
+                {'mcLinkPage', type(openable[entry.id]) == 'string' and openable[entry.id] or entry.id}}) do
+                fields[#fields + 1] = field
+            end
+        else
+            for _, field in ipairs({{'PresetLabels', 'No settings|No settings'}, {'mcReadOnly', 1}, {'mcType', 'tab'}}) do
+                fields[#fields + 1] = field
+            end
+        end
+        block('Setting.' .. id, fields)
+    end
     return table.concat(lines, '\n')
 end
 
@@ -124,7 +120,8 @@ end
 
 -- A reader for a mod folder's mod.json fields under mods (the Mods folder, ending in a
 -- separator): preferred, its collection; settings, false when the mod has none to show;
--- name, author, version, icon and description; and requires, the set of dependency ids.
+-- name, author, version, icon, description and titleLink (the text of the mod's link on
+-- the browser's title line); and requires, the set of dependency ids.
 -- mod.json is decoded as JSON, as the boot index decodes it; an unreadable one gives no
 -- fields. interface names how UE4SS starts the folder, from its files: 'Native'
 -- (dlls/main.dll), 'Lua' (Scripts/main.lua) or 'Native and Lua'; nil with neither. Each folder is read once: mod.json changes need a restart, like the index.
@@ -157,7 +154,7 @@ function M.folderManifest(mods, open)
         end
         local fields = {preferred=text('preferred', 120), name=text('name', 200), author=text('author', 120),
             version=text('version', 64), icon=text('icon', 16), description=text('description', 4096),
-            requires={}}
+            titleLink=text('title_link', 16), requires={}}
         if manifest.settings == false then fields.settings = false end
         for _, dependency in ipairs(type(manifest.dependencies) == 'table' and manifest.dependencies or {}) do
             if type(dependency) == 'table' and type(dependency.id) == 'string' then fields.requires[dependency.id] = true end
@@ -251,6 +248,7 @@ function M.arrange(providers, parse, report, options)
                 local preferred = trimmed(fields.preferred)
                 provider.mcListGroup = preferred ~= 'author' and preferred or false
                 provider.mcFolderAuthor = trimmed(fields.author)
+                provider.mcTitleLink = fields.titleLink
                 -- A mod that declares it has no settings is not listed as incompatible.
                 provider.mcNoSettingsDeclared = fields.settings == false and provider.noSettings or nil
                 -- A mod found on disk, or a contributed page standing in for one, takes its
@@ -880,25 +878,27 @@ function M.install(pages, report, parse, folderVersion, folderManifest, grouping
             local links = {}
             if type(api) == 'table' and api.button and api.construct and page.filterButton then
                 local ok, err = pcall(function()
-                    local available = {}
+                    -- This page's own link comes first, then the others in list order.
+                    local wanted = {}
                     for _, provider in ipairs(providers) do
-                        if not provider.noSettings then available[provider.id] = true end
+                        if provider.mcTitleLink and not provider.noSettings then
+                            table.insert(wanted, provider.id == HOST and 1 or #wanted + 1,
+                                {provider.mcTitleLink, provider.id})
+                        end
                     end
                     local line = api.construct('/Script/UMG.HorizontalBox', tree)
-                    for _, link in ipairs(LINKS) do
-                        if available[link[2]] then
-                            local widget, label = api.button(tree, link[1])
-                            widget.IsFocusable = false
-                            if api.Theme and api.theme then
-                                api.Theme.font(label, api.theme, LINK_SIZE)
-                                api.Theme.textColor(label, 'muted')
-                            end
-                            label.Slot:SetPadding({Left=6, Top=2, Right=6, Bottom=2})
-                            local slot = assert(line:AddChild(widget), 'browser link')
-                            slot:SetPadding({Left=#links > 0 and LINK_GAP or 0, Top=0, Right=0, Bottom=0})
-                            slot:SetVerticalAlignment(2)
-                            links[#links + 1] = {widget=widget, id=link[2], pressed=false, pointer=false}
+                    for _, link in ipairs(wanted) do
+                        local widget, label = api.button(tree, link[1])
+                        widget.IsFocusable = false
+                        if api.Theme and api.theme then
+                            api.Theme.font(label, api.theme, LINK_SIZE)
+                            api.Theme.textColor(label, 'muted')
                         end
+                        label.Slot:SetPadding({Left=6, Top=2, Right=6, Bottom=2})
+                        local slot = assert(line:AddChild(widget), 'browser link')
+                        slot:SetPadding({Left=#links > 0 and LINK_GAP or 0, Top=0, Right=0, Bottom=0})
+                        slot:SetVerticalAlignment(2)
+                        links[#links + 1] = {widget=widget, id=link[2], pressed=false, pointer=false}
                     end
                     if #links == 0 then return end
                     local header = assert(page.filterButton:GetParent(), 'browser title box')

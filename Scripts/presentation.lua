@@ -1,7 +1,8 @@
 -- Runs in DMM's Lua state. Uses its existing menu tick and model, never a timer.
 local M={version=1}
 local Manifest=require('mcs_manifest')
-local dirtySignalPrefix='MC_VALUE_DIRTY_1\n'
+local Protocols=require('mcs_protocols')
+local dirtySignalPrefix=Protocols.valueDirty
 local function trim(s) return (s or ''):match('^%s*(.-)%s*$') end
 local function identityText(value)
     return tostring(value):gsub('%%','%%25'):gsub('\n','%%0A'):gsub('\r','%%0D')
@@ -9,7 +10,7 @@ end
 local function settingIdentity(index,provider,setting)
     local values,labels=setting.values or {},setting.labels or {}
     assert(#values==#labels and #values<=64,'invalid setting identity choices')
-    local fields={'MC_SETTING_6',tostring(index),identityText(provider.id),identityText(setting.id),
+    local fields={Protocols.setting:sub(1,-2),tostring(index),identityText(provider.id),identityText(setting.id),
         setting.kind or '',tostring(setting.minimum or ''),tostring(setting.maximum or ''),
         tostring(setting.step or ''),tostring(setting.decimals or ''),identityText(setting.prefix or ''),
         identityText(setting.suffix or ''),tostring(#values)}
@@ -19,6 +20,9 @@ local function settingIdentity(index,provider,setting)
     assert(#result<=16384,'setting identity exceeds 16 KiB')
     return result
 end
+-- DMM's settings page widths in its 1920-wide design: rows and the header strip are ROW_WIDTH
+-- wide; PAGE_WIDTH is the width of the page itself.
+local ROW_WIDTH,PAGE_WIDTH=572,584
 -- A mod-list group title's padding in its highlight box (set live against the game).
 local HEADER_TITLE_PADDING={Left=-2,Top=6,Right=12,Bottom=-1}
 local styles={
@@ -75,7 +79,8 @@ local sliderValueShrink,sliderShare,sliderMarkHeight,sliderMarkAbove,sliderBotto
 local sliderValueLift=2
 -- A picker's value column in DMM's row: 330 of label and a 32-pixel arrow before it, 190
 -- wide. A toggle's value takes the same column, so every value lines up.
-local pickerValueLeft,pickerValueWidth=330+32,190
+local pickerLabelWidth,pickerArrowWidth,pickerValueWidth=330,32,190
+local pickerValueLeft=pickerLabelWidth+pickerArrowWidth
 -- A one-line picker row's height (DMM's is 40), and with choice notes; row labels are drawn
 -- labelDrop pixels lower; a toggle-shell row's button starts toggleShift pixels left, so its
 -- selection background starts where headings do.
@@ -659,7 +664,7 @@ function M.install(choices,controls,pages,options)
                     assert(not panel.mcHeader,'only one level-one setting per provider')
                     local placeholder=new('SizeBox')
                     local path=assert(row.wrapper:GetFullName():match('^%S+ (.+)$'))
-                    local marker=api.caption(tree,'MC_HEADER_ROW\n'..path)
+                    local marker=api.caption(tree,Protocols.headerRow..path)
                     api.need(placeholder:SetContent(marker),'MCS header identity')
                     placeholder:SetVisibility(1)
                     local children={}
@@ -689,7 +694,7 @@ function M.install(choices,controls,pages,options)
                     local tabs=new('HorizontalBox')
                     row.mcTabs={};row.mcHeaderSeparators={}
                     local count=#setting.values
-                    local share=math.floor(math.min(110,(572-(count+1))/count))
+                    local share=math.floor(math.min(110,(ROW_WIDTH-(count+1))/count))
                     local total=count+1
                     local function separator()
                         local bar=new('Border');bar:SetBrushColor(headerSeparatorDim)
@@ -804,7 +809,7 @@ function M.install(choices,controls,pages,options)
                         referenceSlot:SetHorizontalAlignment(3);referenceSlot:SetVerticalAlignment(2)
                         referenceSlot:SetPadding({Left=0,Top=0,Right=pickerRightMargin,Bottom=0})
                     end
-                    row.widget:GetParent():SetWidthOverride(584-totalWidth-pickerRightMargin)
+                    row.widget:GetParent():SetWidthOverride(PAGE_WIDTH-totalWidth-pickerRightMargin)
                     if providerLink then
                         -- A link row's label wraps within its column and the row grows to
                         -- fit; one line keeps DMM's 40-pixel row. The button stays centred.
@@ -838,7 +843,7 @@ function M.install(choices,controls,pages,options)
                     else
                         slot:SetHorizontalAlignment(3)
                         slot:SetPadding({Left=0,Top=0,Right=pickerRightMargin,Bottom=0})
-                        row.widget:GetParent():SetWidthOverride(584-width-pickerRightMargin)
+                        row.widget:GetParent():SetWidthOverride(PAGE_WIDTH-width-pickerRightMargin)
                     end
                     row.mcTabs={{widget=button,label=label,value=setting.values[1],pressed=false,pointer=false,
                         cycle=true,box=box}}
@@ -851,7 +856,7 @@ function M.install(choices,controls,pages,options)
                     text:SetJustification(0);text:SetAutoWrapText(true)
                     local scroll=new('ScrollBox')
                     add(scroll,text)
-                    local box=new('SizeBox');box:SetWidthOverride(584-2*pickerRightMargin)
+                    local box=new('SizeBox');box:SetWidthOverride(PAGE_WIDTH-2*pickerRightMargin)
                     box:SetHeightOverride(textArea.height)
                     api.need(box:SetContent(scroll),'MCS text area')
                     local overlay=row.background:GetParent()
@@ -867,7 +872,7 @@ function M.install(choices,controls,pages,options)
                     -- least a line tall, so nothing is clipped off-centre, the columns stay
                     -- level and the texts line up whatever the codes' widths. Each pair is
                     -- centred in its column. Taller than textArea.height, the table scrolls.
-                    local width=584-2*pickerRightMargin
+                    local width=PAGE_WIDTH-2*pickerRightMargin
                     local ok,entries,columns=pcall(textTable,setting.mcTable.text,setting.mcTable.columns)
                     local content,height
                     if ok then
@@ -929,7 +934,7 @@ function M.install(choices,controls,pages,options)
                     local value=api.caption(tree,text)
                     api.Theme.font(value,api.theme,13)
                     value:SetJustification(0);value:SetAutoWrapText(true)
-                    local box=new('SizeBox');box:SetWidthOverride(584-wrapLabelWidth-pickerRightMargin)
+                    local box=new('SizeBox');box:SetWidthOverride(PAGE_WIDTH-wrapLabelWidth-pickerRightMargin)
                     api.need(box:SetContent(value),'MCS wrapped value')
                     local overlay=row.background:GetParent()
                     local slot=add(overlay,box);slot:SetHorizontalAlignment(3);slot:SetVerticalAlignment(2)
@@ -948,13 +953,13 @@ function M.install(choices,controls,pages,options)
                         local ok,width=pcall(function() return widget:GetParent().WidthOverride end)
                         return ok and tonumber(width) or fallback
                     end
-                    local left=boxWidth(row.widget,330)+boxWidth(row.parts[1].widget,32)
+                    local left=boxWidth(row.widget,pickerLabelWidth)+boxWidth(row.parts[1].widget,pickerArrowWidth)
                     local note=api.caption(tree,'')
                     api.Theme.font(note,api.theme,noteSize);note:SetFont(note.Font)
                     api.Theme.textColor(note,'muted')
                     note:SetJustification(1);note:SetTextOverflowPolicy(1)
                     local box=new('SizeBox')
-                    box:SetWidthOverride(boxWidth(row.parts[2].widget,190));box:SetHeightOverride(16)
+                    box:SetWidthOverride(boxWidth(row.parts[2].widget,pickerValueWidth));box:SetHeightOverride(16)
                     local noteSlot=api.need(box:SetContent(note),'MCS choice note')
                     noteSlot:SetHorizontalAlignment(2);noteSlot:SetVerticalAlignment(2)
                     local slot=add(row.background:GetParent(),box)
@@ -975,9 +980,9 @@ function M.install(choices,controls,pages,options)
                         local ok,width=pcall(function() return widget:GetParent().WidthOverride end)
                         return ok and tonumber(width) or fallback
                     end
-                    local value=boxWidth(row.parts[2].widget,190)
+                    local value=boxWidth(row.parts[2].widget,pickerValueWidth)
                     local width=math.floor(value*pipShare/2)*2
-                    local left=boxWidth(row.widget,330)+boxWidth(row.parts[1].widget,32)+(value-width)//2
+                    local left=boxWidth(row.widget,pickerLabelWidth)+boxWidth(row.parts[1].widget,pickerArrowWidth)+(value-width)//2
                     local count=#setting.values
                     local box=new('SizeBox');box:SetWidthOverride(width);box:SetHeightOverride(pipActiveHeight)
                     local pips,pipBoxes={},{}
@@ -1409,9 +1414,9 @@ function M.install(choices,controls,pages,options)
             if status then
                 local header=self.panels[self.active].mcHeader
                 local used=header and header.visible and header.mcHeaderTabsWidth or 0
-                local free=572-used-headerStatusGap
+                local free=ROW_WIDTH-used-headerStatusGap
                 local beside=used==0 or free>=headerStatusMinWidth
-                local width=(used==0 or not beside) and 572 or free
+                local width=(used==0 or not beside) and ROW_WIDTH or free
                 local top=beside and 0 or headerTabHeight
                 if status.width~=width or status.top~=top then
                     status.box:SetWidthOverride(width)
@@ -1556,7 +1561,7 @@ function M.install(choices,controls,pages,options)
                         if keyLane and row.mcKeyIndent~=indent and keyLane:GetChildrenCount()==2 then
                             local label=keyLeft()-indent-keyColumn.mode-keyColumn.gap
                             keyLane:GetChildAt(0):SetWidthOverride(label)
-                            keyLane:GetChildAt(1):SetWidthOverride(572-indent-label)
+                            keyLane:GetChildAt(1):SetWidthOverride(ROW_WIDTH-indent-label)
                             row.mcKeyIndent=indent
                         end
                         local wrapperSlot=row.wrapper.Slot
@@ -1678,8 +1683,8 @@ function M.install(choices,controls,pages,options)
                             end
                         end
                         local area=row.mcText
-                        if area and (not area.polled or os.clock()-area.polled>=textArea.poll) then
-                            area.polled=os.clock()
+                        if area and (not area.polled or os.time()-area.polled>=textArea.poll) then
+                            area.polled=os.time()
                             local lines,changed
                             if area.source then lines,changed=area.source.poll() end
                             if not area.shown or changed then
@@ -1790,7 +1795,7 @@ function M.install(choices,controls,pages,options)
             -- divider whether or not tabs are shown.
             local strip=api.construct('/Script/UMG.Overlay',tree)
             local stripBox=api.construct('/Script/UMG.SizeBox',tree)
-            stripBox:SetWidthOverride(572)
+            stripBox:SetWidthOverride(ROW_WIDTH)
             api.need(stripBox:SetContent(strip),'MCS header tabs strip')
             for index,child in ipairs(children) do
                 if child.widget:GetFullName()==statusName then
@@ -1807,7 +1812,7 @@ function M.install(choices,controls,pages,options)
             end
             assert(statusPadding,'MCS page status placement')
             local statusBox=api.construct('/Script/UMG.SizeBox',tree)
-            statusBox:SetWidthOverride(572)
+            statusBox:SetWidthOverride(ROW_WIDTH)
             api.need(statusBox:SetContent(pageStatus),'MCS page status box')
             local statusSlot=api.need(strip:AddChild(statusBox),'MCS page status slot')
             statusSlot:SetHorizontalAlignment(1);statusSlot:SetVerticalAlignment(1)
@@ -1826,7 +1831,7 @@ function M.install(choices,controls,pages,options)
             -- The index has no filter: its button is a plain title that takes no input.
             page.filterButton:SetVisibility(4)
             local header=assert(page.filterButton:GetParent(),'MCS mod-browser header')
-            header:SetWidthOverride(572);header:ClearHeightOverride()
+            header:SetWidthOverride(ROW_WIDTH);header:ClearHeightOverride()
             local list=assert(header:GetParent(),'MCS mod-browser page')
             local headerName=header:GetFullName()
             local children={}
@@ -1843,7 +1848,7 @@ function M.install(choices,controls,pages,options)
                 slot:SetPadding(child.padding)
                 if child.widget:GetFullName()==headerName then
                     local line=api.construct('/Script/UMG.SizeBox',tree)
-                    line:SetWidthOverride(572);line:SetHeightOverride(2)
+                    line:SetWidthOverride(ROW_WIDTH);line:SetHeightOverride(2)
                     api.need(line:SetContent(api.Theme.image(tree,api.theme,'horizontal',api)),'MCS mod-browser divider')
                     api.need(list:AddChild(line),'MCS mod-browser divider slot')
                     inserted=true
@@ -1865,7 +1870,7 @@ function M.install(choices,controls,pages,options)
                         -- The "and N more" entry is a size smaller than the mods it folds.
                         if provider and provider.mcBrowserMore then api.Theme.font(label,api.theme,12) end
                         if row.wrapper then
-                            row.wrapper:SetWidthOverride(584-2*indent)
+                            row.wrapper:SetWidthOverride(PAGE_WIDTH-2*indent)
                             local slot=row.wrapper.Slot
                             local padding=slot.Padding
                             slot:SetPadding({Left=indent,Top=padding.Top,
@@ -1884,7 +1889,7 @@ function M.install(choices,controls,pages,options)
             -- wrapping to two lines before it is cut off; a 'row' page on a line of its own,
             -- also left-aligned. A thin vertical line marks each line on its left. Hidden
             -- pages keep their place in the list.
-            local ICON,ICON_HEIGHT,BAR,CELL,GAP,CELLS,WIDTH=40,54,20,180,8,3,584
+            local ICON,ICON_HEIGHT,BAR,CELL,GAP,CELLS,WIDTH=40,54,20,180,8,3,PAGE_WIDTH
             local KIND_INDENT,CELL_LINE_HEIGHT=10,0.8
             -- A grid cell's height and its name's padding above and below. The "and N
             -- more" cell takes a grid place like a mod; starting a row, its smaller text sits
@@ -2158,7 +2163,7 @@ function M.install(choices,controls,pages,options)
             page.controls.mcHeaderHost=host
             page.controls.mcHeaderTitle=title
             page.controls.mcHeaderTabs=strip
-            page.controls.mcHeaderStatus={box=statusBox,slot=statusSlot,padding=statusPadding,width=572,top=0}
+            page.controls.mcHeaderStatus={box=statusBox,slot=statusSlot,padding=statusPadding,width=ROW_WIDTH,top=0}
             return page
         end
     end

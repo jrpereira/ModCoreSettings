@@ -3,7 +3,7 @@
 local Discovery=require('widget_discovery')
 local M={}
 
-local markerText='MC_ROW_ERROR_1\n'
+local markerText=require('mcs_protocols').rowError
 local function valid(o) return Discovery.valid(o) end
 local function need(o,label) assert(valid(o),label..' unavailable'); return o end
 

@@ -1,4 +1,4 @@
-package.path='Scripts/?.lua;'..package.path
+package.path='Scripts/?.lua;Scripts/vendor/?.lua;'..package.path
 local P=require('mcs_module_patterns')
 local function scan(text)
     return P.scan('/renamed',{'Scripts/main.lua','Scripts/dmm_api.lua','backup/copy.lua'},function(path)

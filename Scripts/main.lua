@@ -1,9 +1,15 @@
-local VERSION='1.1.0'
 local source=debug.getinfo(1,'S').source:gsub('^@','')
 -- Files shared with other modules, unchanged, keep their own module names. Searched first,
 -- so a copy left in Scripts by an earlier release is never loaded instead.
 local scripts=source:match('^(.*)[/\\][^/\\]+$')
 if scripts then package.path=scripts..'/vendor/?.lua;'..scripts..'/?.lua;'..package.path end
+-- The release version is the VERSION file at the mod root, as in every ModCore module.
+local VERSION=(function()
+    local file=io.open((scripts or '.')..'/../VERSION','rb')
+    local value=file and file:read('a'):match('^%s*(%d+%.%d+%.%d+[%w.-]*)%s*$')
+    if file then file:close() end
+    return value
+end)()
 local Bootstrap=require('dmm_bootstrap')
 -- The level comes from log_level.txt in the mod folder; WARN without it.
 local root=source:match('^(.*)[/\\]Scripts[/\\][^/\\]+$')
@@ -16,7 +22,7 @@ local function initialize()
     local ok,err=Binding.install(log)
     if not ok then log('DMM_BINDING_UNAVAILABLE',tostring(err));return false end
     initialized=true
-    logger.info(VERSION,' ready')
+    logger.info(VERSION or 'unversioned',' ready')
     return true
 end
 -- UE4SSLuaFileBridge, when installed: atomic writes, file dates and a record outside the

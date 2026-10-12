@@ -33,28 +33,7 @@ end
 
 -- config.ini text with [Modules] SortBy set to value; other lines are kept as they are.
 function M.config(text,value)
-    text=text or ''
-    local newline=text:find('\r\n',1,true) and '\r\n' or '\n'
-    local lines,section,inModules,done,last={}, '',false,false,nil
-    local body=text=='' and '' or text:gsub('\r\n','\n')..(text:sub(-1)=='\n' and '' or '\n')
-    for line in body:gmatch('([^\n]*)\n') do
-        local header=line:match('^%s*%[([^%]]+)%]%s*$')
-        if header then
-            if inModules and not done then table.insert(lines,last+1,'SortBy='..value);done=true end
-            section=header;inModules=header=='Modules'
-        elseif inModules and line:match('^%s*SortBy%s*=') then
-            line='SortBy='..value;done=true
-        end
-        lines[#lines+1]=line
-        if inModules and line:match('%S') then last=#lines end
-    end
-    if inModules and not done then table.insert(lines,last+1,'SortBy='..value);done=true end
-    if not done then
-        if #lines>0 and lines[#lines]~='' then lines[#lines+1]='' end
-        lines[#lines+1]='[Modules]';lines[#lines+1]='SortBy='..value
-    end
-    while #lines>0 and lines[#lines]=='' do lines[#lines]=nil end
-    return table.concat(lines,newline)..newline
+    return require('mc_ini').set(text or '','Modules','SortBy',value)
 end
 
 -- native: DMM's nativeactions module. read(path)/write(path,text) reach config.ini. Returns

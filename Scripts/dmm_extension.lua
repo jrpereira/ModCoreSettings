@@ -22,11 +22,13 @@ end)()
 
 -- Whether a player is in the world: a player controller possessing a pawn. The main menu
 -- has none. DMM asks on every visibility check of a gated page; FindFirstOf searches the
--- object array, so the answer is kept for a second, far shorter than any menu visit.
-local PLAYER_CHECK_SECONDS=1
+-- object array, so the answer is kept for a moment, far shorter than any menu visit. The
+-- clock is os.time, whole wall-clock seconds (os.clock is CPU time, which runs ahead of
+-- real time in a threaded game), so two seconds keep the answer between one and two.
+local PLAYER_CHECK_SECONDS=2
 local playerChecked,playerFound
 local function playerExists()
-    local now=os.clock()
+    local now=os.time()
     if playerChecked and now-playerChecked<PLAYER_CHECK_SECONDS then return playerFound end
     local controller=FindFirstOf('PlayerController')
     local pawn=controller and controller:IsValid() and controller:K2_GetPawn()
@@ -54,7 +56,13 @@ extension={
             'DMM extension modules unavailable')
         -- The manifest reader the modules below share; DMM's require resolves in DMM's
         -- folder, so it is placed in package.loaded under a name only this mod uses.
+        package.loaded.mc_ini=module('vendor/mc_ini')
         package.loaded.mcs_manifest=module('mcs_manifest')
+        -- The crash-safe file reader and replacer shared by the modules below.
+        local io_=module('vendor/safe_file')
+        package.loaded.safe_file=io_
+        -- The hidden-widget text formats MCS's two states share.
+        package.loaded.mcs_protocols=module('mcs_protocols')
         local navigation=module('navigation')
         local mapped=module('mapped_presets')
         local contributions=module('vendor/menu_contributions')
@@ -100,26 +108,9 @@ extension={
         local folderManifest=browserGroups.folderManifest(mods)
         -- DMM's mod-list filter button becomes Sort by, saved in this mod's config.ini.
         local sortButton=module('sort_button').install(require('nativeactions'),directory..'../config.ini',
-            function(path)
-                local file=io.open(path,'rb')
-                if not file then return nil end
-                local text=file:read('a');file:close()
-                return text
-            end,
-            function(path,text)
-                local temporary=path..'.tmp'
-                local file=assert(io.open(temporary,'wb'))
-                local written,why=file:write(text);local closed,closeWhy=file:close()
-                assert(written and closed,why or closeWhy)
-                if not os.rename(temporary,path) then
-                    os.remove(path);assert(os.rename(temporary,path),'cannot replace '..path)
-                end
-            end,report)
+            io_.read,io_.write,report)
         local function read(path)
-            local file=assert(io.open(path,'rb'))
-            local content=file:read('a')
-            file:close()
-            return assert(content,'unreadable '..path)
+            return assert(io_.read(path),'unreadable '..path)
         end
         browserGroups.install(dmm.pages,report,function(content) return dmm.choices.parse(content) end,
             browserGroups.folderVersion(mods),folderManifest,

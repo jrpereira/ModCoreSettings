@@ -8,7 +8,8 @@
     "frameworks"
   ],
   "description": "Add key-binding pickers, Tap/Hold selectors, presets, and conditional settings through declarative metadata, with Apply, Reset, and persistence support. Compatible with Dawnwalker Mod Menu.",
-  "version_source": "Scripts/main.lua",
+  "title_link": "settings",
+  "version_source": "VERSION",
   "dependencies": [
     {
       "id": "UE4SS",

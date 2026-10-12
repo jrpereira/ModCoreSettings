@@ -3,6 +3,7 @@
 -- only and never executed. Nothing is cached between boots; the index is rebuilt.
 local Text=require('mcs_text_normalize')
 local Json=require('mcs_module_json')
+local Io=require('safe_file')
 local source=assert(debug.getinfo(1,'S').source,'registry source unavailable'):gsub('^@','')
 local scripts=assert(source:match('^(.*)[/\\][^/\\]+$'),'registry directory unavailable')
 local Taxonomy=require('mcs_taxonomy').loadLua(scripts..'/../data/module_categories.lua')
@@ -46,28 +47,7 @@ local function safe(path)
 end
 M.safePath=safe
 
-function M.read(path)
-    local file,err,code=io.open(path,'rb')
-    if not file then if code==2 then return nil end;error(err or ('cannot read '..path)) end
-    local text,why=file:read(1048577)
-    local closed,closeWhy=file:close()
-    assert(closed,closeWhy);assert(text or not why,why)
-    text=text or '';assert(#text<=1048576,'file exceeds 1 MiB: '..path)
-    return text
-end
-
-function M.write(path,text)
-    local temporary=path..'.tmp'
-    local file=assert(io.open(temporary,'wb'))
-    local ok,err=file:write(text);local closed,why=file:close()
-    assert(ok and closed,err or why)
-    local renamed,renameError=os.rename(temporary,path)
-    if not renamed and package.config:sub(1,1)=='\\' then
-        assert(os.remove(path),renameError)
-        renamed,renameError=os.rename(temporary,path)
-    end
-    assert(renamed,renameError)
-end
+M.read,M.write=Io.read,Io.write
 
 function M.encode(index)
     return Json.encode(Taxonomy:index(index))..'\n'
@@ -215,24 +195,7 @@ function M.folders(snapshot,mods)
     return folders
 end
 
--- Creates a folder when it is missing. A probe file shows an existing one without starting
--- a shell, which on Windows is a cmd.exe process (and possibly a console window) per boot.
-local function mkdir(path)
-    local probe=path..'/.mcs-probe'
-    local file=io.open(probe,'wb')
-    if file then file:close();os.remove(probe);return end
-    local command
-    if package.config:sub(1,1)=='\\' then
-        assert(not path:find('["%%!\r\n]'),'unsupported cache directory path')
-        path=path:gsub('/', '\\')
-        command='if not exist "'..path..'" mkdir "'..path..'"'
-    else
-        command="mkdir -p -- '"..path:gsub("'", "'\\''").."'"
-    end
-    local ok=os.execute(command)
-    assert(ok==true or ok==0,'cannot create module cache: '..path)
-end
-M.mkdir=mkdir
+M.mkdir=Io.mkdir
 
 function M.boot(root,mods,iterator,options)
     options=options or {}
@@ -241,7 +204,7 @@ function M.boot(root,mods,iterator,options)
     local cache=root:gsub('[/\\]+$','')..'/cache'
     -- options.files (mcs_files, optional): the file bridge, for atomic writes and file dates.
     local files=options.files
-    ;(options.mkdir or files and files.mkdir or mkdir)(cache)
+    ;(options.mkdir or files and files.mkdir or Io.mkdir)(cache)
     local folders=M.folders(iterator(),mods)
     local read,write=options.read or M.read,options.write or files and files.write or M.write
     local index=M.update({path=cache..'/modules_register.json',folders=folders,read=read,write=write,

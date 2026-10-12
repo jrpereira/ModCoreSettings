@@ -1,4 +1,5 @@
 local M={}
+local Protocols=require('mcs_protocols')
 local function valid(o)
     if o==nil or o==false then return false end
     local ok,result=pcall(function() return o:IsValid() end); return ok and result==true
@@ -140,7 +141,7 @@ function M.rowsFromScroll(scroll)
         local child=childAt(scroll,i)
         local content=contentOf(child)
         if M.isTextBlock(content) then
-            local path=(textOf(content) or ''):match('^MC_HEADER_ROW\n(.+)$')
+            local path=(textOf(content) or ''):match('^'..Protocols.headerRow..'(.+)$')
             if path then
                 local promoted=StaticFindObject(path)
                 if valid(promoted) then child=promoted end
@@ -154,7 +155,7 @@ function M.rowsFromScroll(scroll)
                 if valid(marker) and isA(marker,'TextBlock') then
                     local text=textOf(marker) or ''
                     local function decode(value) return (value:gsub('%%(%x%x)',function(hex) return string.char(tonumber(hex,16)) end)) end
-                    if text:sub(1,13)=='MC_SETTING_6\n' then
+                    if text:sub(1,#Protocols.setting)==Protocols.setting then
                         local fields={}
                         for value in (text..'\n'):gmatch('(.-)\n') do fields[#fields+1]=value end
                         local count=tonumber(fields[12])

@@ -16,35 +16,29 @@ M.trim=trim
 -- setting sections) and id (Id, or DMM's fallback 'setting_<setting>').
 -- Lines before the first section, and comment lines (';' or '#'), are skipped.
 function M.sections(content)
+    local doc=require('mc_ini').parse(content)
     local lines={}
-    for line in (content..'\n'):gmatch('([^\n]*)\n') do lines[#lines+1]=line end
-    if lines[#lines]=='' then lines[#lines]=nil end
-    local list,current,settings={},nil,0
-    for n,line in ipairs(lines) do
-        local clean=trim(line)
-        local name=clean:match('^%[([^%]]+)%]$')
-        if name then
-            if current then current.last=n-1 end
-            current={name=name,first=n,fields={},duplicates={},malformed={}}
-            if name=='Setting' or name:match('^Setting%.') then
+    for n,line in ipairs(doc.lines) do lines[n]=line.text end
+    local malformed={}
+    for _,n in ipairs(doc.malformed) do malformed[n]=true end
+    local list,settings={},0
+    for _,parsed in ipairs(doc.sections) do
+        if parsed.header then
+            local section={name=parsed.name,first=parsed.header,last=parsed.last,fields={},duplicates={},malformed={}}
+            if section.name=='Setting' or section.name:match('^Setting%.') then
                 settings=settings+1
-                current.setting=settings
+                section.setting=settings
             end
-            list[#list+1]=current
-        elseif current and clean~='' and not clean:match('^[;#]') then
-            local key,value=line:match('^%s*([^=]+)=(.*)$')
-            if key then
-                key=trim(key)
-                if current.fields[key]~=nil then current.duplicates[key]=true end
-                current.fields[key]=trim(value)
-            else
-                current.malformed[#current.malformed+1]=n
+            for _,entry in ipairs(parsed.entries) do
+                if section.fields[entry.key]~=nil then section.duplicates[entry.key]=true end
+                section.fields[entry.key]=trim(entry.raw)
             end
+            for n=parsed.header+1,parsed.last do
+                if malformed[n] then section.malformed[#section.malformed+1]=n end
+            end
+            if section.setting then section.id=section.fields.Id or ('setting_'..section.setting) end
+            list[#list+1]=section
         end
-    end
-    if current then current.last=#lines end
-    for _,section in ipairs(list) do
-        if section.setting then section.id=section.fields.Id or ('setting_'..section.setting) end
     end
     return list,lines
 end

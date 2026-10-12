@@ -354,8 +354,10 @@ do
         end}
     local title=node('filterButton')
     local header=node('header');header:AddChild(title)
-    local items={{id='ModCoreControls',name='ModCore Controls',author='X',choices={{id='c'}}},
-        {id='Other',name='Other',author='Y',choices={{id='o'}}}}
+    local items={{id='ModCoreControls',name='ModCore Controls',author='X',choices={{id='c'}},mcFolder='ModCoreControls'},
+        {id='ModCoreSettings',name='ModCore Settings',author='X',choices={{id='s'}},mcFolder='ModCoreSettings'},
+        {id='Other',name='Other',author='Y',choices={{id='o'}},mcFolder='Other'}}
+    local titleLinks={ModCoreControls='controls',ModCoreSettings='settings'}
     -- The page DMM builds carries its title box before the wrapper runs.
     local base=browserPages(true)
     local baseBuild=base.build
@@ -364,13 +366,14 @@ do
         made.filterButton=title
         return made
     end
-    Groups.install(base)
+    Groups.install(base,nil,nil,nil,function(folder) return {titleLink=titleLinks[folder]} end)
     local pageWithTitle=base.build({},items,nil,linkApi)
     local overlay=header.children[1]
     assert(overlay and overlay.name=='/Script/UMG.Overlay' and overlay.children[1]==title,'the title stays, left')
     local line=overlay.children[2]
-    assert(line.Slot.horizontal==3 and #line.children==1 and line.children[1].text=='controls',
-        'one link per listed ModCore page, right of the title')
+    assert(line.Slot.horizontal==3 and #line.children==2 and line.children[1].text=='settings'
+        and line.children[2].text=='controls',
+        'one link per page that declares one, this page first, right of the title')
     local function released(widget,previous,pointer)
         local pressed=widget:IsPressed()
         return previous and not pressed,pressed,pointer

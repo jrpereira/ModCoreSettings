@@ -143,7 +143,7 @@ function M.install(log)
                 local function work()
                     pending[epoch]=nil
                     if not scope:matches(path,epoch) then return end
-                    if EngineTickAvailable==false then scope:invalidate('engine tick unavailable');return end
+                    if EngineTickAvailable==false then scope:invalidate();return end
                     local ok,err=pcall(tick,path,epoch,selections)
                     if not ok then abandon(path,epoch,'DISCOVERY_FAILED',err) end
                 end

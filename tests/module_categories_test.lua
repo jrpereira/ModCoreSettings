@@ -1,4 +1,4 @@
-package.path='Scripts/?.lua;'..package.path
+package.path='Scripts/?.lua;Scripts/vendor/?.lua;'..package.path
 local C=require('module_categories')
 local G=require('browser_groups')
 local J=require('mcs_module_json')

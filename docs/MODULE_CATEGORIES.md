@@ -33,6 +33,10 @@ Declare the listing fields at the top level of a mod folder's `mod.json`:
 a custom group or a canonical category. Mod rows show no icon. `mod.json` is read
 as JSON data only.
 
+A mod with settings can also put a link to its page on the browser's title line, top
+right, with `"title_link": "controls"` (up to 16 characters of link text). ModCore
+Settings' own link comes first.
+
 Declare main categories (the ids before the brackets below), categories, or both.
 Each category counts as its main category, and selecting both a main category and
 one of its categories does not consume two slots. Only the first three distinct

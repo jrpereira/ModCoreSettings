@@ -6,30 +6,8 @@ local M={}
 local LIMIT=1048576
 local function trim(s) return s:match('^%s*(.-)%s*$') end
 
-M.fs={}
-function M.fs.read(path)
-    local f,err,code=io.open(path,'rb')
-    if not f then
-        -- Do not mistake denied access or an I/O error for a missing file.
-        if code==2 then return nil end
-        error(err or ('cannot read '..path))
-    end
-    local text,why=f:read(LIMIT+1)
-    local closed,closeError=f:close()
-    assert(closed,closeError or 'close failed')
-    if not text then
-        assert(not why,why)
-        text=''
-    end
-    assert(#text<=LIMIT,'config exceeds 1 MiB')
-    return text
-end
-function M.fs.write(path,text)
-    local f,err=io.open(path,'wb'); assert(f,err)
-    local wrote,why=f:write(text)
-    local closed,closeError=f:close()
-    assert(wrote and closed,why or closeError or 'write failed')
-end
+local Io=require('safe_file')
+M.fs={read=Io.read,write=Io.put}
 function M.fs.rename(a,b) local ok,err=os.rename(a,b); assert(ok,err) end
 function M.fs.remove(path) local ok,err=os.remove(path); assert(ok,err) end
 
@@ -67,26 +45,20 @@ function M.merge(original,settings,choices)
     local text=original or ''
     assert(not text:find('[%z\1-\8\11\12\14-\31\127]'),'invalid config control character')
     assert(not text:match('^\239\187\191'),'DMM does not support a config BOM')
-    local entries,sections={}, {['']={finish=#text+1}}
-    local section,offset='',1
-    for full in (text..'\n'):gmatch('([^\n]*\n)') do
-        local line=full:gsub('\r?\n$','')
-        local clean=trim(line)
-        if clean~='' and not clean:match('^[;#]') then
-            local header=clean:match('^%[([^%]]+)%]$')
-            if header then
-                header=trim(header);validateName(header,'config section')
-                assert(not sections[header],'duplicate config section '..header)
-                sections[section].finish=offset
-                sections[header]={finish=#text+1};section=header
-            else
-                local key,value=line:match('^%s*([^=]+)=(.*)$')
-                assert(key,'malformed config line')
-                key=trim(key);validateName(key,'config key')
-                entries[#entries+1]={key=key,section=section,value=trim(value:match('^[^;#]*'))}
-            end
+    local doc=require('mc_ini').parse(text)
+    assert(#doc.malformed==0,'malformed config line')
+    local entries,sections={},{}
+    for _,parsed in ipairs(doc.sections) do
+        local section=trim(parsed.name)
+        if parsed.header then
+            validateName(section,'config section')
+            assert(not sections[section],'duplicate config section '..section)
         end
-        offset=offset+#full
+        sections[section]={finish=parsed.finish}
+        for _,entry in ipairs(parsed.entries) do
+            validateName(entry.key,'config key')
+            entries[#entries+1]={key=entry.key,section=section,value=entry.value}
+        end
     end
     local defaults,existing,targets,addresses={},{},{},{}
     for _,entry in ipairs(entries) do

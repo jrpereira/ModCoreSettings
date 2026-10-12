@@ -41,12 +41,17 @@ end}
 ModRef={}
 captured={}
 print=function(value) captured[#captured+1]=value end
+-- The version comes from the VERSION file at the mod root, read here from the checkout.
+local open=io.open
+io.open=function(path,...) return open(path=='C:/Mods/1_ModCore_Settings/Scripts/../VERSION' and 'VERSION' or path,...) end
 dofile('Scripts/main.lua')
+io.open=open
 print=originalPrint
 debug.getinfo=getinfo
+local version=open('VERSION'):read('l')
 local page=published and published.pages[1]
 assert(made=='C:/Mods/1_ModCore_Settings/cache' and #published.pages==1 and page.id=='ModCoreSettings'
     and page.attach=='1_ModCore_Settings' and page.configDirectory=='C:/Mods/1_ModCore_Settings'
-    and page.menu==require('mcs_page') and page.version=='1.1.0' and #captured==0,
+    and page.menu==require('mcs_page') and page.version==version and #captured==0,
     'MCS publishes its own page as menu data attached to its folder')
 print('PASS MCS publishes its own page')
