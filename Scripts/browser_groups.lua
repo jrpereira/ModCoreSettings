@@ -29,7 +29,9 @@ local LINK_SIZE, LINK_GAP, LINK_END = 12, 7, 5
 -- Load order numbers: their box width, text size, opacity and the gap before the name.
 -- Box and gap fill the row's left margin (20 in a plain list), so names start where they
 -- do in Alphabetical. Numbers are right-aligned in their box.
-local LOAD_NUMBER_WIDTH, LOAD_NUMBER_SIZE, LOAD_NUMBER_OPACITY, LOAD_NUMBER_GAP = 16, 12, 0.7, 4
+local LOAD_NUMBER_WIDTH, LOAD_NUMBER_SIZE, LOAD_NUMBER_OPACITY, LOAD_NUMBER_GAP = 16, 11, 0.7, 4
+-- How far left of that the number and the name are drawn, and how far down the number.
+local LOAD_NUMBER_SHIFT, LOAD_NAME_SHIFT, LOAD_NUMBER_DROP = 13, 10, 1
 -- A group heading: its icon, a small line naming the kind of group, and its title.
 local function heading(key, title, kind, icon, columns)
     return {id=GROUP_PREFIX .. key, name=title, author='', version='',
@@ -42,7 +44,7 @@ end
 -- The entry that folds a group's mods without settings; selecting it lists them.
 local function more(key, count)
     return {id=GROUP_PREFIX .. key .. '.more', name='and ' .. count .. ' more with no settings',
-        author='', version='', description='Show the ' .. count .. ' mods in this group that have no settings.',
+        author='', version='', description='',
         choices={}, settingsCount=0, choicesLoaded=true, deferred=false, testOnly=false,
         mcBrowserMore=key}
 end
@@ -124,13 +126,23 @@ end
 -- separator): preferred, its collection; settings, false when the mod has none to show;
 -- name, author, version, icon and description; and requires, the set of dependency ids.
 -- mod.json is decoded as JSON, as the boot index decodes it; an unreadable one gives no
--- fields. Each folder is read once: mod.json changes need a restart, like the index.
+-- fields. interface names how UE4SS starts the folder, from its files: 'Native'
+-- (dlls/main.dll), 'Lua' (Scripts/main.lua) or 'Native and Lua'; nil with neither. Each folder is read once: mod.json changes need a restart, like the index.
 -- open defaults to io.open.
 function M.folderManifest(mods, open)
     if type(mods) ~= 'string' then return nil end
     open = open or io.open
     local Json = require('mcs_module_json')
     local cache = {}
+    local function has(path)
+        local file = open(mods .. path, 'rb')
+        if file then file:close() end
+        return file ~= nil
+    end
+    local function interface(folder)
+        local native, lua = has(folder .. '/dlls/main.dll'), has(folder .. '/Scripts/main.lua')
+        return native and lua and 'Native and Lua' or native and 'Native' or lua and 'Lua' or nil
+    end
     local function read(folder)
         local file = open(mods .. folder .. '/mod.json', 'rb')
         if not file then return {} end
@@ -155,7 +167,10 @@ function M.folderManifest(mods, open)
     return function(folder)
         assert(type(folder) == 'string' and not folder:find('[/\\]') and folder ~= '..' and folder ~= '.',
             'invalid mod folder')
-        if not cache[folder] then cache[folder] = read(folder) end
+        if not cache[folder] then
+            cache[folder] = read(folder)
+            cache[folder].interface = interface(folder)
+        end
         return cache[folder]
     end
 end
@@ -251,10 +266,15 @@ function M.arrange(providers, parse, report, options)
                     provider.author = fields.author or provider.author
                     provider.version = fields.version or version or provider.version
                     provider.mcBrowserIcon = fields.icon or provider.mcBrowserIcon
-                    if provider.mcNoSettingsDeclared then
+                    if provider.noSettings then
+                        -- Whether the mod declares it has no settings, or just offers none.
                         provider.description = (fields.description and fields.description .. '\n\n' or '')
-                            .. provider.name .. ' has no settings to change.'
+                            .. provider.name .. (fields.interface and ' loaded with ' .. fields.interface .. ' interface'
+                                or ' is loaded') .. '; '
+                            .. (provider.mcNoSettingsDeclared and 'declares no settings.' or 'no settings integration.')
                     elseif fields.description then provider.description = fields.description end
+                elseif provider.detectedKind == 'package' and provider.noSettings then
+                    provider.description = provider.name .. ' loaded as a game package; settings not available.'
                 end
             end
             if id == HOST then host = provider end
@@ -560,14 +580,21 @@ function M.arrange(providers, parse, report, options)
             return loaded[a] < loaded[b]
         end)
         local found = headed and {key='various'} or nil
-        if headed then add(heading('various', register and 'Other' or VARIOUS, '', '…', columns), 'head') end
+        if headed then add(heading('various', register and 'Other' or VARIOUS, '', '…', columns), 'head')
+        else
+            -- Ungrouped, the list is still a grid of Modules per row columns, under a heading
+            -- that is never shown (mcBrowserBare).
+            local bare = heading('plain', '', '', '', columns)
+            bare.mcBrowserBare, bare.mcBrowserHidden = true, true
+            add(bare, 'head')
+        end
         -- In load order every mod with a folder keeps its number, so the numbers shown skip
         -- the mods folded away; unfolding them shows theirs.
         local number = 0
         for _, provider in ipairs(plain) do
             if options.loadOrder and folderOf(provider) then number = number + 1;provider.mcLoadIndex = number end
         end
-        members(found, plain, headed and 'cell' or 'row')
+        members(found, plain, 'cell')
     end
     -- Tool pages stay among the providers so their links open them; while the index tabs
     -- reach them they are never listed, otherwise they are listed like any mod.
@@ -625,6 +652,22 @@ function M.install(pages, report, parse, folderVersion, folderManifest, grouping
         if not listed then report('BROWSER_GROUPS_FAILED',why) end
         M.arrange(providers, parse, report,options)
         local page = build(tree, providers, status, api)
+        -- The details card names no version or author for an entry without settings of its
+        -- own: a mod without settings, a group heading or an "and N more" entry.
+        local card = type(page) == 'table' and page.browserCard
+        if type(card) == 'table' and type(card.show) == 'function' and type(card.links) == 'table' then
+            local show = card.show
+            function card:show(index, ...)
+                local result = show(self, index, ...)
+                local provider = index and providers[index]
+                if provider and (provider.noSettings or provider.mcBrowserMore or provider.mcBrowserHeading) then
+                    for _, link in ipairs(self.links) do
+                        link.heading:SetVisibility(1);link.widget:SetVisibility(1)
+                    end
+                end
+                return result
+            end
+        end
         if type(page)=='table' and type(page.setFilter)=='function' then
             local setFilter = page.setFilter
             -- Compatible-only filtering keeps the group headings, which have no settings of
@@ -674,7 +717,7 @@ function M.install(pages, report, parse, folderVersion, folderManifest, grouping
                     -- A group heading shows only while one of its pages does.
                     for index, row in ipairs(self.allRows) do
                         local provider = providers[row.providerIndex]
-                        if provider.mcBrowserHeading and provider.mcBrowserLine == 'head' then
+                        if provider.mcBrowserHeading and provider.mcBrowserLine == 'head' and not provider.mcBrowserBare then
                             local any, next = false, index + 1
                             while self.allRows[next] do
                                 local member = providers[self.allRows[next].providerIndex]
@@ -693,6 +736,8 @@ function M.install(pages, report, parse, folderVersion, folderManifest, grouping
                             row.index = #rows
                         end
                         row.wrapper:SetVisibility(shown and 0 or 1)
+                        -- A mod outside any group hides with its backdrop and the gap under it.
+                        if row.mcLooseFrame then row.mcLooseFrame:SetVisibility(shown and 0 or 1) end
                     end
                     self.rows = rows
                     if type(self.mcLayoutGroups) == 'function' then
@@ -736,8 +781,8 @@ function M.install(pages, report, parse, folderVersion, folderManifest, grouping
             end
             -- The hint counts module folders, not menu entries (headings, a mod listed under
             -- several categories, folded entries). With DMM's page api it is only the count of
-            -- every listed mod, folded ones included, and of those without settings, without
-            -- DMM's input help.
+            -- listed modules with settings and, added to it, of those without (folded ones
+            -- included), without DMM's input help.
             if type(page.refreshHint)=='function' then
                 local refreshHint=page.refreshHint
                 if type(api)=='table' and api.setText and page.hint then
@@ -755,8 +800,9 @@ function M.install(pages, report, parse, folderVersion, folderManifest, grouping
                                 end
                             end
                         end
-                        local text=T('{count} mods',{count=total})
-                        if quiet>0 then text=text..' '..T('({count} with no settings)',{count=quiet}) end
+                        local shown=total-quiet
+                        local text=T(shown==1 and '{count} module' or '{count} modules',{count=shown})
+                        if quiet>0 then text=text..' '..T('( +{count} w/o settings )',{count=quiet}) end
                         api.setText(self.hint,text)
                     end
                 end
@@ -931,7 +977,8 @@ function M.install(pages, report, parse, folderVersion, folderManifest, grouping
                             lineSlot:SetPadding({Left=0, Top=0, Right=0, Bottom=0})
                             local boxSlot = assert(line:AddChild(box), 'load number slot')
                             boxSlot:SetVerticalAlignment(2)
-                            boxSlot:SetPadding({Left=padding.Left, Top=0, Right=LOAD_NUMBER_GAP, Bottom=0})
+                            boxSlot:SetPadding({Left=padding.Left - LOAD_NUMBER_SHIFT, Top=2 * LOAD_NUMBER_DROP,
+                                Right=LOAD_NUMBER_GAP + LOAD_NUMBER_SHIFT - LOAD_NAME_SHIFT, Bottom=0})
                             local wrapperSlot = row.wrapper and row.wrapper.Slot
                             if wrapperSlot then
                                 local margin = wrapperSlot.Padding
@@ -944,6 +991,7 @@ function M.install(pages, report, parse, folderVersion, folderManifest, grouping
                             local labelSlot = assert(line:AddChild(label), 'load order label')
                             labelSlot:SetVerticalAlignment(2);labelSlot:SetSize({SizeRule=1, Value=1})
                             labelSlot:SetPadding({Left=0, Top=padding.Top, Right=padding.Right, Bottom=padding.Bottom})
+                            row.mcNumbered = true
                         end)
                         if not ok then report('BROWSER_GROUPS_FAILED', err) end
                     end

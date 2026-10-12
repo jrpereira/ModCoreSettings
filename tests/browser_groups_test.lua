@@ -56,26 +56,27 @@ Groups.arrange(single)
 expect(single,'ModCore.browser.group.various,Other')
 local flat={{id='A',name='A',author='X'},{id='B',name='B',author='X'}}
 Groups.arrange(flat,nil,nil,{groupModules=false})
-expect(flat,'A,B','without grouping the list is plain')
-assert(flat[1].mcBrowserLine=='row' and flat[2].mcBrowserLine=='row','an ungrouped list is one mod per line')
+expect(flat,'ModCore.browser.group.plain,A,B','without grouping the list is plain, under a bare heading')
+assert(flat[1].mcBrowserBare and flat[1].mcBrowserHidden and flat[1].mcBrowserLine=='head','the heading is never shown')
+assert(flat[2].mcBrowserLine=='cell' and flat[3].mcBrowserLine=='cell','an ungrouped list is a grid')
 -- Ungrouped, mods sort by name, ignoring case, whatever order DMM found them in; a
 -- page listed under another stays with it.
 local unsorted={{id='z',name='zeta'},{id='b',name='Beta'},{id='b.child',name='Aardvark',mcBrowserLevel=4},
     {id='a',name='alpha'},{id='q',name='Quiet',noSettings=true},{id='c',name='Gamma',path='/Mods/2_G/mod_settings.ini'}}
 Groups.arrange(unsorted,nil,nil,{groupModules=false})
-expect(unsorted,'a,b,b.child,c,z,q,ModCore.browser.group.plain.more','ungrouped mods sort by name')
+expect(unsorted,'ModCore.browser.group.plain,a,b,b.child,c,z,q,ModCore.browser.group.plain.more','ungrouped mods sort by name')
 -- Load order: by folder name, as UE4SS starts them; pages without a folder first.
 local folders={{id='p',name='Page'},{id='m9',name='Alpha',mcFolder='9_Alpha'},{id='m1',name='Zed',mcFolder='1_Zed'}}
 Groups.arrange(folders,nil,nil,{groupModules=false,loadOrder=true})
-expect(folders,'p,m1,m9','load order follows the folders')
-assert(folders[1].mcLoadIndex==nil and folders[2].mcLoadIndex==1 and folders[3].mcLoadIndex==2,
+expect(folders,'ModCore.browser.group.plain,p,m1,m9','load order follows the folders')
+assert(folders[2].mcLoadIndex==nil and folders[3].mcLoadIndex==1 and folders[4].mcLoadIndex==2,
     'mods are numbered in load order; a page without a folder is not loaded, so not numbered')
 local quiet={{id='q',name='Quiet',mcFolder='1_Q',noSettings=true},{id='s',name='Set',mcFolder='2_S'}}
 Groups.arrange(quiet,nil,nil,{groupModules=false,loadOrder=true})
-expect(quiet,'s,q,ModCore.browser.group.plain.more','in load order mods without settings still fold')
-assert(quiet[1].mcLoadIndex==2 and quiet[2].mcLoadIndex==1,'each keeps its load-order number, so shown numbers skip')
+expect(quiet,'ModCore.browser.group.plain,s,q,ModCore.browser.group.plain.more','in load order mods without settings still fold')
+assert(quiet[2].mcLoadIndex==2 and quiet[3].mcLoadIndex==1,'each keeps its load-order number, so shown numbers skip')
 Groups.arrange(quiet,nil,nil,{groupModules=false})
-assert(quiet[1].mcLoadIndex==nil,'numbers belong to load order only')
+assert(quiet[2].mcLoadIndex==nil,'numbers belong to load order only')
 print('PASS mods group by collection or author, with no ModCore special case')
 
 -- A mod folder's mod.json gives its preferred group, settings, identity and dependencies.
@@ -83,7 +84,9 @@ local manifests={['Mods/Grouped/mod.json']='{"id":"G","name":"Grouped Mod","auth
         ..'"preferred":"ModCore","icon":"⟴","dependencies":[{"id":"ModCoreSettings","name":"MCS","version":"9"},'
         ..'{"id":"Other"}]}',
     ['Mods/Quiet/mod.json']='{"id":"Q","settings": false}',
-    ['Mods/Escaped/mod.json']='{"dependencies":[{"id":"X"}],"name":"The \\"Quoted\\" Mod \\u2014 Two"}'}
+    ['Mods/Escaped/mod.json']='{"dependencies":[{"id":"X"}],"name":"The \\"Quoted\\" Mod \\u2014 Two"}',
+    ['Mods/Quiet/Scripts/main.lua']='',['Mods/Loud/dlls/main.dll']='',
+    ['Mods/Both/dlls/main.dll']='',['Mods/Both/Scripts/main.lua']=''}
 local function openManifest(path)
     local content=manifests[path]
     return content and {read=function() return content end,close=function() end} or nil
@@ -99,6 +102,9 @@ assert(folderManifest('Escaped').name=='The "Quoted" Mod \u{2014} Two' and folde
 local folders={
     {id='detected:grouped',name='Grouped',detectedKind='ue4ss',noSettings=true,author='Unknown'},
     {id='detected:quiet',name='Quiet',detectedKind='ue4ss',noSettings=true,author='Unknown'},
+    {id='detected:loud',name='Loud',detectedKind='ue4ss',noSettings=true,author='Unknown'},
+    {id='detected:bare',name='Bare',detectedKind='ue4ss',noSettings=true,author='Unknown'},
+    {id='detected:package:~mods/pak',name='Pak',detectedKind='package',noSettings=true,author='Unknown'},
     {id='MCT.module.Grouped',name='Grouped',author='ModCoreTemplates',mcContribution='MCT',
         mcFolder='Grouped',mcModuleEntry=true,choices={{id='x'}}},
     {id='MCT.extra',name='Extra',author='ModCoreTemplates',mcContribution='MCT',mcFolder='Quiet',choices={{id='y'}}},
@@ -110,7 +116,16 @@ assert(byId['detected:grouped'].name=='Grouped Mod' and byId['detected:grouped']
     and byId['detected:grouped'].version=='2.0' and byId['detected:grouped'].mcBrowserIcon=='⟴',
     'a detected mod takes its folder identity')
 assert(byId['detected:quiet'].mcNoSettingsDeclared and byId['detected:quiet'].version=='1.0.12'
-    and byId['detected:quiet'].description=='Quiet has no settings to change.')
+    and byId['detected:quiet'].description=='Quiet loaded with Lua interface; declares no settings.',
+    byId['detected:quiet'].description)
+-- A mod without settings says how UE4SS starts it and whether it declares it has none.
+assert(folderManifest('Loud').interface=='Native' and folderManifest('Both').interface=='Native and Lua'
+    and folderManifest('Quiet').interface=='Lua' and folderManifest('Bare').interface==nil)
+assert(byId['detected:loud'].description=='Loud loaded with Native interface; no settings integration.',
+    byId['detected:loud'].description)
+assert(byId['detected:bare'].description=='Bare is loaded; no settings integration.',byId['detected:bare'].description)
+assert(byId['detected:package:~mods/pak'].description=='Pak loaded as a game package; settings not available.',
+    byId['detected:package:~mods/pak'].description)
 assert(byId['MCT.module.Grouped'].name=='Grouped Mod' and byId['MCT.module.Grouped'].version=='2.0',
     'a contributed page standing in for a mod takes its folder identity')
 assert(byId['MCT.extra'].name=='Extra' and byId['MCT.extra'].author=='ModCoreTemplates',
@@ -228,7 +243,7 @@ end
 local function browserPages(withHint)
     local pages={}
     pages.build=function(_,items)
-        local page={allRows={},rows={},empty=widget(),scroll={ScrollToStart=function() end},opened={},
+        local page={allRows={},rows={},empty=widget(),scroll={ScrollToStart=function() end},opened={},items=items,
             filterLabel=widget(),hint=withHint and widget() or nil}
         for index in ipairs(items) do page.allRows[index]={providerIndex=index,wrapper=widget(),widget=widget()} end
         function page:tickFilter() return true end
@@ -247,6 +262,10 @@ local function browserPages(withHint)
             for _,row in ipairs(self.allRows) do row.widget:SetBackgroundColor({A=self.rows[index]==row and 1 or 0}) end
         end
         function page:describe(index) self.describedBy=index end
+        page.browserCard={links={{heading=widget(),widget=widget()},{heading=widget(),widget=widget()}}}
+        function page.browserCard:show(index)
+            for _,link in ipairs(self.links) do link.heading:SetVisibility(index and 0 or 1);link.widget:SetVisibility(index and 0 or 1) end
+        end
         page:setFilter(false)
         return page
     end
@@ -291,11 +310,23 @@ local hintApi={setText=function(target,text) hintTexts[target]=text end,
     t=function(copy,values) return (copy:gsub('{([%w_]+)}',function(key) return tostring(values[key]) end)) end}
 local hintPage=hinted.build({},{{id='A',name='A',author='X',choices={{id='a'}}},{id='B',name='B',author='X',choices={{id='b'}}}},nil,hintApi)
 hintPage:refreshHint()
-assert(hintTexts[hintPage.hint]=='2 mods' and hintPage.hintCount==nil,'the hint is the count alone')
+assert(hintTexts[hintPage.hint]=='2 modules' and hintPage.hintCount==nil,'the hint is the count alone')
 local quietPage=hinted.build({},{{id='A',name='A',author='X',choices={{id='a'}}},{id='B',name='B',author='X',noSettings=true},
     {id='C',name='C',author='X',noSettings=true}},nil,hintApi)
 quietPage:refreshHint()
-assert(hintTexts[quietPage.hint]=='3 mods (2 with no settings)',hintTexts[quietPage.hint])
+assert(hintTexts[quietPage.hint]=='1 module ( +2 w/o settings )',hintTexts[quietPage.hint])
+-- The details card shows no version or author for a mod without settings.
+do
+    local card,items=quietPage.browserCard,quietPage.items
+    local seen={}
+    for index,provider in ipairs(items) do
+        card:show(index)
+        local shown=card.links[1].heading.visibility==0 and card.links[2].widget.visibility==0
+        assert(shown==not (provider.noSettings or provider.mcBrowserMore or provider.mcBrowserHeading),provider.id)
+        seen[provider.id]=shown
+    end
+    assert(seen.A==true and seen.B==false,'only a mod with settings names its version and author')
+end
 -- Links to ModCore's own pages sit right of the title and open their page when clicked.
 do
     local function node(name)

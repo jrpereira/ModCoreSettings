@@ -32,10 +32,10 @@ local settingLabelSizes={[2]=20}
 -- categoryLeft pixels left of the page edge, categoryTop pixels above, and a 1-pixel
 -- rule under it. Rows under a category indent rowIndent pixels.
 local categorySize,categoryLeft,categoryTop,categoryRuleBottom,rowIndent=18,-2,24,4,10
--- A subgroup's heading (mcWithin): subheadingSize points in the heading color, at the row
--- indent, subheadingTop pixels above, with no rule. Its rows indent nestedIndent pixels
--- further, their labels nestedShrink points smaller.
-local subheadingSize,subheadingTop,nestedIndent,nestedShrink=15,10,10,3
+-- A subgroup's heading (mcWithin): subheadingSize points in the title color, subheadingShift
+-- pixels right of the row indent, subheadingTop pixels above, with no rule. Its rows indent
+-- nestedIndent pixels further, their labels nestedShrink points smaller.
+local subheadingSize,subheadingShift,subheadingTop,nestedIndent,nestedShrink=15,12,10,14,1
 -- A parent heading's place; one drawn for a category sits where its heading would.
 local function parentPadding(parent)
     if parent.category then return {Left=categoryLeft,Top=categoryTop,Right=0,Bottom=0} end
@@ -53,11 +53,11 @@ local headerHover={R=0.95,G=0.63,B=0.08,A=0.06}
 local headerUnderSoft,headerUnderEdge={R=0.95,G=0.63,B=0.08,A=0.14},{R=0.95,G=0.63,B=0.08,A=0.6}
 -- The soft band sits headerUnderSoftDrop below the tab's bottom; the edge is a 1-pixel line
 -- drawn headerUnderEdgeDrop pixels below it.
-local headerUnderSoftHeight,headerUnderSoftDrop,headerUnderEdgeHeight,headerUnderEdgeDrop=4,1,1,2
+local headerUnderSoftHeight,headerUnderSoftDrop,headerUnderEdgeHeight,headerUnderEdgeDrop=4,0,1,1
 -- A picker's choice indicator under its value: one pip per choice up to pipLimit, else a
 -- track with a thumb. Its strip is pipActiveHeight tall and starts pipBottom from the row's
--- bottom; the other pips (pipHeight) are centred in it, so they sit on the row's last pixels
--- and the current one (or the thumb) reaches one pixel further each way. Below a choice note.
+-- bottom; the pips (pipHeight) sit a pixel below its top, on the row's last pixels, and the
+-- current one (or the thumb) grows downwards while its row is hot. Below a choice note.
 -- The indicator spans pipShare of the value's width, centred; the pips share it, pipGap
 -- apart, each as wide as its place allows (they differ by a pixel at most).
 local pipLimit,pipHeight,pipActiveHeight,pipBottom,pipGap,pipShare=16,2,4,-1,3,0.75
@@ -85,15 +85,17 @@ local edgeArrowOpacity=0.5
 -- A choice note's size, and how far up the note sits while the current choice has one.
 local noteSize,noteRaise=10,8
 -- DMM centres a picker's value, so bottom padding raises it by half: noteValueLift raises
--- it 5 pixels over a note. An arrow picker showing no note keeps its value where DMM puts it
--- (plainValueLift) while its indicator sits plainPipLift higher.
-local noteValueLift,plainValueLift,plainPipLift=10,0,3
+-- it 5 pixels over a note. An arrow picker showing no note raises its value 2 pixels
+-- (plainValueLift), plainValueShrink points smaller, while its indicator sits plainPipLift higher.
+local noteValueLift,plainValueLift,plainValueShrink,plainPipLift=10,4,1,5
 -- The indicator's opacity while its row is not hovered: half of full.
 local pipIdleOpacity=0.5
--- The current pip (or thumb) is pipActiveHeight tall while its row is hovered or selected,
--- else pipHeight like the others; the strip centres it either way.
+-- The current pip (or thumb) is pipHotHeight tall while its row is hovered or selected,
+-- else pipHeight like the others. Every pip starts pipTop from the strip's top, so the
+-- current one grows downwards.
+local pipHotHeight,pipTop=3,(pipActiveHeight-pipHeight)//2
 local function sizePips(row)
-    local height=row.mcPipHot and pipActiveHeight or pipHeight
+    local height=row.mcPipHot and pipHotHeight or pipHeight
     for n,box in ipairs(row.mcPipBoxes or {}) do box:SetHeightOverride(n==row.mcPipShown and height or pipHeight) end
     if row.mcPipThumb then row.mcPipThumb.box:SetHeightOverride(height) end
 end
@@ -113,9 +115,11 @@ local function paintHeaderTab(tab)
 end
 -- The page status shares the header tab row, left of the tabs, while it has
 -- this much width; otherwise it drops below them at full width.
-local headerStatusMinWidth,headerStatusGap,headerTabHeight,headerGap=160,12,28,12
+local headerStatusMinWidth,headerStatusGap,headerTabHeight,headerGap=160,12,29,12
 -- A cycle button's background matches the keybind editor's Mode control.
 local cycleBackground={R=0.12,G=0.12,B=0.12,A=0.09}
+-- A module's faint backdrop in the mod list, grouped or not: the separators' warm grey.
+local moduleBackground={R=0.62,G=0.55,B=0.42,A=0.14}
 -- A navigation picker's choice while it separates two colliding keybinds.
 local conflictRed={R=0.85,G=0.2,B=0.16,A=1}
 function M.parse(content,items)
@@ -988,7 +992,7 @@ function M.install(choices,controls,pages,options)
                             local pipBox=new('SizeBox');pipBox:SetWidthOverride(each);pipBox:SetHeightOverride(pipHeight)
                             api.need(pipBox:SetContent(pip),'MCS picker pip')
                             local pipSlot=add(strip,pipBox)
-                            pipSlot:SetPadding({Left=n>1 and pipGap or 0,Top=0,Right=0,Bottom=0});pipSlot:SetVerticalAlignment(2)
+                            pipSlot:SetPadding({Left=n>1 and pipGap or 0,Top=pipTop,Right=0,Bottom=0});pipSlot:SetVerticalAlignment(1)
                             pips[n],pipBoxes[n]=pip,pipBox
                         end
                         local stripSlot=api.need(box:SetContent(strip),'MCS picker pips')
@@ -1004,7 +1008,7 @@ function M.install(choices,controls,pages,options)
                         local thumbBox=new('SizeBox');thumbBox:SetHeightOverride(pipHeight)
                         thumbBox:SetWidthOverride(math.max(4,math.floor(width/count)))
                         api.need(thumbBox:SetContent(thumb),'MCS picker thumb')
-                        local thumbSlot=add(stack,thumbBox);thumbSlot:SetHorizontalAlignment(1);thumbSlot:SetVerticalAlignment(2)
+                        local thumbSlot=add(stack,thumbBox);thumbSlot:SetHorizontalAlignment(1);thumbSlot:SetVerticalAlignment(1);thumbSlot:SetPadding({Left=0,Top=pipTop,Right=0,Bottom=0})
                         api.need(box:SetContent(stack),'MCS picker track')
                         row.mcPipThumb={slot=thumbSlot,box=thumbBox,width=math.max(4,math.floor(width/count)),span=width}
                     end
@@ -1146,7 +1150,7 @@ function M.install(choices,controls,pages,options)
                 api.Theme.font(heading.widget,api.theme,categorySize)
                 if setting.mcGroup and setting.mcGroup.within then
                     heading.mcSubheading=true
-                    slot:SetPadding({Left=rowIndent,Top=subheadingTop,Right=padding.Right,Bottom=padding.Bottom})
+                    slot:SetPadding({Left=rowIndent+subheadingShift,Top=subheadingTop,Right=padding.Right,Bottom=padding.Bottom})
                     api.Theme.font(heading.widget,api.theme,subheadingSize)
                     local help=helpWidgets[heading.widget]
                     if help then
@@ -1155,6 +1159,7 @@ function M.install(choices,controls,pages,options)
                     end
                 end
                 if setting.mcGroup then M.style(heading.widget,setting.mcGroup.font,api) end
+                if heading.mcSubheading then api.Theme.textColor(heading.widget,'title') end
                 -- Theme.font only writes the property; a built heading shows it after SetFont.
                 heading.widget:SetFont(heading.widget.Font)
                 if setting.mcGroup then
@@ -1169,7 +1174,10 @@ function M.install(choices,controls,pages,options)
                             local widget=label
                             if parent.category then
                                 -- A category heading drawn for subgroups whose category
-                                -- has no rows: its look, and its rule.
+                                -- has no rows: DMM's heading look (left, muted), its size,
+                                -- and its rule.
+                                label:SetJustification(0)
+                                api.Theme.textColor(label,'muted')
                                 api.Theme.font(label,api.theme,categorySize);label:SetFont(label.Font)
                                 widget=api.construct('/Script/UMG.VerticalBox',tree)
                                 add(widget,label)
@@ -1190,11 +1198,13 @@ function M.install(choices,controls,pages,options)
             for _,s in ipairs(providers[index].choices) do if s.mcGroup and s.mcGroup.order then ordered=true end end
             if ordered or next(parentWidgets) then
                 panel.mcBlocks={}
+                -- Known widgets are kept by full name: GetChildAt answers with a new
+                -- wrapper each time, never equal to the one captured.
                 local known={}
                 local function capture(block,child)
                     local p=child.Slot.Padding
                     block.children[#block.children+1]={widget=child,padding={Left=p.Left,Top=p.Top,Right=p.Right,Bottom=p.Bottom}}
-                    known[child]=true
+                    known[child:GetFullName()]=true
                 end
                 for _,heading in ipairs(panel.headings) do
                     local block={heading=heading,parent=heading.mcParent,children={}};panel.mcBlocks[#panel.mcBlocks+1]=block
@@ -1206,10 +1216,10 @@ function M.install(choices,controls,pages,options)
                 local extra={children={}}
                 -- Parent headings were added only to obtain real UMG widgets.
                 -- They are rebuilt from mcLayout and must not become extras.
-                for _,entry in pairs(parentWidgets) do known[entry.widget]=true end
+                for _,entry in pairs(parentWidgets) do known[entry.widget:GetFullName()]=true end
                 for n=0,panel.scroll:GetChildrenCount()-1 do
                     local child=panel.scroll:GetChildAt(n)
-                    if not known[child] then capture(extra,child) end
+                    if not known[child:GetFullName()] then capture(extra,child) end
                 end
                 panel.mcLayout={}
                 local entriesByParent={}
@@ -1335,9 +1345,12 @@ function M.install(choices,controls,pages,options)
                     end
                 end
                 if row.mcPipBox then
-                    -- Showing no note, the value and indicator sit a little higher.
+                    -- Showing no note, the value is smaller and it and the indicator sit a little higher.
                     local noted=row.mcNoteText~=nil
                     if row.mcPipNoted~=noted then
+                        row.mcValueSize=row.mcValueSize or tonumber(row.value.Font and row.value.Font.Size) or 14
+                        api.Theme.font(row.value,api.theme,noted and row.mcValueSize or row.mcValueSize-plainValueShrink)
+                        row.value:SetFont(row.value.Font)
                         local padding=row.value.Slot.Padding
                         row.value.Slot:SetPadding({Left=padding.Left,Top=padding.Top,Right=padding.Right,
                             Bottom=noted and noteValueLift or plainValueLift})
@@ -1352,7 +1365,7 @@ function M.install(choices,controls,pages,options)
                         local thumb=row.mcPipThumb
                         if thumb then
                             local offset=math.floor((current-1)*(thumb.span-thumb.width)/math.max(1,#setting.values-1))
-                            thumb.slot:SetPadding({Left=offset,Top=0,Right=0,Bottom=0})
+                            thumb.slot:SetPadding({Left=offset,Top=pipTop,Right=0,Bottom=0})
                         end
                         row.mcPipShown=current
                         sizePips(row)
@@ -1873,11 +1886,10 @@ function M.install(choices,controls,pages,options)
             -- pages keep their place in the list.
             local ICON,ICON_HEIGHT,BAR,CELL,GAP,CELLS,WIDTH=40,54,20,180,8,3,584
             local KIND_INDENT,CELL_LINE_HEIGHT=10,0.8
-            -- A grid cell's height and its name's padding above and below: the name sits
-            -- 5 px higher than centred in 44 and the cell ends 2 px under it. The "and N
+            -- A grid cell's height and its name's padding above and below. The "and N
             -- more" cell takes a grid place like a mod; starting a row, its smaller text sits
             -- MORE_RAISE higher.
-            local CELL_HEIGHT,CELL_TOP,CELL_BOTTOM,MORE_RAISE=31,0,3,4
+            local CELL_HEIGHT,CELL_TOP,CELL_BOTTOM,MORE_RAISE=34,2,4,2
             -- Inside a group, mod names are GROUPED_SIZE points (the "and N more" entry two
             -- sizes below), and a 'row' page is ROW_HEIGHT tall with ROW_PAD above and below
             -- its name.
@@ -1886,6 +1898,8 @@ function M.install(choices,controls,pages,options)
             local SECTION_GAP=14
             -- Space between one row of grid cells and the next; GAP stays between columns.
             local CELL_ROW_GAP=4
+            -- Space under each mod of an ungrouped list.
+            local LOOSE_GAP=4
             -- Group header, tuned live: its highlight box (the title row) starts BOX_TOP
             -- down and is BOX_HEIGHT tall; the kind line sits KIND_TOP down, drawn after
             -- the box so its glow does not cover it. KIND_LINE is the kind text's height.
@@ -1899,7 +1913,7 @@ function M.install(choices,controls,pages,options)
             local HEADER_RAISE,HEADER_GAP,ROW_SHIFT,HEADER_INDENT=4,8,2,2
             local function frame(row,width,height)
                 local box=api.construct('/Script/UMG.Border',tree)
-                box:SetBrushColor(cycleBackground)
+                box:SetBrushColor(moduleBackground)
                 box:SetPadding({Left=0,Top=0,Right=0,Bottom=0})
                 row.wrapper:SetWidthOverride(width);row.wrapper:SetHeightOverride(height)
                 api.need(box:SetContent(row.wrapper),'MCS mod-list cell background')
@@ -1930,13 +1944,22 @@ function M.install(choices,controls,pages,options)
             local function groupLines(head,members)
                 local lines,grid={},nil
                 local columns=columnsOf(head)
+                local bare=providers[head.providerIndex].mcBrowserBare
                 local function line(height)
                     local box=api.construct('/Script/UMG.HorizontalBox',tree)
-                    bar(box,height);lines[#lines+1]=box
+                    -- A list without a heading keeps the bar's margin but draws no line.
+                    if bare then
+                        local space=api.construct('/Script/UMG.SizeBox',tree)
+                        space:SetWidthOverride(BAR);space:SetHeightOverride(height);place(box,space)
+                    else bar(box,height) end
+                    lines[#lines+1]=box
                     return box
                 end
                 for _,row in ipairs(members) do
-                    local label=row.widget:GetContent()
+                    -- The name's text block, kept from the first layout: in load order the
+                    -- button's content becomes a box holding the number and the name.
+                    row.mcNameLabel=row.mcNameLabel or row.widget:GetContent()
+                    local label=row.mcNameLabel
                     api.Theme.font(label,api.theme,providers[row.providerIndex].mcBrowserMore and GROUPED_MORE_SIZE or GROUPED_SIZE)
                     row.mcFrame:RemoveFromParent()
                     if providers[row.providerIndex].mcBrowserLine=='cell' then
@@ -1950,7 +1973,8 @@ function M.install(choices,controls,pages,options)
                         -- Raised only when it starts a row; beside mods it lines up with them.
                         local raise=providers[row.providerIndex].mcBrowserMore and grid.count==1
                             and 2*MORE_RAISE or 0
-                        label.Slot:SetPadding({Left=8,Top=CELL_TOP,Right=8,Bottom=CELL_BOTTOM+raise})
+                        -- A numbered name (load order) has its number's box before it instead.
+                        label.Slot:SetPadding({Left=row.mcNumbered and 0 or 8,Top=CELL_TOP,Right=8,Bottom=CELL_BOTTOM+raise})
                         label.Slot:SetHorizontalAlignment(0);label.Slot:SetVerticalAlignment(2)
                         place(grid.box,row.mcFrame,{Left=0,Top=0,Right=GAP,Bottom=CELL_ROW_GAP})
                     else
@@ -1976,15 +2000,31 @@ function M.install(choices,controls,pages,options)
                 for _,line in ipairs(group.lines) do line:RemoveFromParent() end
                 group.lines={}
                 local visible=shown(group.head)
+                -- A list without a heading shows while any of its pages does.
+                if group.bare then
+                    visible=false
+                    for _,row in ipairs(group.members) do visible=visible or shown(row) end
+                end
                 group.box:SetVisibility(visible and 0 or 1)
                 if not visible then return end
-                group.header:RemoveFromParent()
-                place(group.box,group.header,{Left=0,Top=-HEADER_RAISE,Right=0,Bottom=HEADER_GAP})
+                if not group.bare then
+                    group.header:RemoveFromParent()
+                    place(group.box,group.header,{Left=0,Top=-HEADER_RAISE,Right=0,Bottom=HEADER_GAP})
+                end
                 local members={}
                 for _,row in ipairs(group.members) do
                     if shown(row) then members[#members+1]=row end
                 end
-                group.lines=groupLines(group.head,members)
+                -- A failed layout parks every page again before it is reported: a page left
+                -- without a parent would be freed under its row and crash the next change.
+                local ok,lines=pcall(groupLines,group.head,members)
+                if not ok then
+                    for _,row in ipairs(group.members) do
+                        row.mcFrame:RemoveFromParent();place(group.park,row.mcFrame)
+                    end
+                    error(lines,0)
+                end
+                group.lines=lines
                 for _,line in ipairs(group.lines) do place(group.box,line) end
             end
             local function lineBrowserRows(rows)
@@ -1992,15 +2032,29 @@ function M.install(choices,controls,pages,options)
                 for _,row in ipairs(rows or {}) do
                     local provider=providers[row.providerIndex]
                     local line=row.wrapper and provider and provider.mcBrowserLine
-                    if line=='head' and not provider.mcBrowserHidden then
+                    if line=='head' and (not provider.mcBrowserHidden or provider.mcBrowserBare) then
                         current={head=row,members={}};groups[#groups+1]=current
                     elseif (line=='cell' or line=='row') and current then
                         if not provider.mcBrowserHidden then current.members[#current.members+1]=row end
                     elseif line~='cell' and line~='row' then current=nil end
                 end
-                if #groups==0 then return end
+                -- A mod on a line of its own outside any group (an ungrouped list) gets the
+                -- same backdrop, LOOSE_GAP above the next; an "and N more" entry gets none.
+                local loose,looseRows={},{}
+                for _,row in ipairs(rows or {}) do
+                    local provider=providers[row.providerIndex]
+                    if row.wrapper and provider and provider.mcBrowserLine=='row' and not provider.mcBrowserHidden
+                        and not provider.mcBrowserMore then
+                        loose[row.wrapper:GetFullName()]=row;looseRows[#looseRows+1]=row
+                    end
+                end
+                for _,group in ipairs(groups) do
+                    for _,row in ipairs(group.members) do loose[row.wrapper:GetFullName()]=nil end
+                end
+                if #groups==0 and not next(loose) then return end
                 -- Read and clear the list before any row moves into a group.
-                local scroll=assert(groups[1].head.wrapper:GetParent(),'MCS mod-list rows')
+                local first=groups[1] and groups[1].head or looseRows[1]
+                local scroll=assert(first.wrapper:GetParent(),'MCS mod-list rows')
                 local children={}
                 for n=0,scroll:GetChildrenCount()-1 do
                     local child=scroll:GetChildAt(n)
@@ -2025,6 +2079,8 @@ function M.install(choices,controls,pages,options)
                     -- naming the kind of group above the title, then a rule filling the
                     -- rest of the width.
                     local provider=providers[group.head.providerIndex]
+                    -- A heading that is never shown (mcBrowserBare) waits in the park.
+                    group.bare=provider.mcBrowserBare==true
                     local header=api.construct('/Script/UMG.HorizontalBox',tree)
                     local iconBox=api.construct('/Script/UMG.SizeBox',tree)
                     -- As wide as the line bar below, so the icon centres on its line; the
@@ -2081,6 +2137,12 @@ function M.install(choices,controls,pages,options)
                         end
                         placed=placed+1
                         api.need(scroll:AddChild(group.box),'MCS mod-list group'):SetPadding(padding)
+                    elseif loose[name] then
+                        local row,padding=loose[name],child.padding
+                        row.mcFrame=frame(row,row.wrapper.WidthOverride,row.wrapper.HeightOverride)
+                        row.mcLooseFrame=row.mcFrame
+                        api.need(scroll:AddChild(row.mcFrame),'MCS mod-list row'):SetPadding({Left=padding.Left,
+                            Top=padding.Top,Right=padding.Right,Bottom=padding.Bottom+LOOSE_GAP})
                     elseif not moved[name] then
                         api.need(scroll:AddChild(child.widget),'MCS mod-list child'):SetPadding(child.padding)
                     end

@@ -78,7 +78,7 @@ assert(list[1].mcBrowserKind=='Unclassified' and list[2].id=='U'
 local one={{id='A',name='A',mcFolder='A'},{id='A.child',name='Child',mcBrowserLevel=4,mcFolder='A'}}
 G.arrange(one,nil,nil,reader());assert(one[1].mcBrowserKind=='Content','children do not meet the preferred-group threshold')
 files.config='[Modules]\nSortBy=0\n'
-list=providers();G.arrange(list,nil,nil,reader());assert(#list==4 and list.mcModuleCount==3)
+list=providers();G.arrange(list,nil,nil,reader());assert(#list==5 and list[1].mcBrowserBare and list.mcModuleCount==3)
 -- Recently added: newest first, in sections by age; baseline and unrecorded mods are Earlier.
 local now=10*86400
 files.config='[Modules]\nSortBy=2\n'

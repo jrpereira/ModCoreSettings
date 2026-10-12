@@ -74,17 +74,30 @@ assert(not pcall(M.parse,'[Category.One]\nmcLabel= \n',parentItems),'mcLabel nee
 assert(not pcall(M.parse,'[Category.One]\nmcParentLevel=2\n',parentItems))
 assert(not pcall(M.parse,'[Category.One]\nmcParent=Shared\nmcParentLevel=2\n[Category.Two]\nmcParent=Shared\nmcParentLevel=3\n',parentItems))
 M.parse(schema,items)
+-- UE4SS gives a fresh Lua wrapper for every lookup, so two wrappers of one widget are
+-- never equal and never the same table key. GetChildAt answers with such a wrapper: it
+-- reads and writes through to the widget, but only its full name identifies it.
+local widgets,originals=0,setmetatable({},{__mode='k'})
+local function original(child) return originals[child] or child end
 local function widget()
-    local w={children={},Font={SkewAmount=0},enabled=true,position=0,visible=0,
+    widgets=widgets+1
+    local w={children={},Font={SkewAmount=0},enabled=true,position=0,visible=0,id=widgets,
         WidgetStyle={NormalPadding={Left=16,Top=0,Right=0,Bottom=0},
             PressedPadding={Left=16,Top=0,Right=0,Bottom=0}}}
-    function w:GetFullName() return 'Widget '..tostring(self) end
+    function w:GetFullName() return 'Widget '..self.id end
     function w:IsValid() return true end
     function w:GetParent() return self.parent end
     function w:GetChildrenCount() return #self.children end
-    function w:GetChildAt(n) return self.children[n+1] end
+    function w:GetChildAt(n)
+        local child=self.children[n+1]
+        if child==nil then return nil end
+        local wrapper=setmetatable({},{__index=child,__newindex=child})
+        originals[wrapper]=child
+        return wrapper
+    end
     function w:GetContent() return self.children[1] end
     function w:AddChild(child)
+        child=original(child)
         child.parent=self;self.children[#self.children+1]=child
         child.Slot={Padding={Left=0,Top=0,Right=0,Bottom=0}}
         setmetatable(child.Slot,{__index=function(_,key)
@@ -93,10 +106,11 @@ local function widget()
         return child.Slot
     end
     function w:RemoveChild(child)
+        child=original(child)
         for n,v in ipairs(self.children) do if v==child then table.remove(self.children,n);child.parent=nil;return true end end
         return false
     end
-    function w:RemoveFromParent() if self.parent then self.parent:RemoveChild(self) end end
+    function w:RemoveFromParent() if self.parent then self.parent:RemoveChild(original(self)) end end
     function w:ClearChildren() for _,child in ipairs(self.children) do child.parent=nil end;self.children={} end
     function w:SetContent(child) self:ClearChildren();return self:AddChild(child) end
     function w:SetVisibility(v) self.visible=v end
@@ -162,7 +176,7 @@ local pages={build=function(tree,providers,status,a)
     local getChildAt,addChild=parent.GetChildAt,parent.AddChild
     function parent:GetChildAt(n)
         local child=getChildAt(self,n)
-        return child==title and titleWrapper or child
+        return child and child:GetFullName()==title:GetFullName() and titleWrapper or child
     end
     function parent:AddChild(child)
         return addChild(self,child==titleWrapper and title or child)
@@ -383,12 +397,12 @@ assert(kind.text=='Collection' and kind.Font.Size==10 and kind.color=='muted' an
     and kind.Slot.Padding.Top==-35 and kind.Slot.Padding.Left==10 and kind.opacity==0.6,
     'a small faint line names the kind of group, drawn over the box')
 assert(math.abs(kind.Slot.Padding.Bottom-15.6)<0.01,'the kind line keeps the column as tall as the box')
-assert(#grid.children==4 and grid.children[1].HeightOverride==31 and grid.children[1].WidthOverride==20
+assert(#grid.children==4 and grid.children[1].HeightOverride==34 and grid.children[1].WidthOverride==20
     and grid.children[1]:GetContent(),'a grid row starts with its vertical line')
 for n,index in ipairs({3,5,6}) do
     local frame=grid.children[n+1]
     assert(frame:GetContent()==lineRows[index].wrapper and frame.BrushColor and frame.BrushColor.A<0.2
-        and lineRows[index].wrapper.WidthOverride==180 and lineRows[index].wrapper.HeightOverride==31
+        and lineRows[index].wrapper.WidthOverride==180 and lineRows[index].wrapper.HeightOverride==34
         and frame.Slot.Padding.Right==8 and frame.Slot.Padding.Bottom==4,
         'pages fill three columns in order, each on a faint background, rows 4 px apart')
     local label=lineRows[index].widget:GetContent()
@@ -434,6 +448,43 @@ assert(modRow.mcFrame:GetContent().HeightOverride==34 and modRow.widget:GetConte
     and modRow.widget:GetContent().Slot.Padding.Bottom==1,'a grouped mod row is 3 shorter above and below')
 assert(modRow.mcFrame.Slot.Padding.Left==2 and modRow.mcFrame.Slot.Padding.Right==6
     and modRow.widget:GetContent().Slot.Padding.Left==6,'a mod row box sits 2 right of its line, its text 6 in')
+assert(modRow.mcFrame.BrushColor.R==0.62 and modRow.mcFrame.BrushColor.A==0.14,'a module has a faint warm backdrop')
+-- Ungrouped, each mod line has the same backdrop with a gap under it; the folded entry none.
+do
+    local flat=pages.build(widget(),{
+        {name='A',choices=items,mcBrowserLine='row',mcBrowserLevel=4,mcBrowserIndent=20},
+        {name='B',choices=items,mcBrowserLine='row',mcBrowserLevel=4,mcBrowserIndent=20},
+        {name='and 1 more with no settings',choices=items,mcBrowserLine='row',mcBrowserMore='g',
+            mcBrowserLevel=4,mcBrowserIndent=20},
+    },nil,api).allRows
+    assert(flat[1].mcFrame and flat[1].mcFrame.BrushColor.A==0.14 and flat[1].mcFrame:GetContent()==flat[1].wrapper
+        and flat[1].mcLooseFrame==flat[1].mcFrame and flat[1].mcFrame.Slot.Padding.Left==20
+        and flat[1].mcFrame.Slot.Padding.Bottom==4 and flat[2].mcFrame and flat[3].mcFrame==nil
+        and flat[3].wrapper:GetParent()==flat[1].mcFrame:GetParent(),
+        'an ungrouped mod line sits on the backdrop, the folded entry stays bare in the list')
+end
+-- An ungrouped list is a grid under a heading that is never shown, with no line bar.
+do
+    local barePage=pages.build(widget(),{
+        {name='',choices=items,mcBrowserLine='head',mcBrowserBare=true,mcBrowserHidden=true,mcBrowserColumns=2},
+        {name='A',choices=items,mcBrowserLine='cell'},{name='B',choices=items,mcBrowserLine='cell'},
+        {name='C',choices=items,mcBrowserLine='cell'},
+    },nil,api)
+    local bareRows=barePage.allRows
+    local line=bareRows[2].mcFrame:GetParent()
+    local box=line:GetParent()
+    assert(line==bareRows[3].mcFrame:GetParent() and bareRows[4].mcFrame:GetParent()~=line
+        and #box.children==3 and box.visible==0,'two per row, with no header in the group')
+    assert(line.children[1]:GetContent()==nil and line.children[1].WidthOverride==20,'the bar\'s margin, without its line')
+    -- Load order puts each name in a box after its number; a later layout (a filter or
+    -- sort change) still styles the name, not the box, and leaves no page unparented.
+    local name=bareRows[2].widget:GetContent()
+    local numbered=widget();numbered.SetJustification=false;numbered.SetAutoWrapText=false
+    bareRows[2].widget:SetContent(numbered);numbered:AddChild(name);bareRows[2].mcNumbered=true
+    barePage:mcLayoutGroups()
+    assert(bareRows[2].mcFrame:GetParent() and bareRows[2].mcNameLabel==name and name.Slot.Padding.Left==0
+        and bareRows[3].widget:GetContent().Slot.Padding.Left==8,'a numbered name keeps its place on relayout')
+end
 -- In a grid the folded entry takes the next place beside the mods.
 local gridMore=pages.build(widget(),{
     {name='Group',choices=items,mcBrowserLine='head'},
@@ -442,15 +493,15 @@ local gridMore=pages.build(widget(),{
 },nil,api).allRows
 local modCell,moreCell=gridMore[2],gridMore[3]
 assert(modCell.mcFrame.parent and modCell.mcFrame.parent==moreCell.mcFrame.parent,'the folded entry fills a column like a mod')
-assert(modCell.widget:GetContent().Slot.Padding.Top==0 and modCell.widget:GetContent().Slot.Padding.Bottom==3
-    and moreCell.widget:GetContent().Slot.Padding.Bottom==3,'cells sit 5 px higher, 2 px shorter; beside a mod the entry lines up')
--- Starting a row of its own, the entry sits 4 px higher.
+assert(modCell.widget:GetContent().Slot.Padding.Top==2 and modCell.widget:GetContent().Slot.Padding.Bottom==4
+    and moreCell.widget:GetContent().Slot.Padding.Bottom==4,'cells pad 2 px above the name, 4 below; beside a mod the entry lines up')
+-- Starting a row of its own, the entry sits 2 px higher.
 local alone=pages.build(widget(),{
     {name='Group',choices=items,mcBrowserLine='head',mcBrowserColumns=2},
     {name='A',choices=items,mcBrowserLine='cell'},{name='B',choices=items,mcBrowserLine='cell'},
     {name='and 1 more with no settings',choices=items,mcBrowserLine='cell',mcBrowserMore='g'},
 },nil,api).allRows
-assert(alone[4].widget:GetContent().Slot.Padding.Bottom==11 and alone[4].mcFrame.parent~=alone[2].mcFrame.parent,
+assert(alone[4].widget:GetContent().Slot.Padding.Bottom==8 and alone[4].mcFrame.parent~=alone[2].mcFrame.parent,
     'in the first column the entry is raised')
 -- A 'row' page takes a whole line of its own after the grid; each group has its own header.
 local mixedProviders={{name='Bob',choices=items,mcBrowserLine='head'},
@@ -680,7 +731,7 @@ local tabsWidth=headerRow.mcHeaderTabsWidth
 assert(tabsWidth==2*110+3 and statusBox.WidthOverride==572-tabsWidth-12 and statusBox.Slot.Padding.Top==4,
     'The page status must stay beneath the divider, left of the header tabs')
 headerRow.mcHeaderTabsWidth=8*70+9;pickerHeader:refresh()
-assert(statusBox.WidthOverride==572 and statusBox.Slot.Padding.Top==4+28,
+assert(statusBox.WidthOverride==572 and statusBox.Slot.Padding.Top==4+29,
     'A page status without room beside the tabs must drop below them at full width')
 headerRow.mcHeaderTabsWidth=tabsWidth;pickerHeader:refresh()
 assert(statusBox.WidthOverride==572-tabsWidth-12 and statusBox.Slot.Padding.Top==4,
@@ -689,7 +740,7 @@ headerRow.mcTabs[2].widget.clicked=true
 pickerHeader:tick({},function(w) local clicked=w.clicked;w.clicked=false;return clicked,false,false end,false)
 assert(pickerHeader.model.pending[1]==items[1].values[2] and headerRow.mcTabs[2].selected,
     'Clicking a header tab must select its choice')
-assert(headerRow.mcTabs[1].label.Font.Size==12 and headerTabs.children[2].HeightOverride==28,
+assert(headerRow.mcTabs[1].label.Font.Size==12 and headerTabs.children[2].HeightOverride==29,
     'Header tabs must use a compact 12-point font and 28-pixel height')
 assert(page.controls.mcHeaderTabs:GetParent().Slot.Padding.Bottom==12,
     'the page header ends 12 pixels above its first entry')
@@ -698,7 +749,7 @@ for n,tab in ipairs(headerRow.mcTabs) do
     assert(tab.widget.WidgetStyle.NormalPadding.Left==3 and tab.widget.WidgetStyle.NormalPadding.Right==3
         and headerTabs.children[2*n].MinDesiredWidth==110,'header tabs pad their labels by 3 pixels')
     assert(tab.widget.WidgetStyle.NormalPadding.Top==0 and tab.widget.WidgetStyle.NormalPadding.Bottom==2
-        and tab.widget.WidgetStyle.PressedPadding.Bottom==2 and headerTabs.children[2*n].HeightOverride==28,
+        and tab.widget.WidgetStyle.PressedPadding.Bottom==2 and headerTabs.children[2*n].HeightOverride==29,
         'a header tab label sits 1 pixel above centre in a tab of unchanged height')
 end
 local longLabels=items[1].labels
@@ -719,9 +770,9 @@ for n,tab in ipairs(headerRow.mcTabs) do
     assert((tab.glow.BrushColor.A>0)==(n==2) and tab.widget:GetParent()==tab.glow,
         'Only the selected header tab may glow')
     assert(#tab.under==2,'a soft band and a brighter edge under each tab')
-    assert(tab.under[1].HeightOverride==4 and tab.under[1].Slot.Padding.Bottom==-1
-        and tab.under[2].HeightOverride==1 and tab.under[2].Slot.Padding.Bottom==-2,
-        'the soft band is 4 tall, 1 below the tab\'s bottom; the 1-pixel edge sits 2 below, touching it')
+    assert(tab.under[1].HeightOverride==4 and tab.under[1].Slot.Padding.Bottom==0
+        and tab.under[2].HeightOverride==1 and tab.under[2].Slot.Padding.Bottom==-1,
+        'the soft band is 4 tall, ending at the tab\'s bottom; the 1-pixel edge sits 1 below')
     for _,band in ipairs(tab.under) do
         assert(band.visible==(n==2 and 3 or 1),'the glow under a tab shows only while it is selected, never hit-tested')
     end
@@ -1022,20 +1073,25 @@ do
     assert(outer.widget.Font.Size==18 and outer.widget.Slot.Padding.Left==-2 and not outer.mcSubheading,
         'a category with rows keeps its heading')
     for _,heading in ipairs({inner,only}) do
-        assert(heading.mcSubheading and heading.widget.Font.Size==15 and heading.widget.Slot.Padding.Left==10
-            and heading.widget.Slot.Padding.Top==10 and heading.widget.visible~=1,'a subgroup heading is smaller, at the row indent')
+        assert(heading.mcSubheading and heading.widget.Font.Size==15 and heading.widget.Slot.Padding.Left==22
+            and heading.widget.Slot.Padding.Top==10 and heading.widget.visible~=1 and heading.widget.color=='title',
+            'a subgroup heading is smaller, in the title color, 12 pixels right of the row indent')
     end
     assert(outer.mcRuleVisible==true and inner.mcRuleVisible==false,'only a category heading has a rule')
     local top,nested=panel.rows[1],panel.rows[2]
-    assert(top.mcLabel.Font.Size==14 and nested.mcLabel.Font.Size==11 and panel.rows[4].mcLabel.Font.Size==11,
-        'subgroup rows are 3pt smaller')
-    assert(nested.mcLabel.Slot.Padding.Left==top.mcLabel.Slot.Padding.Left+10,'subgroup rows indent 10 pixels further')
+    assert(top.mcLabel.Font.Size==14 and nested.mcLabel.Font.Size==13 and panel.rows[4].mcLabel.Font.Size==13,
+        'subgroup rows are 1pt smaller')
+    assert(nested.mcLabel.Slot.Padding.Left==top.mcLabel.Slot.Padding.Left+14,'subgroup rows indent 14 pixels further')
     local drawn
     for _,child in ipairs(panel.scroll.children) do
         if child.children[1] and child.children[1].text=='Bare' then drawn=child end
     end
     assert(drawn and drawn.children[1].Font.Size==18 and drawn.Slot.Padding.Left==-2 and drawn.Slot.Padding.Top==24
         and drawn.children[2].HeightOverride==1,'a row-less category gets a heading with its rule')
+    -- DMM draws a category heading left-justified in the muted colour; the drawn one matches.
+    local label=drawn.children[1]
+    assert(label.Justification==0 and label.color=='muted' and label.Font.Size==outer.widget.Font.Size,
+        'a drawn category heading is left-justified, muted and as large as a real one')
     local function at(target)
         for n,child in ipairs(panel.scroll.children) do if child==target then return n end end
     end
@@ -1186,20 +1242,23 @@ assert(noteRow.mcNote.Slot.HorizontalAlignment==2 and noteRow.mcNote.Slot.Vertic
     'the note is centered in that space')
 assert(noteRow.mcNote.Font.Size==10 and noteRow.mcNote.color=='muted','the note is small and muted')
 assert(#noteRow.parts==3 and noteRow.value.parent~=noteBox,'DMM\'s value keeps its place')
--- None has no note: one line, where DMM puts it.
-assert(noteBox.visible==1 and noteRow.value.Slot.Padding.Bottom==0)
+-- None has no note: one line, 2 pixels above where DMM puts it, a point smaller.
+local valueSize=noteRow.mcValueSize
+assert(noteBox.visible==1 and noteRow.value.Slot.Padding.Bottom==4 and valueSize
+    and noteRow.value.Font.Size==valueSize-1)
 noteUi.model.pending[1]=7;noteUi:refresh()
 assert(noteBox.visible==3 and noteRow.mcNote.text=='Fangdango' and noteRow.value.Slot.Padding.Bottom==10
-    and noteBox.Slot.Padding.Bottom==8 and noteRow.mcPipBox.Slot.Padding.Bottom==-1,
-    'a noted choice shows its note without taking clicks, and the value moves up')
+    and noteBox.Slot.Padding.Bottom==8 and noteRow.mcPipBox.Slot.Padding.Bottom==-1
+    and noteRow.value.Font.Size==valueSize,
+    'a noted choice shows its note without taking clicks, and the value moves up at full size')
 noteUi.model.pending[1]=0;noteUi:refresh()
-assert(noteBox.visible==1 and noteRow.value.Slot.Padding.Bottom==0,'back to one line')
+assert(noteBox.visible==1 and noteRow.value.Slot.Padding.Bottom==4 and noteRow.value.Font.Size==valueSize-1,'back to one line')
 -- A picker with arrows shows one pip per choice under its value, the current one lit,
 -- in the row's bottom pixels below the note; half strength until its row is hovered.
 local pipBox=noteRow.mcPipBox
 assert(pipBox and #noteRow.mcPips==3 and pipBox:GetParent()==noteRow.background:GetParent()
     and pipBox.WidthOverride==142 and pipBox.HeightOverride==4 and pipBox.Slot.Padding.Left==362+24
-    and pipBox.Slot.VerticalAlignment==3 and pipBox.Slot.Padding.Bottom==-1+3 and pipBox.visible==3,
+    and pipBox.Slot.VerticalAlignment==3 and pipBox.Slot.Padding.Bottom==-1+5 and pipBox.HeightOverride==4 and pipBox.visible==3,
     'the indicator spans 75% of the value\'s width, centred, in the bottom pixels, never hit-tested')
 local widths={}
 for n,b in ipairs(noteRow.mcPipBoxes) do widths[n]=b.WidthOverride end
@@ -1209,17 +1268,18 @@ assert(pipBox.Slot.Padding.Bottom+pipBox.HeightOverride<=noteBox.Slot.Padding.Bo
 local function lit() local out={} for n,pip in ipairs(noteRow.mcPips) do if pip.BrushColor.A>0.5 then out[#out+1]=n end end return table.concat(out,',') end
 assert(lit()=='1','the first choice is current')
 local function heights() local out={} for n,b in ipairs(noteRow.mcPipBoxes) do out[n]=b.HeightOverride end return table.concat(out,',') end
-assert(heights()=='2,2,2' and noteRow.mcPipBoxes[2].Slot.VerticalAlignment==2,
-    'idle, the current pip is as tall as the others, all centred on one line')
+assert(heights()=='2,2,2' and noteRow.mcPipBoxes[2].Slot.VerticalAlignment==1
+    and noteRow.mcPipBoxes[2].Slot.Padding.Top==1,
+    'idle, the current pip is as tall as the others, all a pixel below the strip\'s top')
 noteUi.model.pending[1]=9;noteUi:refresh()
 assert(lit()=='3' and heights()=='2,2,2','the indicator follows the choice')
 assert(pipBox.opacity==0.5,'half strength while the row is not hovered')
 noteUi.hovered=1;noteUi:tick({},function() return false,false,false end,false)
-assert(pipBox.opacity==1 and heights()=='2,2,4','full strength while hovered, the current pip 2 taller')
+assert(pipBox.opacity==1 and heights()=='2,2,3','full strength while hovered, the current pip a pixel taller, downwards')
 noteUi.hovered=nil;noteUi:tick({},function() return false,false,false end,false)
 assert(pipBox.opacity==0.5 and heights()=='2,2,2','back to half and level when the pointer leaves')
 noteUi.current=1;noteUi:tick({},function() return false,false,false end,false)
-assert(pipBox.opacity==1 and heights()=='2,2,4','the selected row counts as hovered, keyboard or controller')
+assert(pipBox.opacity==1 and heights()=='2,2,3','the selected row counts as hovered, keyboard or controller')
 noteUi.current=nil;noteUi:tick({},function() return false,false,false end,false)
 -- A click on the value's outer 40%, either side, steps like the arrow there: two clear
 -- buttons over the text inside DMM's value button; the middle 20% is left to that button.
@@ -1342,7 +1402,7 @@ for n=#items,1,-1 do items[n]=nil end;items[1]=manyItems[1]
 local manyUi=controls.build(widget(),{{choices=items}},api)
 manyUi.model.pending[1]=20;manyUi:show(1)
 local thumb=manyUi.panels[1].rows[1].mcPipThumb
-assert(thumb and #manyUi.panels[1].rows[1].mcPips==0 and thumb.width==7 and thumb.slot.Padding.Left==142-7,
+assert(thumb and #manyUi.panels[1].rows[1].mcPips==0 and thumb.width==7 and thumb.slot.Padding.Left==142-7 and thumb.slot.Padding.Top==1,
     'beyond sixteen choices a thumb marks the place along a track')
 for n=#items,1,-1 do items[n]=nil end;for n,item in ipairs(savedItems) do items[n]=item end
 -- A tab picker shows every choice itself and gets no note line.
