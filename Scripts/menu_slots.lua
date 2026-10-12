@@ -7,7 +7,7 @@ local Manifest=require('mcs_manifest')
 -- Inserted rows render as plain DMM controls; source presentation keys are not copied,
 -- except a label rule naming an earlier inserted row and a picker's choice notes.
 local COPIED={'Id','Type','Label','Description','PresetValues','PresetLabels','Presets','Default',
-    'Minimum','Maximum','Step','Decimals','Prefix','Suffix','mcChoiceNotes'}
+    'Minimum','Maximum','Step','Decimals','Prefix','Suffix','mcChoiceNotes','mcReadOnly'}
 
 -- Raw [Setting] sections with their line span, as DMM's parser reads them, and the lines.
 local function sections(content)
@@ -37,6 +37,11 @@ function M.parse(content,items)
             assert(name~=nil,'mcSlotLabel requires mcSlot')
             assert(label=='1','mcSlotLabel must be 1')
         end
+        local grouped=section.fields.mcSlotGroups
+        if grouped~=nil then
+            assert(name~=nil,'mcSlotGroups requires mcSlot')
+            assert(grouped=='1','mcSlotGroups must be 1')
+        end
     end
     return items
 end
@@ -45,8 +50,9 @@ local function eligible(setting)
     assert(setting,'setting not found')
     assert(setting.kind=='picker' or setting.kind=='toggle' or setting.kind=='slider','unsupported kind')
     assert(not setting.targets and not setting.mcMapping,'presets cannot be inserted')
-    assert(not setting.mcNavigation and not setting.mcReadOnly and not setting.mcLinkPage,
-        'navigation and read-only rows cannot be inserted')
+    -- A read-only row is copied with its mcReadOnly, so it stays a shown value: it has no
+    -- storage and is never dirty. Navigation and link rows act on their own page.
+    assert(not setting.mcNavigation and not setting.mcLinkPage,'navigation and link rows cannot be inserted')
 end
 
 -- Section text for one inserted setting, placed in the slot's group. Its own VisibleWhen may
@@ -55,7 +61,7 @@ end
 -- not carried: contributors express that gating per row. With mcSlotLabel=1 on the slot
 -- row, the first inserted row takes the slot row's Label, mcLevel and mcCategory: the host
 -- names it.
-local function insertion(source,id,slot,number,earlier,first)
+local function insertion(source,id,slot,number,earlier,first,grouping)
     local found
     for _,section in ipairs(sections(source.mcManifest or '')) do
         if section.fields.Id==id then found=section.fields end
@@ -81,7 +87,7 @@ local function insertion(source,id,slot,number,earlier,first)
         out[#out+1]='mcLabelWhen='..found.mcLabelWhen
         out[#out+1]='mcLabels='..found.mcLabels
     end
-    out[#out+1]='Group='..(fields.Group or fields.Section or fields.Category or 'Settings')
+    out[#out+1]='Group='..(grouping and grouping(found) or fields.Group or fields.Section or fields.Category or 'Settings')
     local rule=fields
     if found.VisibleWhen or found.VisibleValues then
         assert(found.VisibleWhen and earlier[found.VisibleWhen],
@@ -92,6 +98,56 @@ local function insertion(source,id,slot,number,earlier,first)
     if rule.VisibleWhen then out[#out+1]='VisibleWhen='..rule.VisibleWhen end
     if rule.VisibleValues then out[#out+1]='VisibleValues='..rule.VisibleValues end
     return out
+end
+
+-- Under mcSlotGroups=1 inserted rows keep their source groups, each a group of the host
+-- named mcSlot.<slot>.<n>, so DMM heads them as any group. A group keeps its heading's
+-- presentation keys and takes the visibility of the slot's own group; a source group with
+-- a rule of its own is rejected, as its rows would be. A subgroup's mcWithin follows its
+-- category's host name.
+local GROUP_COPIED={'mcLabel','mcHeading','mcLevel','mcHelp','mcSilent','mcWithinLabel'}
+local function groupOf(fields) return fields.Group or fields.Section or fields.Category or 'Settings' end
+
+local function categories(content)
+    local byName={}
+    for _,section in ipairs((Manifest.sections(content))) do
+        local name=section.name:match('^Category%.(.+)$')
+        if name then byName[name]=section end
+    end
+    return byName
+end
+
+-- Returns grouping(found) for one entry, which names (and records) the host group of each
+-- source group, and the Category sections those groups need.
+local function regroup(source,slotName,hostRule,counter,known)
+    local own=categories(source.mcManifest or '')
+    local added={}
+    local function grouping(found)
+        local group=groupOf(found)
+        local name=known[group]
+        if name then return name end
+        local category=own[group] and own[group].fields or {}
+        assert(category.VisibleWhen==nil and category.mcLabelWhen==nil,
+            'group '..group..' has its own rule; it cannot keep its group in the slot')
+        counter.n=counter.n+1
+        name='mcSlot.'..slotName..'.'..counter.n
+        known[group]=name
+        local out={'[Category.'..name..']','mcLabel='..(category.mcLabel or group)}
+        for _,key in ipairs(GROUP_COPIED) do
+            if key~='mcLabel' and category[key]~=nil then out[#out+1]=key..'='..category[key] end
+        end
+        if category.mcWithin~=nil then
+            local outer=category.mcWithin
+            if not known[outer] then counter.n=counter.n+1;known[outer]='mcSlot.'..slotName..'.'..counter.n end
+            out[#out+1]='mcWithin='..known[outer]
+        end
+        if hostRule.VisibleWhen then out[#out+1]='VisibleWhen='..hostRule.VisibleWhen end
+        if hostRule.VisibleValues then out[#out+1]='VisibleValues='..hostRule.VisibleValues end
+        for _,line in ipairs(out) do added[#added+1]=line end
+        added[#added+1]=''
+        return name
+    end
+    return grouping,added
 end
 
 -- Rebuild provider.choices from its unspliced base with the current inserts.
@@ -116,39 +172,64 @@ function M.load(provider,inserts,read,parse,report)
         for _,section in ipairs(list) do assert(section.fields.Id,'host settings need explicit Id') end
         local replaced,added,sources,used,serial,slotOf={},0,{},{},0,{}
         for _,setting in ipairs(base.choices) do used[setting.id]=true end
+        local hostCategories,emptied=categories(text),{}
         for _,section in ipairs(list) do
             local name=section.fields.mcSlot
             if name and slots[name] then
                 local generated,earlier={},{}
+                local grouped=section.fields.mcSlotGroups=='1'
+                local hostGroup=groupOf(section.fields)
+                local hostRule=hostCategories[hostGroup] and hostCategories[hostGroup].fields or {}
+                local counter,known={n=0},{}
                 for _,entry in ipairs(inserts[name]) do
                     local rows,ids={},{}
                     local mine=earlier[entry.contributor] or {}
                     local seen=setmetatable({},{__index=mine})
+                    -- Groups are named per source page, so one page's chunks share them.
+                    known[entry.source]=known[entry.source] or {}
+                    local before,groupNames=counter.n,{}
+                    for group,named in pairs(known[entry.source]) do groupNames[group]=named end
+                    local grouping,headings
+                    if grouped then grouping,headings=regroup(entry.source,name,hostRule,counter,known[entry.source]) end
                     local fine,why=pcall(function()
                         for _,id in ipairs(entry.settings) do
                             assert(not used[id] and not ids[id],'setting id '..id..' is already on this page')
                             serial=serial+1
                             local first=#generated==0 and #rows==0
-                            for _,row in ipairs(insertion(entry.source,id,section,serial,seen,first)) do rows[#rows+1]=row end
+                            for _,row in ipairs(insertion(entry.source,id,section,serial,seen,first,grouping)) do rows[#rows+1]=row end
                             ids[id]=true;seen[id]=true
                             rows[#rows+1]=''
                         end
                     end)
+                    if not fine and grouped then counter.n,known[entry.source]=before,groupNames end
                     if fine then
                         for id in pairs(ids) do
                             used[id]=true;sources[id]=entry.source;mine[id]=true;slotOf[id]=name
                         end
                         earlier[entry.contributor]=mine
+                        for _,row in ipairs(headings or {}) do generated[#generated+1]=row end
                         for _,row in ipairs(rows) do generated[#generated+1]=row end
                         added=added+#entry.settings
                     else
                         report('SLOT_ROW_SKIPPED',entry.contributor..' -> '..provider.id..'/'..name..': '..tostring(why))
                     end
                 end
-                if #generated>0 then replaced[section.first]={last=section.last,rows=generated} end
+                if #generated>0 then
+                    replaced[section.first]={last=section.last,rows=generated}
+                    if grouped then emptied[hostGroup]=true end
+                end
             end
         end
         if added==0 then return end
+        -- A host group left without settings of its own loses its Category section: DMM
+        -- rejects a Category with no settings.
+        for _,section in ipairs(list) do
+            if not replaced[section.first] then emptied[groupOf(section.fields)]=nil end
+        end
+        for group in pairs(emptied) do
+            local category=hostCategories[group]
+            if category then replaced[category.first]={last=category.last,rows={}} end
+        end
         local out,n={},1
         while n<=#lines do
             local swap=replaced[n]
@@ -166,7 +247,7 @@ function M.load(provider,inserts,read,parse,report)
         end
         assert(next(sources)==nil,'inserted setting missing after parse')
         local removed=0
-        for _ in pairs(replaced) do removed=removed+1 end
+        for _,section in ipairs(list) do if replaced[section.first] then removed=removed+1 end end
         provider.choices,provider.mcSlotChoices=choices,choices
         provider.settingsCount=base.count-removed+added
     end)

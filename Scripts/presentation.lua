@@ -28,12 +28,89 @@ local styles={
 -- A level-2 setting label is larger than a level-2 heading: it names the page's main
 -- choice, while the heading groups rows.
 local settingLabelSizes={[2]=20}
+-- A category heading, as the game's own settings draw theirs: categorySize points,
+-- categoryLeft pixels left of the page edge, categoryTop pixels above, and a 1-pixel
+-- rule under it. Rows under a category indent rowIndent pixels.
+local categorySize,categoryLeft,categoryTop,categoryRuleBottom,rowIndent=18,-2,24,4,10
+-- A subgroup's heading (mcWithin): subheadingSize points in the heading color, at the row
+-- indent, subheadingTop pixels above, with no rule. Its rows indent nestedIndent pixels
+-- further, their labels nestedShrink points smaller.
+local subheadingSize,subheadingTop,nestedIndent,nestedShrink=15,10,10,3
+-- A parent heading's place; one drawn for a category sits where its heading would.
+local function parentPadding(parent)
+    if parent.category then return {Left=categoryLeft,Top=categoryTop,Right=0,Bottom=0} end
+    return {Left=0,Top=18,Right=0,Bottom=6}
+end
 local headerSeparatorDim={R=0.62,G=0.55,B=0.42,A=0.25}
 -- Opacity of anything shown faded: a disabled choice, or a row mcDimValues fades.
 local fadedOpacity=0.45
 local headerSeparatorBright={R=0.62,G=0.55,B=0.42,A=0.9}
 local headerGlowOn={R=0.95,G=0.63,B=0.08,A=0.10}
 local headerGlowOff={R=0,G=0,B=0,A=0}
+-- A hovered page tab's background; the selected tab keeps its own glow.
+local headerHover={R=0.95,G=0.63,B=0.08,A=0.06}
+-- The glow under the selected page tab: a soft band with a brighter edge at the bottom.
+local headerUnderSoft,headerUnderEdge={R=0.95,G=0.63,B=0.08,A=0.14},{R=0.95,G=0.63,B=0.08,A=0.6}
+-- The soft band sits headerUnderSoftDrop below the tab's bottom; the edge is a 1-pixel line
+-- drawn headerUnderEdgeDrop pixels below it.
+local headerUnderSoftHeight,headerUnderSoftDrop,headerUnderEdgeHeight,headerUnderEdgeDrop=4,1,1,2
+-- A picker's choice indicator under its value: one pip per choice up to pipLimit, else a
+-- track with a thumb. Its strip is pipActiveHeight tall and starts pipBottom from the row's
+-- bottom; the other pips (pipHeight) are centred in it, so they sit on the row's last pixels
+-- and the current one (or the thumb) reaches one pixel further each way. Below a choice note.
+-- The indicator spans pipShare of the value's width, centred; the pips share it, pipGap
+-- apart, each as wide as its place allows (they differ by a pixel at most).
+local pipLimit,pipHeight,pipActiveHeight,pipBottom,pipGap,pipShare=16,2,4,-1,3,0.75
+-- A click on the outer stepZone of a picker's value, either side, steps like the arrow there.
+local stepZone=0.4
+local pipOn,pipOff={R=0.95,G=0.63,B=0.08,A=0.9},{R=0.62,G=0.55,B=0.42,A=0.35}
+-- A slider is drawn like a picker's indicator: its value sliderValueShrink points smaller,
+-- centred on the control, over a bar sliderShare of the control's width: the filled part
+-- pipActiveHeight tall and lit, the rest pipHeight and dim, centred on one line. While its
+-- row is hovered or selected, a 3-pixel mark (lit between two dim lines) stands at the value,
+-- sliderMarkHeight tall from sliderMarkAbove above the bar. The bar sits sliderBottom above
+-- the row's bottom.
+local sliderValueShrink,sliderShare,sliderMarkHeight,sliderMarkAbove,sliderBottom=2,0.75,10,2,4
+-- The slider's value sits sliderValueLift pixels above the control's centre.
+local sliderValueLift=2
+-- A picker's value column in DMM's row: 330 of label and a 32-pixel arrow before it, 190
+-- wide. A toggle's value takes the same column, so every value lines up.
+local pickerValueLeft,pickerValueWidth=330+32,190
+-- A one-line picker row's height (DMM's is 40), and with choice notes; row labels are drawn
+-- labelDrop pixels lower; a toggle-shell row's button starts toggleShift pixels left, so its
+-- selection background starts where headings do.
+local pickerRowHeight,notedPickerRowHeight,labelDrop,toggleShift=43,42,1,14
+-- A picker arrow at the first or last choice: shown faint, not hidden.
+local edgeArrowOpacity=0.5
+-- A choice note's size, and how far up the note sits while the current choice has one.
+local noteSize,noteRaise=10,8
+-- DMM centres a picker's value, so bottom padding raises it by half: noteValueLift raises
+-- it 5 pixels over a note. An arrow picker showing no note keeps its value where DMM puts it
+-- (plainValueLift) while its indicator sits plainPipLift higher.
+local noteValueLift,plainValueLift,plainPipLift=10,0,3
+-- The indicator's opacity while its row is not hovered: half of full.
+local pipIdleOpacity=0.5
+-- The current pip (or thumb) is pipActiveHeight tall while its row is hovered or selected,
+-- else pipHeight like the others; the strip centres it either way.
+local function sizePips(row)
+    local height=row.mcPipHot and pipActiveHeight or pipHeight
+    for n,box in ipairs(row.mcPipBoxes or {}) do box:SetHeightOverride(n==row.mcPipShown and height or pipHeight) end
+    if row.mcPipThumb then row.mcPipThumb.box:SetHeightOverride(height) end
+end
+-- A page tab's label when it is not the selected one.
+local headerTabDimmed=0.8
+-- A page tab's label sits headerTabRaise pixels above its tab's centre.
+local headerTabRaise=1
+-- Paints a page tab for its state: selected (glow behind and under, full label), hovered
+-- (background) or neither (dimmed label). Only state changes touch the widgets.
+local function paintHeaderTab(tab)
+    local state=tab.selected and 'selected' or tab.hovered and 'hovered' or 'idle'
+    if tab.painted==state then return end
+    tab.glow:SetBrushColor(state=='selected' and headerGlowOn or state=='hovered' and headerHover or headerGlowOff)
+    for _,band in ipairs(tab.under or {}) do band:SetVisibility(state=='selected' and 3 or 1) end
+    tab.label:SetRenderOpacity(state=='selected' and 1 or headerTabDimmed)
+    tab.painted=state
+end
 -- The page status shares the header tab row, left of the tabs, while it has
 -- this much width; otherwise it drops below them at full width.
 local headerStatusMinWidth,headerStatusGap,headerTabHeight,headerGap=160,12,28,12
@@ -129,12 +206,20 @@ function M.parse(content,items)
                 if parent then assert(parent.font==font,'categories sharing mcParent must use the same mcParentLevel')
                 else parent={key=label,label=label,font=font};parents[label]=parent end
             elseif r.mcParentLevel~=nil then error('mcParentLevel requires mcParent') end
+            -- mcWithin=<category> makes this category a subgroup of that one; when that one
+            -- has no rows (so DMM draws no heading for it), mcWithinLabel is its heading.
+            local within=r.mcWithin~=nil and trim(r.mcWithin) or nil
+            assert(within~='' and within~=group,'mcWithin requires another category')
+            assert(not within or not parent,'mcWithin cannot be combined with mcParent')
+            local withinLabel=r.mcWithinLabel~=nil and trim(r.mcWithinLabel) or nil
+            assert(withinLabel~='','mcWithinLabel requires a non-empty label')
+            assert(not withinLabel or within,'mcWithinLabel requires mcWithin')
             -- mcLabel=<text> is the heading's text in place of the category name.
             local label=r.mcLabel~=nil and trim(r.mcLabel) or nil
             assert(label~='','mcLabel requires a non-empty label')
             groups[group]={font=level(r.mcLevel),help=r.mcHelp,labelRule=labelRule(r),label=label,order=order,parent=parent,
                 heading=flag(r.mcHeading,'mcHeading')~=false,playerExists=playerRule(r.mcPlayerExists),
-                silent=flag(r.mcSilent,'mcSilent')}
+                silent=flag(r.mcSilent,'mcSilent'),within=within,withinLabel=withinLabel}
         end
         if section.setting then
             local id=section.id
@@ -200,10 +285,27 @@ function M.parse(content,items)
             end
         end
     end
-    local headers=0
+    local headers,rows=0,{}
     for _,s in ipairs(items) do
         s.mcGroup=groups[s.group]
+        rows[s.group]=true
         if s.mcHeader then headers=headers+1 end
+    end
+    -- A subgroup's category is not a subgroup itself. When that category has no rows,
+    -- DMM draws no heading for it, so its subgroups share one drawn in the category style.
+    for _,group in pairs(groups) do
+        if group.within then
+            local outer=groups[group.within]
+            assert(not (outer and outer.within),'mcWithin must name a category that is not a subgroup')
+            assert(not (rows[group.within] and group.withinLabel),'mcWithinLabel is for a category without rows')
+            if group.withinLabel then
+                local key='\0'..group.within
+                local shared=parents[key]
+                assert(not shared or shared.label==group.withinLabel,'subgroups of one category share its mcWithinLabel')
+                parents[key]=shared or {key=key,label=group.withinLabel,category=true}
+                group.parent=parents[key]
+            end
+        end
     end
     assert(headers<=1,'only one level-one setting per provider')
     return items
@@ -237,6 +339,8 @@ end
 function M.install(choices,controls,pages,options)
     if controls.mcPresentationVersion then return false end
     local keyColumn=options and options.keyColumn
+    -- Where a keybind's key box (and a cycle button) starts: centred on a picker's value column.
+    local function keyLeft() return pickerValueLeft+(pickerValueWidth-keyColumn.key)/2 end
     -- textSources[name].poll() returns lines and whether they changed, for mcText rows.
     local textSources=options and options.textSources or {}
     local textArea={height=360,poll=1,format=function(lines) return table.concat(lines,'\n') end}
@@ -297,12 +401,33 @@ function M.install(choices,controls,pages,options)
         local labels=setmetatable({},{__mode='k'})
         local rowButtonInset=setmetatable({},{__mode='k'})
         local helpWidgets=setmetatable({},{__mode='k'})
+        local headingRules=setmetatable({},{__mode='k'})
         local valueSignals=setmetatable({},{__mode='k'})
         local ui
         -- While DMM builds a page: the provider, the last row whose label button was
         -- seen, and how many of that row's value buttons follow before the next label.
-        local constructing,pendingHelp,buttonSettingIndex,buttonsToSkip
+        local constructing,pendingHeading,buttonSettingIndex,buttonsToSkip
         for k,v in pairs(api) do adapted[k]=v end
+        -- A page-tab row is not highlighted as a whole when it has focus: its selected tab
+        -- takes DMM's focus highlight instead. headerFocus maps the row's highlighted widget
+        -- to the row; DMM's highlight calls for it are redirected here.
+        local headerFocus=setmetatable({},{__mode='k'})
+        local highlight=api.highlight
+        local function focusHeaderTabs(row)
+            for _,tab in ipairs(row.mcTabs or {}) do
+                local want=tab.selected and row.mcFocusAlpha or 0
+                if tab.focus and tab.focusAlpha~=want then highlight(tab.focus,want,false);tab.focusAlpha=want end
+            end
+        end
+        if highlight then
+            adapted.highlight=function(widget,alpha,background)
+                local row=headerFocus[widget]
+                if not row then return highlight(widget,alpha,background) end
+                highlight(widget,0,background)
+                row.mcFocusAlpha=alpha
+                focusHeaderTabs(row)
+            end
+        end
         -- DMM plays a sound after making the row its own: hovered for Hover, current for
         -- Select and Change. A silent row (mcSilent, or its category's) plays none.
         if api.feedback then
@@ -328,20 +453,33 @@ function M.install(choices,controls,pages,options)
             local label=api.caption(owner,text)
             if constructing then
                 for _,s in ipairs(providers[constructing].choices or {}) do
-                    if text==s.group and s.mcGroup and s.mcGroup.heading and s.mcGroup.help then
-                        pendingHelp={heading=label,text=s.mcGroup.help};break
+                    if text==s.group then
+                        local help=s.mcGroup and s.mcGroup.heading and s.mcGroup.help
+                        pendingHeading={heading=label,help=help or nil};break
                     end
                 end
             end
             return label
         end
+        -- DMM adds a heading to the page after captioning it, and its first row after
+        -- that: the heading's rule, then its help, go in between.
         adapted.button=function(...)
-            if pendingHelp then
-                local help=api.caption(tree,pendingHelp.text);help:SetAutoWrapText(true)
-                M.style(help,5,api)
-                local slot=api.need(pendingHelp.heading:GetParent():AddChild(help),'MCS group help')
-                slot:SetPadding({Left=20,Top=0,Right=20,Bottom=8})
-                helpWidgets[pendingHelp.heading]=help;pendingHelp=nil
+            if pendingHeading then
+                local parent=pendingHeading.heading:GetParent()
+                local rule=api.construct('/Script/UMG.Border',tree);rule:SetBrushColor(headerSeparatorDim)
+                local box=api.construct('/Script/UMG.SizeBox',tree);box:SetHeightOverride(1)
+                api.need(box:SetContent(rule),'MCS heading rule')
+                api.need(parent:AddChild(box),'MCS heading rule')
+                    :SetPadding({Left=categoryLeft,Top=0,Right=0,Bottom=categoryRuleBottom})
+                headingRules[pendingHeading.heading]=box
+                if pendingHeading.help then
+                    local help=api.caption(tree,pendingHeading.help);help:SetAutoWrapText(true)
+                    M.style(help,5,api)
+                    local slot=api.need(parent:AddChild(help),'MCS group help')
+                    slot:SetPadding({Left=rowIndent,Top=0,Right=20,Bottom=8})
+                    helpWidgets[pendingHeading.heading]=help
+                end
+                pendingHeading=nil
             end
             local button,label=api.button(...)
             -- DMM builds each row's label button first; a picker then adds its left,
@@ -370,6 +508,7 @@ function M.install(choices,controls,pages,options)
         end
         ui=build(tree,providers,adapted)
         local prepare,show,refresh,tick,clearPresses,isPressed=ui.prepare,ui.show,ui.refresh,ui.tick,ui.clearPresses,ui.isPressed
+        local select=ui.select
         local function new(kind) return api.construct('/Script/UMG.'..kind,tree) end
         local function add(parent,child) return api.need(parent:AddChild(child),'MCS presentation child') end
         local function sized(child,width,height)
@@ -392,10 +531,13 @@ function M.install(choices,controls,pages,options)
             slot:SetHorizontalAlignment(0);slot:SetVerticalAlignment(0)
             return box
         end
-        local function padTab(button,side)
+        -- raise (optional) lifts the vertically centred label that many pixels in a tab of
+        -- unchanged height.
+        local function padTab(button,side,raise)
+            local bottom=2*(raise or 0)
             local style=button.WidgetStyle
-            style.NormalPadding={Left=side,Top=0,Right=side,Bottom=0}
-            style.PressedPadding={Left=side,Top=0,Right=side,Bottom=0}
+            style.NormalPadding={Left=side,Top=0,Right=side,Bottom=bottom}
+            style.PressedPadding={Left=side,Top=0,Right=side,Bottom=bottom}
         end
         local pickerRightMargin=24
         -- Label column of a wrapped read-only row; the value takes the rest.
@@ -474,6 +616,21 @@ function M.install(choices,controls,pages,options)
                 if row.mcLabel and not setting.mcNavigation and not setting.mcReadOnly then
                     row.mcStar=starAfter(row.mcLabel)
                 end
+                -- Every label is drawn labelDrop pixels lower; only the drawing moves.
+                if row.mcLabel then
+                    local line=row.mcStar and row.mcLabel:GetParent() or row.mcLabel
+                    line:SetRenderTranslation({X=0,Y=labelDrop})
+                end
+                -- A selected or hovered row's background starts where headings do. A
+                -- toggle-shell row's button is its background: it starts toggleShift
+                -- further left, and its content's indent gives that back.
+                if row.background then
+                    local p=row.background.Slot.Padding
+                    row.background.Slot:SetPadding({Left=categoryLeft,Top=p.Top,Right=p.Right,Bottom=p.Bottom})
+                elseif toggleShell(setting) then
+                    local p=row.widget.Slot.Padding
+                    row.widget.Slot:SetPadding({Left=-toggleShift,Top=p.Top,Right=p.Right,Bottom=p.Bottom})
+                end
                 local identity=api.caption(tree,settingIdentity(i,providers[index],setting))
                 identity:SetVisibility(1)
                 add(row.wrapper:GetContent(),identity)
@@ -523,8 +680,8 @@ function M.install(choices,controls,pages,options)
                 end
                 if row.mcHeaderTabs then
                     -- A header picker shows every choice as a tab hanging from the
-                    -- divider, right-aligned, separated by thin vertical bars. Only
-                    -- the bars beside the selected tab are drawn at full strength.
+                    -- divider, right-aligned, separated by thin vertical bars, all drawn
+                    -- alike. The selected tab glows behind and under its label.
                     local tabs=new('HorizontalBox')
                     row.mcTabs={};row.mcHeaderSeparators={}
                     local count=#setting.values
@@ -538,23 +695,52 @@ function M.install(choices,controls,pages,options)
                     separator()
                     for n,value in ipairs(setting.values) do
                         local button,label=api.button(tree,setting.labels[n]);button.IsFocusable=false
-                        padTab(button,tabPadding)
+                        padTab(button,tabPadding,headerTabRaise)
                         api.Theme.font(label,api.theme,12)
                         label:SetJustification(1);label:SetTextOverflowPolicy(1)
                         label.Slot:SetHorizontalAlignment(0);label.Slot:SetVerticalAlignment(2)
                         local glow=new('Border');glow:SetBrushColor(headerGlowOff)
                         api.need(glow:SetContent(button),'MCS header tab glow')
+                        local stack=new('Overlay')
+                        -- DMM's focus highlight, behind the tab: shown on the selected tab while
+                        -- the row has focus, instead of across the whole title row.
+                        local focus=api.Theme.image(tree,api.theme,'selection',api)
+                        focus:SetRenderOpacity(0);focus:SetVisibility(3)
+                        local focusSlot=add(stack,focus);focusSlot:SetHorizontalAlignment(0);focusSlot:SetVerticalAlignment(0)
+                        local glowSlot=add(stack,glow);glowSlot:SetHorizontalAlignment(0);glowSlot:SetVerticalAlignment(0)
+                        local under={}
+                        for _,band in ipairs({{headerUnderSoft,headerUnderSoftHeight,headerUnderSoftDrop},
+                            {headerUnderEdge,headerUnderEdgeHeight,headerUnderEdgeDrop}}) do
+                            local fill=new('Border');fill:SetBrushColor(band[1])
+                            local box=new('SizeBox');box:SetHeightOverride(band[2])
+                            api.need(box:SetContent(fill),'MCS header tab underglow')
+                            -- Collapsed until its tab is selected, then shown without hit
+                            -- testing, so the tab's button still takes the pointer.
+                            box:SetVisibility(1)
+                            local bandSlot=add(stack,box);bandSlot:SetHorizontalAlignment(0);bandSlot:SetVerticalAlignment(3)
+                            bandSlot:SetPadding({Left=0,Top=0,Right=0,Bottom=-band[3]})
+                            under[#under+1]=box
+                        end
                         local width=tabWidth(setting.labels[n],12,share,0)
                         total=total+width
-                        add(tabs,tabSized(glow,width,headerTabHeight))
+                        add(tabs,tabSized(stack,width,headerTabHeight))
                         row.mcTabs[#row.mcTabs+1]={widget=button,label=label,value=value,
-                            pressed=false,pointer=false,glow=glow}
+                            pressed=false,pointer=false,glow=glow,under=under,header=true,focus=focus}
                         separator()
                     end
                     local slot=add(ui.mcHeaderTabs,tabs)
                     slot:SetHorizontalAlignment(3);slot:SetVerticalAlignment(1)
                     row.mcHeaderTabsBox=tabs
                     row.mcHeaderTabsWidth=total
+                    if highlight then
+                        local target=row.background or row.widget
+                        headerFocus[target]=row
+                        -- DMM may already have highlighted the row; move that to its tab.
+                        if row.paintOn~=nil then
+                            adapted.highlight(target,api.Theme.selectionState(target,api.theme,row.paintOn,
+                                row.paintHover,row.background~=nil),not row.background)
+                        end
+                    end
                     if row.value then row.value:SetVisibility(1) end
                     for _,part in ipairs(row.parts) do part.widget:GetParent():SetVisibility(1) end
                 elseif setting.mcTabs then
@@ -641,10 +827,10 @@ function M.install(choices,controls,pages,options)
                     if keyColumn then
                         slot:SetHorizontalAlignment(1)
                         row.mcCyclePlace=function(indent)
-                            slot:SetPadding({Left=indent+keyColumn.keyOffset,Top=0,Right=0,Bottom=0})
+                            slot:SetPadding({Left=keyLeft(),Top=0,Right=0,Bottom=0})
+                            row.widget:GetParent():SetWidthOverride(keyLeft()-indent)
                         end
-                        row.mcCyclePlace(20+(rowButtonInset[row.widget] or 0))
-                        row.widget:GetParent():SetWidthOverride(keyColumn.keyOffset)
+                        row.mcCyclePlace(rowIndent+(rowButtonInset[row.widget] or 0))
                     else
                         slot:SetHorizontalAlignment(3)
                         slot:SetPadding({Left=0,Top=0,Right=pickerRightMargin,Bottom=0})
@@ -760,7 +946,7 @@ function M.install(choices,controls,pages,options)
                     end
                     local left=boxWidth(row.widget,330)+boxWidth(row.parts[1].widget,32)
                     local note=api.caption(tree,'')
-                    api.Theme.font(note,api.theme,11);note:SetFont(note.Font)
+                    api.Theme.font(note,api.theme,noteSize);note:SetFont(note.Font)
                     api.Theme.textColor(note,'muted')
                     note:SetJustification(1);note:SetTextOverflowPolicy(1)
                     local box=new('SizeBox')
@@ -769,17 +955,209 @@ function M.install(choices,controls,pages,options)
                     noteSlot:SetHorizontalAlignment(2);noteSlot:SetVerticalAlignment(2)
                     local slot=add(row.background:GetParent(),box)
                     slot:SetHorizontalAlignment(1);slot:SetVerticalAlignment(3)
-                    slot:SetPadding({Left=left,Top=0,Right=0,Bottom=4})
+                    slot:SetPadding({Left=left,Top=0,Right=0,Bottom=noteRaise})
                     -- Never in the way of the value button underneath.
                     box:SetVisibility(1)
                     row.mcNote,row.mcNoteBox=note,box
+                end
+                -- A picker with arrows (<>) shows how many choices it has and which is
+                -- current: pips, or a track and thumb for many choices, centered under the
+                -- value in the row's bottom pixels, below any choice note.
+                if setting.kind=='picker' and row.value and row.background and row.parts and #row.parts==3
+                    and not row.mcTabs and not row.mcHeaderTabs and not setting.mcTabs and not setting.mcCycle
+                    and not setting.mcText and not setting.mcTable and not setting.mcWrap
+                    and not setting.mcReadOnly and #(setting.values or {})>=2 then
+                    local function boxWidth(widget,fallback)
+                        local ok,width=pcall(function() return widget:GetParent().WidthOverride end)
+                        return ok and tonumber(width) or fallback
+                    end
+                    local value=boxWidth(row.parts[2].widget,190)
+                    local width=math.floor(value*pipShare/2)*2
+                    local left=boxWidth(row.widget,330)+boxWidth(row.parts[1].widget,32)+(value-width)//2
+                    local count=#setting.values
+                    local box=new('SizeBox');box:SetWidthOverride(width);box:SetHeightOverride(pipActiveHeight)
+                    local pips,pipBoxes={},{}
+                    if count<=pipLimit then
+                        local strip=new('HorizontalBox')
+                        -- Pip n takes the n-th of count equal places (each with its gap), rounded.
+                        local step=(width+pipGap)/count
+                        local function edge(n) return math.floor(n*step+0.5) end
+                        for n=1,count do
+                            local pip=new('Border');pip:SetBrushColor(pipOff)
+                            local each=math.max(1,edge(n)-edge(n-1)-pipGap)
+                            local pipBox=new('SizeBox');pipBox:SetWidthOverride(each);pipBox:SetHeightOverride(pipHeight)
+                            api.need(pipBox:SetContent(pip),'MCS picker pip')
+                            local pipSlot=add(strip,pipBox)
+                            pipSlot:SetPadding({Left=n>1 and pipGap or 0,Top=0,Right=0,Bottom=0});pipSlot:SetVerticalAlignment(2)
+                            pips[n],pipBoxes[n]=pip,pipBox
+                        end
+                        local stripSlot=api.need(box:SetContent(strip),'MCS picker pips')
+                        stripSlot:SetHorizontalAlignment(2);stripSlot:SetVerticalAlignment(0)
+                    else
+                        -- Too many for pips: a track, and a thumb a choice wide at its place.
+                        local stack=new('Overlay')
+                        local track=new('Border');track:SetBrushColor(pipOff)
+                        local trackBox=new('SizeBox');trackBox:SetHeightOverride(pipHeight)
+                        api.need(trackBox:SetContent(track),'MCS picker track line')
+                        local trackSlot=add(stack,trackBox);trackSlot:SetHorizontalAlignment(0);trackSlot:SetVerticalAlignment(2)
+                        local thumb=new('Border');thumb:SetBrushColor(pipOn)
+                        local thumbBox=new('SizeBox');thumbBox:SetHeightOverride(pipHeight)
+                        thumbBox:SetWidthOverride(math.max(4,math.floor(width/count)))
+                        api.need(thumbBox:SetContent(thumb),'MCS picker thumb')
+                        local thumbSlot=add(stack,thumbBox);thumbSlot:SetHorizontalAlignment(1);thumbSlot:SetVerticalAlignment(2)
+                        api.need(box:SetContent(stack),'MCS picker track')
+                        row.mcPipThumb={slot=thumbSlot,box=thumbBox,width=math.max(4,math.floor(width/count)),span=width}
+                    end
+                    local slot=add(row.background:GetParent(),box)
+                    slot:SetHorizontalAlignment(1);slot:SetVerticalAlignment(3)
+                    slot:SetPadding({Left=left,Top=0,Right=0,Bottom=pipBottom})
+                    row.mcPipLeft=left
+                    -- Never in the way of the value button underneath.
+                    box:SetVisibility(3);box:SetRenderOpacity(pipIdleOpacity)
+                    row.mcPips,row.mcPipBoxes,row.mcPipBox,row.mcPipShown,row.mcPipHot=pips,pipBoxes,box,nil,false
+                    -- The value's outer parts step like its arrows: two clear buttons over the
+                    -- text, inside DMM's value button, so the row still reads as hovered over
+                    -- them. The middle passes clicks to the value button, as before.
+                    -- Wrappers are new on every lookup, so widgets compare by full name.
+                    local valueButton=row.parts[2].widget
+                    local holder=row.value:GetParent()
+                    if holder and holder:GetFullName()==valueButton:GetFullName() then
+                        local padding=row.value.Slot.Padding
+                        local stack=new('Overlay')
+                        -- A button centres new content; the zones need its whole width.
+                        local stackSlot=api.need(valueButton:SetContent(stack),'MCS picker value zones')
+                        stackSlot:SetHorizontalAlignment(0);stackSlot:SetVerticalAlignment(0)
+                        stackSlot:SetPadding({Left=0,Top=0,Right=0,Bottom=0})
+                        local textSlot=add(stack,row.value)
+                        textSlot:SetHorizontalAlignment(0);textSlot:SetVerticalAlignment(2)
+                        textSlot:SetPadding({Left=padding.Left,Top=padding.Top,Right=padding.Right,Bottom=padding.Bottom})
+                        local lane=new('HorizontalBox')
+                        local laneSlot=add(stack,lane);laneSlot:SetHorizontalAlignment(0);laneSlot:SetVerticalAlignment(0)
+                        row.mcZones={}
+                        for n,share in ipairs({stepZone,1-2*stepZone,stepZone}) do
+                            local part=n==2 and new('Spacer') or api.button(tree,'')
+                            if n~=2 then part.IsFocusable=false end
+                            add(lane,part):SetSize({SizeRule=1,Value=share})
+                            if n~=2 then
+                                row.mcZones[#row.mcZones+1]={widget=part,arrow=n,direction=n==1 and 1 or 2,
+                                    pressed=false,pointer=false}
+                            end
+                        end
+                    end
+                end
+                -- A one-line picker row is pickerRowHeight tall: its columns grow with it and
+                -- their content sits 1 pixel lower, so 1 pixel more above and 2 below. With
+                -- choice notes it is notedPickerRowHeight, its content centred: 1 more each way.
+                if setting.kind=='picker' and row.parts and #row.parts==3
+                    and tonumber(row.wrapper.HeightOverride)==40 then
+                    local noted=setting.mcChoiceNotes~=nil
+                    local height=noted and notedPickerRowHeight or pickerRowHeight
+                    row.wrapper:SetHeightOverride(height)
+                    for _,widget in ipairs({row.widget,row.parts[1].widget,row.parts[2].widget,row.parts[3].widget}) do
+                        widget:GetParent():SetHeightOverride(height)
+                        widget.Slot:SetPadding({Left=0,Top=0,Right=0,Bottom=noted and 0 or 1})
+                    end
+                end
+            end
+            -- Sliders: DMM's track and value column give way to one control holding the value,
+            -- centred, and the bar; the native slider, still taking input, spans the bar. The
+            -- control takes a picker's value column, so every value lines up.
+            for i,row in ipairs(panel.rows) do
+                local setting=providers[index].choices[i]
+                local surface=row.slider and row.slider:GetParent()
+                if setting.kind=='slider' and surface and row.value then
+                    local surfaceBox,valueBox=surface:GetParent(),row.value:GetParent()
+                    local width=pickerValueWidth
+                    local span=math.floor(width*sliderShare/2)*2
+                    local margin=(width-span)/2
+                    row.widget:GetParent():SetWidthOverride(pickerValueLeft)
+                    surfaceBox:SetWidthOverride(width)
+                    valueBox:SetWidthOverride(0);valueBox:SetVisibility(1)
+                    local track=surface:GetChildAt(0)
+                    if track and track~=row.slider then track:SetVisibility(1) end
+                    row.slider.Slot:SetPadding({Left=margin,Top=0,Right=margin,Bottom=0})
+                    -- DMM shows the native handle on a hovered or selected row; the mark
+                    -- replaces it. Opacity leaves the slider's input as it was.
+                    row.slider:SetRenderOpacity(0)
+                    local value=row.value
+                    value:RemoveFromParent()
+                    api.Theme.font(value,api.theme,(tonumber(value.Font and value.Font.Size) or 14)-sliderValueShrink)
+                    value:SetFont(value.Font);value:SetJustification(1);value:SetVisibility(3)
+                    -- Across the whole control, its text centred: the text's centre is the control's.
+                    local valueSlot=add(surface,value);valueSlot:SetHorizontalAlignment(0);valueSlot:SetVerticalAlignment(2)
+                    valueSlot:SetPadding({Left=0,Top=0,Right=0,Bottom=2*sliderValueLift})
+                    local function line(color,lineWidth,height)
+                        local fill=new('Border');fill:SetBrushColor(color)
+                        local box=new('SizeBox');box:SetHeightOverride(height)
+                        if lineWidth then box:SetWidthOverride(lineWidth) end
+                        api.need(box:SetContent(fill),'MCS slider line')
+                        return box
+                    end
+                    local bar=new('SizeBox');bar:SetWidthOverride(span);bar:SetHeightOverride(sliderMarkHeight)
+                    local stack=new('Overlay')
+                    api.need(bar:SetContent(stack),'MCS slider bar')
+                    local strip=new('HorizontalBox')
+                    local filled=line(pipOn,0,pipActiveHeight)
+                    add(strip,filled):SetVerticalAlignment(2)
+                    local restSlot=add(strip,line(pipOff,nil,pipHeight))
+                    restSlot:SetVerticalAlignment(2);restSlot:SetSize({SizeRule=1,Value=1})
+                    local stripBox=new('SizeBox');stripBox:SetHeightOverride(pipActiveHeight)
+                    api.need(stripBox:SetContent(strip),'MCS slider strip')
+                    local stripSlot=add(stack,stripBox);stripSlot:SetHorizontalAlignment(0);stripSlot:SetVerticalAlignment(1)
+                    stripSlot:SetPadding({Left=0,Top=sliderMarkAbove,Right=0,Bottom=0})
+                    local mark=new('HorizontalBox')
+                    for _,color in ipairs({pipOff,pipOn,pipOff}) do add(mark,line(color,1,sliderMarkHeight)) end
+                    local markSlot=add(stack,mark);markSlot:SetHorizontalAlignment(1);markSlot:SetVerticalAlignment(1)
+                    mark:SetVisibility(1)
+                    local barSlot=add(surface,bar);barSlot:SetHorizontalAlignment(2);barSlot:SetVerticalAlignment(3)
+                    barSlot:SetPadding({Left=0,Top=0,Right=0,Bottom=sliderBottom})
+                    bar:SetVisibility(3);bar:SetRenderOpacity(pipIdleOpacity)
+                    row.mcSlider={bar=bar,filled=filled,mark=mark,markSlot=markSlot,span=span,hot=false,shown=nil}
+                end
+            end
+            -- A read-only row is never selected: the pointer passes through its buttons, so it is
+            -- not hovered or clicked either.
+            for i,row in ipairs(panel.rows) do
+                if providers[index].choices[i].mcReadOnly then
+                    row.widget:SetVisibility(3)
+                    for _,part in ipairs(row.parts or {}) do part.widget:SetVisibility(3) end
+                end
+            end
+            -- As in the game's own settings, a picker shows its arrows only while its row is
+            -- hovered or selected. Hidden arrows keep their place, so the value never moves.
+            -- Arrows a decoration already collapsed stay collapsed.
+            for i,row in ipairs(panel.rows) do
+                if providers[index].choices[i].kind=='picker' and row.parts and #row.parts==3 then
+                    local boxes={}
+                    for _,n in ipairs({1,3}) do
+                        local box=row.parts[n].widget:GetParent()
+                        local shown=box:GetVisibility()
+                        if shown~=1 then boxes[#boxes+1]={box=box,shown=shown};box:SetVisibility(2) end
+                    end
+                    if #boxes>0 then row.mcArrowBoxes,row.mcArrowsHot=boxes,false end
                 end
             end
             local parentWidgets={}
             for _,heading in ipairs(panel.headings) do
                 local setting=providers[index].choices[heading.first]
+                local slot=heading.widget.Slot
+                local padding=slot.Padding
+                slot:SetPadding({Left=categoryLeft,Top=categoryTop,Right=padding.Right,Bottom=padding.Bottom})
+                api.Theme.font(heading.widget,api.theme,categorySize)
+                if setting.mcGroup and setting.mcGroup.within then
+                    heading.mcSubheading=true
+                    slot:SetPadding({Left=rowIndent,Top=subheadingTop,Right=padding.Right,Bottom=padding.Bottom})
+                    api.Theme.font(heading.widget,api.theme,subheadingSize)
+                    local help=helpWidgets[heading.widget]
+                    if help then
+                        local p=help.Slot.Padding
+                        help.Slot:SetPadding({Left=rowIndent+nestedIndent,Top=p.Top,Right=p.Right,Bottom=p.Bottom})
+                    end
+                end
+                if setting.mcGroup then M.style(heading.widget,setting.mcGroup.font,api) end
+                -- Theme.font only writes the property; a built heading shows it after SetFont.
+                heading.widget:SetFont(heading.widget.Font)
                 if setting.mcGroup then
-                    M.style(heading.widget,setting.mcGroup.font,api)
                     if not setting.mcGroup.heading then
                         heading.widget:SetVisibility(1);heading.visible=false
                     end
@@ -787,10 +1165,21 @@ function M.install(choices,controls,pages,options)
                     if parent then
                         heading.mcParent=parent
                         if not parentWidgets[parent.key] then
-                            local label=api.caption(tree,parent.label);M.style(label,parent.font,api)
-                            local slot=add(panel.scroll,label)
-                            slot:SetPadding({Left=0,Top=18,Right=0,Bottom=6})
-                            parentWidgets[parent.key]={widget=label,parent=parent}
+                            local label=api.caption(tree,parent.label)
+                            local widget=label
+                            if parent.category then
+                                -- A category heading drawn for subgroups whose category
+                                -- has no rows: its look, and its rule.
+                                api.Theme.font(label,api.theme,categorySize);label:SetFont(label.Font)
+                                widget=api.construct('/Script/UMG.VerticalBox',tree)
+                                add(widget,label)
+                                local rule=api.construct('/Script/UMG.Border',tree);rule:SetBrushColor(headerSeparatorDim)
+                                local box=api.construct('/Script/UMG.SizeBox',tree);box:SetHeightOverride(1)
+                                api.need(box:SetContent(rule),'MCS heading rule')
+                                add(widget,box):SetPadding({Left=0,Top=0,Right=0,Bottom=categoryRuleBottom})
+                            else M.style(label,parent.font,api) end
+                            add(panel.scroll,widget):SetPadding(parentPadding(parent))
+                            parentWidgets[parent.key]={widget=widget,parent=parent}
                         end
                     end
                 end
@@ -810,6 +1199,7 @@ function M.install(choices,controls,pages,options)
                 for _,heading in ipairs(panel.headings) do
                     local block={heading=heading,parent=heading.mcParent,children={}};panel.mcBlocks[#panel.mcBlocks+1]=block
                     capture(block,heading.widget)
+                    if headingRules[heading.widget] then capture(block,headingRules[heading.widget]) end
                     if helpWidgets[heading.widget] then capture(block,helpWidgets[heading.widget]) end
                     for i=heading.first,heading.last do capture(block,panel.rows[i].mcPlaceholder or panel.rows[i].wrapper) end
                 end
@@ -846,14 +1236,22 @@ function M.install(choices,controls,pages,options)
         end
         -- Construction state never outlives DMM's build, even when the build fails.
         function ui:prepare(index,...)
-            constructing,buttonSettingIndex,buttonsToSkip,pendingHelp=index,0,0,nil
+            constructing,buttonSettingIndex,buttonsToSkip,pendingHeading=index,0,0,nil
             local results=table.pack(pcall(prepare,self,index,...))
-            constructing,pendingHelp=nil,nil
+            constructing,pendingHeading=nil,nil
             if not results[1] then error(results[2],0) end
             decorate(index)
             return table.unpack(results,2,results.n)
         end
         function ui:show(index,...) self:prepare(index);return show(self,index,...) end
+        local function readOnly(self,index)
+            local setting=self.model and self.model.items and self.model.items[index]
+            return setting~=nil and setting.mcReadOnly==true
+        end
+        function ui:select(index,...)
+            if index and readOnly(self,index) then return end
+            return select(self,index,...)
+        end
         local function dynamic(rule,model,fallback)
             if not rule then return fallback end
             for i,s in ipairs(model.items) do
@@ -876,6 +1274,31 @@ function M.install(choices,controls,pages,options)
                 end
             end
             local result=refresh(self,...)
+            -- A slider's bar fills to its pending value; the mark stands at the fill's end.
+            for i,row in ipairs(self.panels[self.active].rows) do
+                local bar=row.mcSlider
+                local setting=bar and self.model.items[i]
+                local value=bar and self.model.pending[i]
+                if bar and setting and type(value)=='number' and setting.maximum~=setting.minimum then
+                    local share=math.max(0,math.min(1,(value-setting.minimum)/(setting.maximum-setting.minimum)))
+                    local filled=math.floor(share*bar.span+0.5)
+                    if bar.shown~=filled then
+                        bar.filled:SetWidthOverride(filled)
+                        bar.markSlot:SetPadding({Left=math.max(0,math.min(bar.span-3,filled-1)),Top=0,Right=0,Bottom=0})
+                        bar.shown=filled
+                    end
+                end
+            end
+            -- At the first or last choice DMM hides that arrow; it shows faint instead, still
+            -- disabled. Both hidden (a disabled picker) stays hidden.
+            for _,row in ipairs(self.panels[self.active].rows) do
+                -- DMM sets an arrow's opacity only when its state changes, so the faint one is
+                -- set again on every refresh rather than remembered.
+                if row.left and row.right and row.renderLeft~=row.renderRight then
+                    local arrow=row.renderLeft and row.right or row.left
+                    arrow.widget:SetRenderOpacity(edgeArrowOpacity)
+                end
+            end
             for i,state in ipairs(pressed) do
                 local row=self.panels[self.active].rows[i]
                 if row.visible then
@@ -907,8 +1330,32 @@ function M.install(choices,controls,pages,options)
                         row.mcNoteBox:SetVisibility(note and 3 or 1)
                         local padding=row.value.Slot.Padding
                         row.value.Slot:SetPadding({Left=padding.Left,Top=padding.Top,
-                            Right=padding.Right,Bottom=note and 4 or 0})
+                            Right=padding.Right,Bottom=note and noteValueLift or 0})
                         row.mcNoteText=note
+                    end
+                end
+                if row.mcPipBox then
+                    -- Showing no note, the value and indicator sit a little higher.
+                    local noted=row.mcNoteText~=nil
+                    if row.mcPipNoted~=noted then
+                        local padding=row.value.Slot.Padding
+                        row.value.Slot:SetPadding({Left=padding.Left,Top=padding.Top,Right=padding.Right,
+                            Bottom=noted and noteValueLift or plainValueLift})
+                        row.mcPipBox.Slot:SetPadding({Left=row.mcPipLeft,Top=0,Right=0,
+                            Bottom=noted and pipBottom or pipBottom+plainPipLift})
+                        row.mcPipNoted=noted
+                    end
+                    local current=1
+                    for n,value in ipairs(setting.values) do if value==self.model.pending[i] then current=n end end
+                    if row.mcPipShown~=current then
+                        for n,pip in ipairs(row.mcPips) do pip:SetBrushColor(n==current and pipOn or pipOff) end
+                        local thumb=row.mcPipThumb
+                        if thumb then
+                            local offset=math.floor((current-1)*(thumb.span-thumb.width)/math.max(1,#setting.values-1))
+                            thumb.slot:SetPadding({Left=offset,Top=0,Right=0,Bottom=0})
+                        end
+                        row.mcPipShown=current
+                        sizePips(row)
                     end
                 end
                 for _,tab in ipairs(row.mcTabs or {}) do
@@ -934,18 +1381,9 @@ function M.install(choices,controls,pages,options)
                     if not row.visible or not enabled then tab.pressed,tab.pointer=false,false end
                 end
                 if row.mcHeaderSeparators then
-                    local selected
-                    for n,tab in ipairs(row.mcTabs) do if tab.selected then selected=n;break end end
-                    if row.mcHeaderSelected~=selected then
-                        for n,bar in ipairs(row.mcHeaderSeparators) do
-                            local bright=selected and (n==selected or n==selected+1)
-                            bar:SetBrushColor(bright and headerSeparatorBright or headerSeparatorDim)
-                        end
-                        for n,tab in ipairs(row.mcTabs) do
-                            tab.glow:SetBrushColor(n==selected and headerGlowOn or headerGlowOff)
-                        end
-                        row.mcHeaderSelected=selected
-                    end
+                    for _,tab in ipairs(row.mcTabs) do paintHeaderTab(tab) end
+                    -- The focus highlight follows the selected tab.
+                    if row.mcFocusAlpha then focusHeaderTabs(row) end
                 end
             end
             for index,panel in ipairs(self.panels) do
@@ -985,6 +1423,12 @@ function M.install(choices,controls,pages,options)
                 if group and (group.labelRule or group.label) then
                     local text=dynamic(group.labelRule,self.model,group.label or setting.group)
                     if heading.mcText~=text then api.setText(heading.widget,text);heading.mcText=text end
+                end
+                -- A subgroup heading has no rule.
+                local rule=headingRules[heading.widget]
+                local ruleShown=heading.visible and not heading.mcSubheading
+                if rule and heading.mcRuleVisible~=ruleShown then
+                    rule:SetVisibility(ruleShown and 4 or 1);heading.mcRuleVisible=ruleShown
                 end
                 local help=helpWidgets[heading.widget]
                 if help and heading.mcHelpVisible~=heading.visible then
@@ -1027,7 +1471,7 @@ function M.install(choices,controls,pages,options)
                     panel.scroll:ClearChildren()
                     for _,entry in ipairs(panel.mcLayout) do
                         if entry.parentWidget then
-                            add(panel.scroll,entry.parentWidget):SetPadding({Left=0,Top=18,Right=0,Bottom=6})
+                            add(panel.scroll,entry.parentWidget):SetPadding(parentPadding(entry.parent))
                         end
                         for _,block in ipairs(entry.orderedBlocks) do
                             for _,child in ipairs(block.children) do add(panel.scroll,child.widget):SetPadding(child.padding) end
@@ -1060,25 +1504,51 @@ function M.install(choices,controls,pages,options)
                         -- the heading's look, and the rows after it indent beneath it.
                         local beforeCategory=setting.mcCategory or not categoryAdded
                         if setting.mcCategory and row.visible then categoryAdded=true end
-                        if row.mcCategoryStyle~=beforeCategory then
-                            api.Theme.font(row.mcLabel,api.theme,beforeCategory and 16 or 14)
+                        -- A subgroup's rows indent further, a little smaller.
+                        local nested=not beforeCategory and setting.mcGroup and setting.mcGroup.within~=nil
+                        local style=beforeCategory and 'category' or nested and 'nested' or 'row'
+                        if row.mcCategoryStyle~=style then
+                            api.Theme.font(row.mcLabel,api.theme,beforeCategory and categorySize
+                                or nested and 14-nestedShrink or 14)
                             row.mcLabel:SetFont(row.mcLabel.Font)
                             api.Theme.textColor(row.mcLabel,beforeCategory and 'muted' or 'body')
                             starStyle(row)
-                            row.mcCategoryStyle=beforeCategory
+                            row.mcCategoryStyle=style
                         end
                         local labelSlot=toggleShell(setting) and row.widget:GetContent().Slot
                             or row.mcLabel.Slot
                         local labelPadding=labelSlot.Padding
-                        local indent=beforeCategory and 0 or 20+(rowButtonInset[row.widget] or 0)
+                        local indent=beforeCategory and categoryLeft
+                            or rowIndent+(nested and nestedIndent or 0)+(rowButtonInset[row.widget] or 0)
                         if row.mcCyclePlace then row.mcCyclePlace(indent) end
-                        if labelPadding.Left~=indent then
-                            labelSlot:SetPadding({Left=indent,Top=labelPadding.Top,
+                        local contentLeft=toggleShell(setting) and not row.background and indent+toggleShift or indent
+                        if labelPadding.Left~=contentLeft then
+                            labelSlot:SetPadding({Left=contentLeft,Top=labelPadding.Top,
                                 Right=labelPadding.Right,Bottom=labelPadding.Bottom})
+                        end
+                        -- A toggle's label and value sit in its indented content: its label
+                        -- column ends where a picker's value column starts, and its value
+                        -- takes that column's width.
+                        local content=setting.kind=='toggle' and row.value and row.widget:GetContent()
+                        if content and row.mcToggleIndent~=indent and content:GetChildrenCount()==2 then
+                            content:GetChildAt(0):SetWidthOverride(pickerValueLeft-indent)
+                            content:GetChildAt(1):SetWidthOverride(pickerValueWidth)
+                            row.mcToggleIndent=indent
+                        end
+                        -- A keybind's key box is centred on a picker's value column, whatever
+                        -- the row's indent; the editor ends at the row's 584 less the button's
+                        -- 12-pixel right padding.
+                        local keyLane=keyColumn and setting.kind=='extension' and setting.editor=='keybind'
+                            and row.widget:GetContent()
+                        if keyLane and row.mcKeyIndent~=indent and keyLane:GetChildrenCount()==2 then
+                            local label=keyLeft()-indent-keyColumn.mode-keyColumn.gap
+                            keyLane:GetChildAt(0):SetWidthOverride(label)
+                            keyLane:GetChildAt(1):SetWidthOverride(572-indent-label)
+                            row.mcKeyIndent=indent
                         end
                         local wrapperSlot=row.wrapper.Slot
                         local wrapperPadding=wrapperSlot.Padding
-                        local top,bottom=beforeCategory and 12 or 0,beforeCategory and 4 or 0
+                        local top,bottom=beforeCategory and categoryTop or 0,beforeCategory and 4 or 0
                         if wrapperPadding.Top~=top or wrapperPadding.Bottom~=bottom then
                             wrapperSlot:SetPadding({Left=wrapperPadding.Left,Top=top,
                                 Right=wrapperPadding.Right,Bottom=bottom})
@@ -1104,7 +1574,9 @@ function M.install(choices,controls,pages,options)
                     for _,block in ipairs(panel.mcOrderedBlocks or panel.mcBlocks) do
                         if block.heading then
                             for i=block.heading.first,block.heading.last do
-                                if panel.rows[i].visible and not panel.rows[i].mcHeader then visible[#visible+1]=i end
+                                if panel.rows[i].visible and not panel.rows[i].mcHeader and not readOnly(self,i) then
+                                    visible[#visible+1]=i
+                                end
                             end
                         end
                     end
@@ -1114,9 +1586,16 @@ function M.install(choices,controls,pages,options)
             if self.visibleRows and not panel.mcBlocks then
                 local navigation={}
                 for i,row in ipairs(panel.rows) do
-                    if row.visible then navigation[#navigation+1]=i end
+                    if row.visible and not readOnly(self,i) then navigation[#navigation+1]=i end
                 end
                 self.visibleRows=navigation;self:wireNavigation(self.footer)
+            end
+            -- DMM may have selected a read-only row before it was left out: move to the nearest
+            -- selectable row above it, else the first.
+            if self.visibleRows and self.current and readOnly(self,self.current) then
+                local replacement=self.visibleRows[1]
+                for _,i in ipairs(self.visibleRows) do if i<self.current then replacement=i else break end end
+                select(self,replacement,true)
             end
             -- Field types mark the pickers separating colliding keybinds on each refresh.
             local separating=not self.model.error and self.model.mcConflictPickers or {}
@@ -1160,6 +1639,31 @@ function M.install(choices,controls,pages,options)
                                 row.lastValue=value
                             end
                         end
+                        if row.mcPipBox then
+                            -- Full strength while its row is hovered or selected (the row
+                            -- the keys and a controller move); DMM records both each tick.
+                            local hot=self.hovered==i or self.current==i
+                            if row.mcPipHot~=hot then
+                                row.mcPipBox:SetRenderOpacity(hot and 1 or pipIdleOpacity);row.mcPipHot=hot
+                                sizePips(row)
+                            end
+                        end
+                        if row.mcSlider then
+                            -- Full strength, with its mark, while hovered or selected.
+                            local hot=self.hovered==i or self.current==i
+                            if row.mcSlider.hot~=hot then
+                                row.mcSlider.bar:SetRenderOpacity(hot and 1 or pipIdleOpacity)
+                                row.mcSlider.mark:SetVisibility(hot and 3 or 1)
+                                row.mcSlider.hot=hot
+                            end
+                        end
+                        if row.mcArrowBoxes then
+                            local hot=self.hovered==i or self.current==i
+                            if row.mcArrowsHot~=hot then
+                                for _,arrow in ipairs(row.mcArrowBoxes) do arrow.box:SetVisibility(hot and arrow.shown or 2) end
+                                row.mcArrowsHot=hot
+                            end
+                        end
                         local area=row.mcText
                         if area and (not area.polled or os.clock()-area.polled>=textArea.poll) then
                             area.polled=os.clock()
@@ -1171,9 +1675,22 @@ function M.install(choices,controls,pages,options)
                                 area.shown=true
                             end
                         end
+                        -- A click on a picker's value zone steps like its arrow, while that
+                        -- arrow could be clicked.
+                        for _,zone in ipairs(row.mcZones or {}) do
+                            local clicked
+                            clicked,zone.pressed,zone.pointer=released(zone.widget,zone.pressed,zone.pointer,
+                                not controller and zone.widget:IsHovered()==true)
+                            if clicked and row.parts[zone.arrow].widget:GetIsEnabled() then
+                                self:select(i,false);self.model:change(i,zone.direction);self:refresh()
+                                if adapted.feedback then adapted.feedback('Change') end
+                                return tick(self,queued,released,controller)
+                            end
+                        end
                         -- A controller has no pointer to hover with; its presses come through focus.
                         for _,tab in ipairs(row.mcTabs or {}) do
                             tab.hovered=not controller and tab.widget:IsHovered()==true
+                            if tab.header then paintHeaderTab(tab) end
                         end
                         for _,tab in ipairs(row.mcTabs or {}) do
                             local clicked
@@ -1194,6 +1711,7 @@ function M.install(choices,controls,pages,options)
             if self.active then
                 for _,row in ipairs(self.panels[self.active].rows) do
                     for _,tab in ipairs(row.mcTabs or {}) do tab.pressed,tab.pointer=false,false end
+                    for _,zone in ipairs(row.mcZones or {}) do zone.pressed,zone.pointer=false,false end
                 end
             end
         end
@@ -1203,6 +1721,7 @@ function M.install(choices,controls,pages,options)
                 for _,row in ipairs(self.panels[self.active].rows) do
                     if row.visible then
                         for _,tab in ipairs(row.mcTabs or {}) do if tab.widget:IsPressed() then return true end end
+                        for _,zone in ipairs(row.mcZones or {}) do if zone.widget:IsPressed() then return true end end
                     end
                 end
             end
@@ -1358,13 +1877,22 @@ function M.install(choices,controls,pages,options)
             -- 5 px higher than centred in 44 and the cell ends 2 px under it. The "and N
             -- more" cell takes a grid place like a mod; starting a row, its smaller text sits
             -- MORE_RAISE higher.
-            local CELL_HEIGHT,CELL_TOP,CELL_BOTTOM,MORE_RAISE=37,0,3,4
+            local CELL_HEIGHT,CELL_TOP,CELL_BOTTOM,MORE_RAISE=31,0,3,4
+            -- Inside a group, mod names are GROUPED_SIZE points (the "and N more" entry two
+            -- sizes below), and a 'row' page is ROW_HEIGHT tall with ROW_PAD above and below
+            -- its name.
+            local GROUPED_SIZE,GROUPED_MORE_SIZE,ROW_HEIGHT,ROW_PAD=13,11,34,1
+            -- Extra space above every group after the first.
+            local SECTION_GAP=14
             -- Space between one row of grid cells and the next; GAP stays between columns.
             local CELL_ROW_GAP=4
             -- Group header, tuned live: its highlight box (the title row) starts BOX_TOP
             -- down and is BOX_HEIGHT tall; the kind line sits KIND_TOP down, drawn after
             -- the box so its glow does not cover it. KIND_LINE is the kind text's height.
             local BOX_TOP,BOX_HEIGHT,KIND_TOP,KIND_LINE=20,34,19,19.4
+            -- The header's rule is 2 pixels tall, RULE_TOP down, and starts RULE_GAP right
+            -- of the wider of the title and the kind line.
+            local RULE_TOP,RULE_GAP=35,8
             -- The header is drawn HEADER_RAISE up from its place in the group, with
             -- HEADER_GAP of bottom padding; a mod row's box sits ROW_SHIFT right of the line bar.
             -- HEADER_INDENT moves the header's icon and title right of the line bar's column.
@@ -1409,6 +1937,7 @@ function M.install(choices,controls,pages,options)
                 end
                 for _,row in ipairs(members) do
                     local label=row.widget:GetContent()
+                    api.Theme.font(label,api.theme,providers[row.providerIndex].mcBrowserMore and GROUPED_MORE_SIZE or GROUPED_SIZE)
                     row.mcFrame:RemoveFromParent()
                     if providers[row.providerIndex].mcBrowserLine=='cell' then
                         if not grid or grid.count==columns then grid={box=line(CELL_HEIGHT),count=0} end
@@ -1427,9 +1956,9 @@ function M.install(choices,controls,pages,options)
                     else
                         grid=nil
                         label:SetJustification(0)
-                        label.Slot:SetPadding({Left=6,Top=4,Right=12,Bottom=4})
+                        label.Slot:SetPadding({Left=6,Top=ROW_PAD,Right=12,Bottom=ROW_PAD})
                         label.Slot:SetHorizontalAlignment(0)
-                        place(line(40),row.mcFrame,{Left=ROW_SHIFT,Top=0,Right=GAP-ROW_SHIFT,Bottom=GAP})
+                        place(line(ROW_HEIGHT),row.mcFrame,{Left=ROW_SHIFT,Top=0,Right=GAP-ROW_SHIFT,Bottom=GAP})
                     end
                 end
                 return lines
@@ -1486,15 +2015,15 @@ function M.install(choices,controls,pages,options)
                     for _,row in ipairs(group.members) do
                         moved[row.wrapper:GetFullName()]=true
                         local cell=providers[row.providerIndex].mcBrowserLine=='cell'
-                        row.mcFrame=frame(row,cell and cellWidth(columnsOf(group.head)) or WIDTH-BAR-GAP,cell and CELL_HEIGHT or 40)
+                        row.mcFrame=frame(row,cell and cellWidth(columnsOf(group.head)) or WIDTH-BAR-GAP,cell and CELL_HEIGHT or ROW_HEIGHT)
                         -- The "and N more" entry has no background of its own.
                         if providers[row.providerIndex].mcBrowserMore then
                             row.mcFrame:SetBrushColor({R=0,G=0,B=0,A=0})
                         end
                     end
                     -- The header: the group's icon in a box of its own, then a small line
-                    -- naming the kind of group above the title, whose rule is centred on
-                    -- it and fills the rest of the width.
+                    -- naming the kind of group above the title, then a rule filling the
+                    -- rest of the width.
                     local provider=providers[group.head.providerIndex]
                     local header=api.construct('/Script/UMG.HorizontalBox',tree)
                     local iconBox=api.construct('/Script/UMG.SizeBox',tree)
@@ -1515,14 +2044,11 @@ function M.install(choices,controls,pages,options)
                     kind:SetRenderOpacity(0.6)
                     -- Left-aligned with the title's text, which sits inside its row's padding.
                     kind:SetJustification(0)
-                    local titleLine=api.construct('/Script/UMG.HorizontalBox',tree)
+                    -- The title keeps its own width; the column is as wide as the wider of
+                    -- it and the kind line.
                     group.head.wrapper:ClearWidthOverride();group.head.wrapper:SetHeightOverride(BOX_HEIGHT)
-                    place(titleLine,group.head.wrapper)
-                    local line=rule('horizontal',2)
-                    local lineSlot=api.need(titleLine:AddChild(line),'MCS mod-list group header line')
-                    lineSlot:SetVerticalAlignment(2);lineSlot:SetSize({SizeRule=1,Value=1})
-                    lineSlot:SetPadding({Left=8,Top=6,Right=0,Bottom=-2})
-                    place(text,titleLine,{Left=0,Top=BOX_TOP,Right=0,Bottom=0})
+                    place(text,group.head.wrapper,{Left=0,Top=BOX_TOP,Right=0,Bottom=0})
+                    group.head.wrapper.Slot:SetHorizontalAlignment(1)
                     -- Added after the title row so it draws over the highlight box, then
                     -- pulled up to KIND_TOP; its bottom padding keeps the column as tall as
                     -- the box.
@@ -1530,7 +2056,11 @@ function M.install(choices,controls,pages,options)
                     kindSlot:SetPadding({Left=KIND_INDENT,Top=KIND_TOP-BOX_TOP-BOX_HEIGHT,Right=0,
                         Bottom=BOX_TOP+BOX_HEIGHT-KIND_TOP-KIND_LINE})
                     kindSlot:SetHorizontalAlignment(0)
-                    api.need(header:AddChild(text),'MCS mod-list group header text'):SetSize({SizeRule=1,Value=1})
+                    place(header,text)
+                    local line=rule('horizontal',2)
+                    local lineSlot=api.need(header:AddChild(line),'MCS mod-list group header line')
+                    lineSlot:SetVerticalAlignment(1);lineSlot:SetSize({SizeRule=1,Value=1})
+                    lineSlot:SetPadding({Left=RULE_GAP,Top=RULE_TOP,Right=0,Bottom=0})
                     local width=api.construct('/Script/UMG.SizeBox',tree)
                     width:SetWidthOverride(WIDTH)
                     api.need(width:SetContent(header),'MCS mod-list group header width')
@@ -1540,11 +2070,17 @@ function M.install(choices,controls,pages,options)
                     group.park:SetVisibility(1);place(group.box,group.park)
                     group.lines={}
                 end
+                local placed=0
                 for _,child in ipairs(children) do
                     local name=child.widget:GetFullName()
                     local group=heads[name]
                     if group then
-                        api.need(scroll:AddChild(group.box),'MCS mod-list group'):SetPadding(child.padding)
+                        local padding=child.padding
+                        if placed>0 then
+                            padding={Left=padding.Left,Top=padding.Top+SECTION_GAP,Right=padding.Right,Bottom=padding.Bottom}
+                        end
+                        placed=placed+1
+                        api.need(scroll:AddChild(group.box),'MCS mod-list group'):SetPadding(padding)
                     elseif not moved[name] then
                         api.need(scroll:AddChild(child.widget),'MCS mod-list child'):SetPadding(child.padding)
                     end

@@ -9,10 +9,10 @@ local TITLE = 'Modules'
 -- Opacity of quiet rows (mods without settings, "and N more" entries): at rest,
 -- hovered, and, for a mod, selected (keyboard selection or the mod described).
 local QUIET_OPACITY, QUIET_HOVER_OPACITY, QUIET_SELECTED_OPACITY = 0.5, 0.75, 0.7
--- The page that carries the index tabs (Errors, Developer Tools): MCS's own.
+-- The page that carries the index tab (Developer Tools): MCS's own.
 local HOST = 'ModCoreSettings'
--- The MCS_Page values of those tabs, after the page's own three.
-local TABS = {errors=4, tools=5}
+-- The MCS_Page value of that tab.
+local TABS = {tools=5}
 local COLLECTION_ICON = '⁂'
 -- Every group is a grid of this many columns unless options.columns (1-3, [Modules]
 -- ModulesPerRow) says otherwise; an ungrouped list is one mod per line.
@@ -89,11 +89,6 @@ function M.manifest(openable, versions, tools)
             block('Setting.' .. id, fields)
         end
     end
-    -- The latest error lines of UE4SS.log, newest at the bottom (the host's 'errors' source).
-    block('Category.Errors', {{'VisibleWhen', 'MCS_Page'}, {'VisibleValues', TABS.errors}, {'mcHeading', 0}})
-    block('Setting.MCS_Index_Errors', {{'Id', 'MCS_Index_Errors'}, {'Label', 'Errors'}, {'Group', 'Errors'},
-        {'Type', 'picker'}, {'Default', 0}, {'PresetValues', '0|1'}, {'PresetLabels', 'Errors|Errors'},
-        {'mcReadOnly', 1}, {'mcText', 'errors'}})
     section('Developer Tools', tools or {}, TABS.tools, 'None installed')
     return table.concat(lines, '\n')
 end
@@ -801,7 +796,10 @@ function M.install(pages, report, parse, folderVersion, folderManifest, grouping
                 local described=self.described and rows[self.described]
                 for _,row in ipairs(self.allRows or {}) do
                     local provider=providers[row.providerIndex]
-                    if quiet(provider) then
+                    if provider and provider.mcBrowserHeading then
+                        -- A group heading names its group: hovering it highlights nothing.
+                        dim(row,1)
+                    elseif quiet(provider) then
                         local opacity=QUIET_OPACITY
                         local mod=provider.mcBrowserMore==nil
                         if row==current then

@@ -86,11 +86,12 @@ expect(providers,'Alpha,MCT.module.Beta,Gamma,MCT.module.Gamma,MCT.module.Groupe
 Pages.apply(providers,{},parse,state,report)
 expect(providers,ids(base()),'withdrawn')
 
--- A hidden page attached to a detected placeholder keeps that placeholder hidden.
+-- A hidden page attached to a mod keeps that mod's entry hidden, whether it is a detected
+-- placeholder or a mod with settings of its own.
 providers=base()
 Pages.apply(providers,{{id='MCT',pages={{id='MCT',name='ModCore Templates',attach='3_ModCore_Templates',visible=false},
     {id='MCT.real',name='Real',attach='Alpha',visible=false}}}},parse,state,report)
-expect(providers,'Alpha,detected:ue4ss:beta,Gamma,Zeta','hidden page claims placeholder only')
+expect(providers,'detected:ue4ss:beta,Gamma,Zeta','hidden page claims a placeholder and a mod with settings')
 Pages.apply(providers,{},parse,state,report)
 expect(providers,ids(base()),'hidden claim released')
 
@@ -267,6 +268,24 @@ do
     declared=true
     expect(build({mod('ModCoreControls','Controls')},false),'ModCoreControls,ModCoreTemplates,ModCoreTemplates.quickslots',
         'no slot support: fallback')
+end
+
+-- A slot's host may itself be a contributed page, published after the contributor whose rows
+-- fill it (a lower folder starts first). The rows still land, and their source stays hidden.
+do
+    local slots={address=Menu.address,provider=Menu.provider,
+        declares=function(_,provider,name) return provider.id=='ModCoreSettings' and name=='verifications' end}
+    local rowsFirst={{id='LEX.Events',pages={{id='LEX.Events',name='Events',manifest=manifest,configDirectory='/e',
+            attach='EventBridge',visible=false}},
+            rows={{page='LEX.Events',slot='settings:verifications',settings={'A'}}}},
+        {id='ModCoreSettings',pages={{id='ModCoreSettings',name='ModCore Settings',manifest=manifest,configDirectory='/s'}}}}
+    local list,state={mod('EventBridge','Event Bridge'),mod('Zeta')},{}
+    Pages.apply(list,rowsFirst,parse,state,report,slots)
+    expect(list,'ModCoreSettings,Zeta','a host published later still takes the rows; source and its mod stay hidden')
+    assert(state.inserts.settings.verifications[1].source.id=='LEX.Events')
+    -- A rebuild gives the same list.
+    Pages.apply(list,rowsFirst,parse,state,report,slots)
+    expect(list,'ModCoreSettings,Zeta','the same on every build')
 end
 
 -- The real DMM parser accepts generated manifests through the installed choices chain.

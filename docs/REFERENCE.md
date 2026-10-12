@@ -50,7 +50,9 @@ Placement on every menu build:
   and the page's own are only fallbacks. So a page that holds another mod's
   settings shows as that mod. Otherwise the page follows that mod, indented,
   unless it is a module group page. A name matching several mods rejects the
-  contributor. A page with `visible=false` still hides its detected placeholder.
+  contributor. A page with `visible=false` still hides the mod it attaches to, whether a
+  detected placeholder or a mod with settings of its own; the mod returns when the page is
+  withdrawn.
 - Otherwise: sorted by name with other mods, so a page that returns does not move.
 
 Contributed pages need no `mod_settings.ini` on disk; ModCoreSettings keeps
@@ -88,18 +90,27 @@ menu={
 
 - `storage`: values are saved under `section` in `file`, relative to the page's
   `configDirectory`. Without it, DMM's default storage applies.
-- Groups keep their order; only groups with fields are shown. A group's heading is
-  its `label`, else its `id`; `heading=false` hides it; `level` (0–6) sets its size.
+- Groups keep their order, and fields theirs within their group; only groups with
+  fields are shown. A group's heading is its `label`, else its `id`; `heading=false`
+  hides it; `level` (0–6) sets its size.
+- A group's `groups` are its subgroups, one level deep, shown after its own fields:
+  `{id='Quickslots',label='Player Quickslots',groups={{id='Fangdango',label='Fangdango'}}}`.
+  A subgroup's heading is smaller and sits at the row indent; its fields indent
+  further, 3pt smaller (`mcWithin`). A group whose fields are all in subgroups still
+  shows its heading, but cannot take `visible` or `relabel`.
 - A field has `choices` (a picker; up to 64) or a whole-number `range`, and a
   `default` among them. One choice makes a button or, `readOnly`, a shown value.
   `tabs=true` shows up to eight choices side by side.
-- `level` 1 puts a picker in the page's title row (one per page); 0 and 2–6 set
-  the label size.
+- `heading=true` puts a picker in the page's title row (one per page); `level` 0
+  or 2–6 sets the label size.
 - `visible={field=,values={...}}` shows a field or group only while that picker
   on the page holds one of the values. `relabel={field=,values={[value]='text'}}`
   names it after that picker's value.
 - A choice's `note` is shown small under it. `module='<mod folder>'` notes that
   mod's name, as the mod browser shows it.
+- `slot='<name>'` makes a read-only field the page's [slot](#slot-rows) for other
+  contributors' rows; `slotLabel=true` lets it name the first of them, and
+  `slotGroups=true` lets the rows keep their own groups (`mcSlotGroups`).
 - `action=true` makes a navigation row (never stored; see [page hooks](#page-hooks));
   `link='<page id>'` or `'<provider>:<slot>'` opens that page.
 - Ids are letters, digits and `_ . : -`; text has no `| ; [ ]` or control
@@ -148,11 +159,20 @@ one. Source Category rules are not carried. Only core DMM fields are copied, so
 inserted rows render as plain pickers, toggles or sliders. The exception is a
 row label rule (`mcLabelWhen`/`mcLabels`): it is copied when `mcLabelWhen` names
 a row the same contributor inserted earlier, and the row is skipped otherwise. A
-row named by `mcSlotLabel=1` keeps no label rule. A picker's `mcChoiceNotes` is
-also copied. Presets, navigation,
-read-only and link rows cannot be inserted. With no valid rows the slot row
+row named by `mcSlotLabel=1` keeps no label rule. A picker's `mcChoiceNotes` is also
+copied. Read-only rows stay shown values that store nothing. Presets, navigation and
+link rows cannot be inserted. With no valid rows the slot row
 shows unchanged. Each `rows` entry is all or nothing: one invalid setting skips
 that entry, logged as `SLOT_ROW_SKIPPED`, and other entries still insert.
+
+Add `mcSlotGroups=1` to the slot row to let inserted rows keep their source groups.
+Each source group becomes a group of the host, `mcSlot.<slot>.<n>`, headed like any
+group: DMM starts a heading wherever the group changes. One source page's entries share
+its groups. The group keeps its source Category's `mcLabel` (else its name), `mcHeading`,
+`mcLevel`, `mcHelp` and `mcSilent`, and takes the slot group's `VisibleWhen` rule; a
+source group with its own `VisibleWhen` or `mcLabelWhen` skips that entry. A slot group
+left without settings of its own is dropped. Host rows after the slot in the slot's group
+would be headed again after the inserted groups, so give such a slot a group of its own.
 
 Add `mcSlotLabel=1` to the slot row to let the host name the slot. The first
 inserted row then takes the slot row's `Label`, `mcLevel` and `mcCategory`;
@@ -332,8 +352,8 @@ presentation only: the row stays enabled and its value saves as usual.
 `mcText=<source>` on an `mcReadOnly=1` picker replaces the row with a 360-pixel
 scrollable text area showing a text source the host provides, newest line at the
 bottom. While the row shows, the source is checked about once a second; new text
-scrolls the area to its end. An unknown source shows "Unavailable." The ModCore
-Settings page's Errors tab uses the `errors` source: the latest 100 error lines of
+scrolls the area to its end. An unknown source shows "Unavailable." ModCore
+Settings provides an `errors` source: the latest 100 error lines of
 `UE4SS.log` (ModCore `ERROR`/`CRITICAL` messages, failed Lua calls, and lines
 mentioning an error, exception or stack traceback, with their stack traces).
 
@@ -413,6 +433,15 @@ visibility rules, navigation and Apply/Restore behavior. Any shared `mcParent`
 heading remains visible while the category has visible rows. `mcHelp` is not
 rendered when its category heading is suppressed. `mcHeading` accepts
 `false`/`true` or `0`/`1` and defaults to `true` on categories.
+
+Set `mcWithin=<category>` on a category to make it a subgroup of that category:
+its heading is 15pt in the heading color at the row indent, 10 pixels below the
+rows above, with no rule, and its rows indent 10 pixels further with labels 3pt
+smaller. One level only: the named category cannot itself be a subgroup. DMM takes
+no category without settings, so when the named category has no rows of its own,
+`mcWithinLabel=<text>` on its subgroups is its heading, drawn as a category heading
+before them and hidden while they all are. It cannot be combined with `mcParent`.
+Under `mcSlotGroups=1` a subgroup's `mcWithin` follows its category's slot name.
 
 Categories can also share a parent heading without flattening that heading into
 each category label:
@@ -510,4 +539,4 @@ Recently added lists mods by their latest install or update, newest first, under
 
 Browser grouping is described in [Module categories](MODULE_CATEGORIES.md#browser-behavior). Every mod, ModCore's own included, groups by the same rules. Unregistered folders and conflicting matches use Other or Specialized.
 
-ModCore Settings' own page also carries two generated tabs, rebuilt with the mod list: Errors, and Developer Tools (the `group='tool'` pages).
+ModCore Settings' own page has a Templates tab holding one slot, `settings:templates`, which ModCore Templates fills with every loaded template, one group per category (`mcSlotGroups=1`). It also carries a generated Developer Tools tab, rebuilt with the mod list, listing the `group='tool'` pages.

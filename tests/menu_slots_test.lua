@@ -343,4 +343,187 @@ assert(not pcall(Choices.parse,host:gsub('mcSlot=visuals\n','mcSlot=visuals\nmcS
 -- Slot declarations are validated with the manifest.
 assert(not pcall(Choices.parse,host:gsub('mcReadOnly=1\n','')),'mcSlot requires read-only')
 assert(not pcall(Choices.parse,host:gsub('mcSlot=visuals','mcSlot=a-b')),'slot names are words')
+-- A read-only row can be mirrored: it stays a shown value, with no storage, never dirty.
+-- Navigation rows still cannot.
+local shown=[[
+[Mod]
+Id=Extras
+Name=Extras
+[Setting.Installed]
+Id=Installed
+Type=picker
+Label=Installed extensions
+Group=Extras
+PresetValues=0|1
+PresetLabels=2|2
+Default=0
+mcReadOnly=1
+[Setting.Go]
+Id=Go
+Type=picker
+Label=Go
+Group=Extras
+PresetValues=0|1
+PresetLabels=Go|Go
+Default=0
+mcNavigation=1
+]]
+files['/extras/mod_settings.ini']=shown
+local extras=provider('Extras','/extras/mod_settings.ini',shown,true)
+logs={}
+controller.inserts={controls={visuals={{contributor='Extras',source=extras,settings={'Installed'}}}}}
+assert(controller:load(mcc,read) and #logs==0,logs[1])
+local mirrored
+for _,setting in ipairs(mcc.choices) do if setting.id=='Installed' then mirrored=setting end end
+assert(mirrored and mirrored.mcReadOnly and mirrored.mcSlotSource==extras and not mirrored.file,
+    'a mirrored read-only row stays read-only and stores nothing')
+model=Choices.open(mcc)
+assert(not model.error and not model:dirty(),'a mirrored read-only row never dirties the page')
+logs={}
+controller.inserts={controls={visuals={{contributor='Extras',source=extras,settings={'Go'}}}}}
+assert(controller:load(mcc,read)==false and logs[1]:find('navigation and link rows cannot be inserted',1,true),logs[1])
+-- Under mcSlotGroups=1 inserted rows keep their source groups as the host's own groups,
+-- headed as any group and shown under the slot group's rule. A host group left empty
+-- loses its Category; a source group with a rule of its own is rejected.
+do
+    local tabs=[[
+[Category.Pages]
+mcHeading=0
+[Category.Listed]
+mcHeading=0
+VisibleWhen=Page
+VisibleValues=1
+[Setting.Page]
+Id=Page
+Type=picker
+Label=Page
+Group=Pages
+PresetValues=0|1
+PresetLabels=A|B
+Default=0
+[Setting.Slot]
+Id=Slot
+Type=picker
+Label=Listed
+Group=Listed
+PresetValues=0|1
+PresetLabels=None|None
+Default=0
+mcReadOnly=1
+mcSlot=listed
+mcSlotGroups=1
+]]
+    local listing=[[
+[Category.First]
+mcLabel=First Things
+mcLevel=3
+[Category.Second]
+mcSilent=1
+[Category.Gated]
+VisibleWhen=One
+VisibleValues=0
+[Setting.One]
+Id=One
+Type=picker
+Label=One
+Group=First
+PresetValues=0|1
+PresetLabels=Yes|Yes
+Default=0
+mcReadOnly=1
+[Setting.Two]
+Id=Two
+Type=picker
+Label=Two
+Group=Second
+PresetValues=0|1
+PresetLabels=Yes|Yes
+Default=0
+mcReadOnly=1
+[Setting.Three]
+Id=Three
+Type=picker
+Label=Three
+Group=Second
+PresetValues=0|1
+PresetLabels=Yes|Yes
+Default=0
+mcReadOnly=1
+[Setting.Four]
+Id=Four
+Type=picker
+Label=Four
+Group=Gated
+PresetValues=0|1
+PresetLabels=Yes|Yes
+Default=0
+mcReadOnly=1
+]]
+    files['/tabs/mod_settings.ini']=tabs
+    local page=provider('Tabs','/tabs/mod_settings.ini',tabs)
+    Slots.parse(tabs,page.choices)
+    local list=provider('Lister','/list/mod_settings.ini',listing,true)
+    local text
+    local function spy(content) text=content;return Choices.parse(content) end
+    logs={}
+    -- Two entries from one page share its groups: Second gets one heading.
+    assert(Slots.load(page,{listed={{contributor='Lister',source=list,settings={'One','Two'}},
+        {contributor='Lister',source=list,settings={'Three'}}}},read,spy,report),logs[1])
+    assert(ids(page.choices)=='Page,One,Two,Three',ids(page.choices))
+    assert(page.choices[2].group=='mcSlot.listed.1' and page.choices[3].group=='mcSlot.listed.2'
+        and page.choices[4].group=='mcSlot.listed.2','rows keep their groups under slot names')
+    assert(text:find('[Category.mcSlot.listed.1]\nmcLabel=First Things\nmcLevel=3\nVisibleWhen=Page\nVisibleValues=1\n',1,true)
+        and text:find('[Category.mcSlot.listed.2]\nmcLabel=Second\nmcSilent=1\nVisibleWhen=Page\nVisibleValues=1\n',1,true),
+        text)
+    assert(not text:find('[Category.Listed]',1,true),'the emptied slot group loses its Category')
+    assert(page.settingsCount==4,'counts the slot row once')
+    -- A group with its own rule cannot keep its group; that entry alone is skipped.
+    logs={}
+    assert(Slots.load(page,{listed={{contributor='Lister',source=list,settings={'Four'}},
+        {contributor='Lister',source=list,settings={'One'}}}},read,spy,report))
+    assert(ids(page.choices)=='Page,One' and logs[1]:find('has its own rule',1,true),logs[1])
+    assert(page.choices[2].group=='mcSlot.listed.1','a skipped entry does not use up a group name')
+    assert(not pcall(Slots.parse,tabs:gsub('mcSlotGroups=1','mcSlotGroups=2'),page.choices))
+end
+-- Subgroups keep their category under its slot name, and its drawn heading's label.
+do
+    local tabs=[[
+[Setting.Slot]
+Id=Slot
+Type=picker
+Label=Listed
+Group=Listed
+PresetValues=0|1
+PresetLabels=None|None
+Default=0
+mcReadOnly=1
+mcSlot=listed
+mcSlotGroups=1
+]]
+    local listing=[[
+[Category.Inner]
+mcLabel=Module
+mcWithin=Outer
+mcWithinLabel=Category
+[Setting.One]
+Id=One
+Type=picker
+Label=One
+Group=Inner
+PresetValues=0|1
+PresetLabels=Yes|Yes
+Default=0
+mcReadOnly=1
+]]
+    files['/nest/mod_settings.ini']=tabs
+    local page=provider('Nest','/nest/mod_settings.ini',tabs)
+    Slots.parse(tabs,page.choices)
+    local list=provider('Nester','/nested/mod_settings.ini',listing,true)
+    local text
+    local function spy(content) text=content;return Choices.parse(content) end
+    logs={}
+    assert(Slots.load(page,{listed={{contributor='Nester',source=list,settings={'One'}}}},read,spy,report),logs[1])
+    assert(page.choices[1].group=='mcSlot.listed.1',text)
+    assert(text:find('[Category.mcSlot.listed.1]\nmcLabel=Module\nmcWithinLabel=Category\nmcWithin=mcSlot.listed.2\n',1,true),text)
+end
 print('PASS menu slots splice contributed rows and route them to their source model')

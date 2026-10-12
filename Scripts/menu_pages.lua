@@ -122,7 +122,17 @@ function M.apply(providers,contributions,parse,state,report,slots,hooked,compile
     state.inserts={}
     local ids={}
     for _,provider in ipairs(providers) do ids[provider.id]=true end
+    -- Contributors without rows go first, in publish order: a slot's host may be a contributed
+    -- page, and a contributor whose rows fill it can publish before it (its folder starts first).
+    -- Rows keep their publish order.
+    local ordered={}
     for _,contribution in ipairs(contributions) do
+        if not contribution.rows or #contribution.rows==0 then ordered[#ordered+1]=contribution end
+    end
+    for _,contribution in ipairs(contributions) do
+        if contribution.rows and #contribution.rows>0 then ordered[#ordered+1]=contribution end
+    end
+    for _,contribution in ipairs(ordered) do
         local hidden,inserts={},{}
         local ok,err=pcall(function()
             local built,shown,landed={},{},{}
@@ -140,14 +150,15 @@ function M.apply(providers,contributions,parse,state,report,slots,hooked,compile
                 end
             end
             -- Validate all attachments before changing the list; a contributor is all or nothing.
-            -- A hidden page still claims its folder: its detected placeholder stays hidden too.
+            -- A hidden page still claims its folder: that mod's own entry stays hidden too, whether
+            -- it is a detected placeholder or a mod with settings of its own.
             local claimed={}
             for _,page in ipairs(contribution.pages) do
                 local entry=built[page.id]
                 if entry and page.attach then entry.match=attached(providers,page.attach)
                 elseif not shown[page.id] and page.attach then
                     local match=attached(providers,page.attach)
-                    if match and match.noSettings and match.detectedKind then claimed[#claimed+1]=match end
+                    if match and (match.detectedKind or not match.noSettings) then claimed[#claimed+1]=match end
                 end
             end
             for _,match in ipairs(claimed) do

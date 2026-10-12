@@ -22,8 +22,7 @@ edits and Apply; your mod applies the saved values to gameplay.
 - **Preserve configuration:** add missing numeric defaults while keeping existing
   choices and unrelated content.
 - **Browse your mods:** the Modules page lists every installed mod, sorted by
-  category, by when it was added, alphabetically or in load order, with collections
-  and an Errors tab that gathers error lines from `UE4SS.log`.
+  category, by when it was added, alphabetically or in load order, with collections.
 
 ## Choose the right module
 
@@ -75,7 +74,8 @@ Settings page sets the rest:
 - **Modules per row** sets 1, 2 or 3 mods per row in Categories and Recently Added.
 
 Mods without settings fold into a final "and N more" entry in each group. The
-**Errors** tab shows the latest error lines from `UE4SS.log`; **Developer Tools**
+**Templates** tab shows ModCore Templates' loaded templates by category, the active ones
+marked; **Developer Tools**
 lists tool pages.
 
 ## Logging

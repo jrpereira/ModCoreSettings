@@ -117,7 +117,7 @@ assert(byId['MCT.extra'].name=='Extra' and byId['MCT.extra'].author=='ModCoreTem
     'a page that does not stand in for a mod keeps its own')
 print('PASS mod.json gives each folder its group, identity and dependencies')
 
--- MCS's own page carries the index tabs: Errors and Developer Tools. Tool pages stay among the
+-- MCS's own page carries the index tab: Developer Tools. Tool pages stay among the
 -- providers so links open them, but are not listed while the tabs reach them.
 local host='[Mod]\nId=ModCoreSettings\n\n[Setting.MCS_Page]\nId=MCS_Page\nType=picker\n'
 local reads=0
@@ -146,15 +146,14 @@ assert(mcs.mcManifest==parsed and mcs.settingsCount==2 and mcs.choicesLoaded and
 local function at(text) return assert(parsed:find(text,1,true),text) end
 assert(not parsed:find('Installed',1,true) and not parsed:find('ModCore Controls',1,true),
     'there is no Installed tab')
-assert(at('[Category.Errors]\nVisibleWhen=MCS_Page\nVisibleValues=4\nmcHeading=0\n') and at('mcText=errors'),
-    'the Errors tab shows the errors text source')
+assert(not parsed:find('Templates',1,true),'the Templates tab is the page\'s own slot, not an index')
 assert(at('[Category.Developer Tools]\nVisibleWhen=MCS_Page\nVisibleValues=5\n')<at('Label=Sounds Explorer')
     and at('mcLinkPage=ModCoreDevTools.sounds'),'Developer Tools lists the tool pages')
 local tool
 for _,provider in ipairs(indexed) do if provider.id=='ModCoreDevTools.sounds' then tool=provider end end
 assert(tool.mcBrowserHidden and indexed[#indexed]==tool,'tool pages stay listed last, hidden')
 Groups.arrange(indexed,parse,nil,{folderManifest=folderFields,read=read})
-assert(reads==1 and select(2,mcs.mcManifest:gsub('%[Category%.Errors%]',''))==1,
+assert(reads==1 and select(2,mcs.mcManifest:gsub('%[Category%.Developer Tools%]',''))==1,
     'the base manifest is read once and the tabs are never appended twice')
 local failures={}
 local broken={{id='ModCoreSettings',name='Settings',path='/x'},{id='T',name='Tool',mcBrowserGroup='tool'}}
@@ -162,7 +161,7 @@ Groups.arrange(broken,function() error('bad manifest') end,function(event) failu
     {read=function() return host end})
 assert(failures[1]=='BROWSER_INDEX_FAILED' and not broken[#broken].mcBrowserHidden,
     'without the tabs a tool page is listed so it stays reachable')
-print('PASS MCS\'s own page carries the Errors and Developer Tools tabs')
+print('PASS MCS\'s own page carries the Developer Tools tab')
 
 -- With the taxonomy, a mod is listed under each top category its categories belong to,
 -- in load order (folder name order, keeping 0_ ... 9_ in sequence). Collections follow
@@ -375,6 +374,18 @@ end
 assert(moreRow and moreRow.widget.opacity==0.5,'the folded entry is dimmed')
 foldPage.selected=moreIndex;foldPage:highlight(moreIndex)
 assert(moreRow.widget.opacity==0.75 and moreRow.widget.background==0,'hovering the folded entry only brightens it')
+-- A group heading is never highlighted, hovered or not, and stays at full strength.
+local headingRow,headingIndex
+for _,page in ipairs({foldPage,browsing}) do
+    for index,row in ipairs(page.rows) do
+        local list=page==foldPage and foldItems or browsingItems
+        if not headingRow and list[row.providerIndex] and list[row.providerIndex].mcBrowserHeading then
+            headingRow,headingIndex=row,index;page:highlight(index)
+        end
+    end
+end
+assert(headingRow and headingRow.widget.background==0 and headingRow.widget.opacity==1,
+    'hovering a group heading highlights nothing')
 -- The index page is titled Modules and lists MCS's modules: active module folders,
 -- MCS's own page and tool pages. Disabled folders and packages are dropped.
 local modulePages=browserPages()
@@ -467,8 +478,8 @@ Groups.arrange(hostPage,function(manifest) return Presentation.parse(manifest,Ch
 local page
 for _,provider in ipairs(hostPage) do if provider.id=='ModCoreSettings' then page=provider end end
 local items={};for _,item in ipairs(page.choices) do items[item.id]=item end
-assert(items.MCS_Page and #items.MCS_Page.values==3 and items.MCS_Page.labels[2]=='Errors'
-    and items.MCS_Index_Errors.mcText=='errors' and items.MCS_Index_1.mcLinkPage
+assert(items.MCS_Page and #items.MCS_Page.values==3 and items.MCS_Page.labels[2]=='Templates'
+    and items.MCS_Index_1.mcLinkPage and items.MCS_Templates and items.MCS_Templates.mcReadOnly
     and items.SortBy.file=='config.ini' and items.SortBy.section=='Modules',
     'the tabs parse through DMM beside the page\'s own settings')
 print('PASS the index tabs parse through DMM')

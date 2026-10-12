@@ -1,5 +1,53 @@
 # Changelog
 
+## Unreleased
+
+- Clicking the outer 40% of a picker's value, either side, steps like the arrow on that side;
+  the middle 20% selects the row as before. The choice indicator under the value spans 75% of
+  its width, its pips sharing it evenly.
+- Subgroups: a menu-data group's `groups` are its subgroups, one level deep (manifests:
+  `mcWithin=<category>` on a category, with `mcWithinLabel` heading a category that has no
+  rows). A subgroup heading is smaller, at the row indent and without a rule; its rows
+  indent 10 pixels further, 3pt smaller. Menu-data fields now stay together under their
+  group, in group order.
+- Menu data puts a picker in the page title row with `heading=true` (compiles to
+  `mcHeading=1`) instead of `level=1`; a field's `level` now takes 0 or 2–6.
+- ModCore Settings' page has no Errors tab any more; its tabs are Modules, Templates and
+  Developer Tools. The Templates tab is a slot, `settings:templates`, that ModCore Templates
+  fills with its list of loaded templates.
+- A slot row with `mcSlotGroups=1` (menu data `slotGroups=true`) lets inserted rows keep their
+  source groups: each becomes a group of the host page with its own heading, shown under the
+  slot group's rule.
+- Menu data fields can be slots: `slot=<name>` (and `slotLabel=true`) on a read-only field
+  with choices compiles to `mcSlot`/`mcSlotLabel`, so a menu-data page can host other
+  contributors' rows.
+- Read-only rows can be mirrored into a slot. They stay shown values with no storage and never
+  dirty the page. Navigation and link rows still cannot.
+- ModCore Settings' Modules tab reserves two slots after Listing, `settings:extensions` and
+  `settings:verifications`, which UE4SS Lua Extensions fills with its installed count and a
+  startup verification switch per extension.
+- A picker choice's note is 1 point smaller (10), and while it shows, the note and the value
+  sit 4 pixels higher than before. An arrow picker showing no note has its indicator
+  2 pixels higher.
+- Pickers with arrows show how many choices they have and which is current: a row of pips
+  under the value (a track with a thumb beyond 16 choices), in the row's bottom pixels below
+  any choice note. It is at half strength until its row is hovered or selected. While its row
+  is hovered or selected, the current pip (or the thumb) is 2 pixels taller than the others,
+  centred on the same line.
+- At a picker's first or last choice the arrow that has nowhere to go stays visible at 50%
+  instead of disappearing. A disabled picker still hides both.
+- In grouped mod lists, mod names are 2 points smaller (12, the "and N more" entry 10) and each
+  grid cell or row is 3 pixels shorter above and below. Each group after the first starts 10
+  pixels further down, and hovering a group heading no longer highlights it.
+- Page tabs (top right): every separator line stays thin and dim, the selected tab's too. The
+  selected tab glows behind its label and under it, with a 4-pixel soft band 1 pixel lower and a 1-pixel line 3 pixels below the tab, a hovered tab's background lights up, and
+  the other tabs' labels are dimmed 20%. When the tab row has focus, DMM's focus highlight
+  shows on the selected tab instead of across the whole title row.
+- A hidden page attached to a mod now also hides that mod's own entry when the mod has
+  settings of its own, not only a detected placeholder without settings. A contributor can
+  therefore replace several mods' entries with one page. The entry returns when the
+  contributor withdraws or does not load.
+
 ## v1.1.0
 
 - A key row's `DefaultControl` keys come from `Scripts/vendor/standard_keys.lua`, which
