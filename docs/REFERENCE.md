@@ -349,14 +349,6 @@ to 45% opacity while its own value is one of those listed, the opacity of a
 disabled choice. Each value must be one of the picker's `PresetValues`. It is
 presentation only: the row stays enabled and its value saves as usual.
 
-`mcText=<source>` on an `mcReadOnly=1` picker replaces the row with a 360-pixel
-scrollable text area showing a text source the host provides, newest line at the
-bottom. While the row shows, the source is checked about once a second; new text
-scrolls the area to its end. An unknown source shows "Unavailable." ModCore
-Settings provides an `errors` source: the latest 100 error lines of
-`UE4SS.log` (ModCore `ERROR`/`CRITICAL` messages, failed Lua calls, and lines
-mentioning an error, exception or stack traceback, with their stack traces).
-
 `mcTable=<code>:<text>|<code>:<text>|...` on an `mcReadOnly=1` picker replaces the
 row with a static table of pairs, such as `2192:→|25CF:●`. `mcColumns=<n>` (1–6,
 default 1) sets the columns, filled top to bottom. Codes are 12pt muted and texts
@@ -368,11 +360,11 @@ columns.
 The code ends at the first `:`; neither part may contain `|`. Both are trimmed,
 non-empty and at most 8 characters; a table has at most 256 entries. A malformed
 table shows "Unavailable:" and the reason in its place; the page still loads. It
-cannot be combined with `mcText`, `mcWrap` or `mcType`, and `mcColumns` requires
-it. Like every read-only row it is never saved or marked dirty. Contributors can
-check their values offline with `menu_contributions.textTable(value, columns)`,
-which decodes them as ModCoreSettings does and raises on malformed input. A hooks
-page writes the fields into the manifest its `manifest()` returns.
+cannot be combined with `mcWrap` or `mcType`, and `mcColumns` requires it. Like
+every read-only row it is never saved or marked dirty. Contributors can check
+their values offline with `menu_contributions.textTable(value, columns)`, which
+decodes them as ModCoreSettings does and raises on malformed input. A hooks page
+writes the fields into the manifest its `manifest()` returns.
 
 `mcChoiceNotes=<value>:<text>;<value>:<text>` on a picker gives choices a note,
 shown small and muted on a second line under the current choice, within DMM's

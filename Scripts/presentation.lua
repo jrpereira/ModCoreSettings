@@ -243,20 +243,12 @@ function M.parse(content,items)
                     'mcCategory cannot be combined with mcLevel or mcHeading')
                 s.mcWrap=flag(r.mcWrap,'mcWrap')
                 assert(not s.mcWrap or s.kind=='picker' and r.mcReadOnly=='1','mcWrap requires a read-only picker')
-                -- mcText=<source> shows a source's text in a scrollable area; the host
-                -- passes the sources to install().
-                if r.mcText~=nil then
-                    assert(s.kind=='picker' and r.mcReadOnly=='1','mcText requires a read-only picker')
-                    assert(r.mcText:match('^[%w_]+$') and #r.mcText<=64,'invalid mcText')
-                end
-                s.mcText=r.mcText
                 -- mcTable=<code>:<text>|... shows static pairs in mcColumns columns. Its
                 -- entries are decoded when the row is built, so a malformed table shows
                 -- a placeholder instead of skipping the page.
                 if r.mcTable~=nil then
                     assert(s.kind=='picker' and r.mcReadOnly=='1','mcTable requires a read-only picker')
-                    assert(r.mcText==nil and not s.mcWrap and r.mcType==nil,
-                        'mcTable cannot be combined with mcText, mcWrap or mcType')
+                    assert(not s.mcWrap and r.mcType==nil,'mcTable cannot be combined with mcWrap or mcType')
                     s.mcTable={text=r.mcTable,columns=r.mcColumns}
                 else
                     assert(r.mcColumns==nil,'mcColumns requires mcTable')
@@ -350,10 +342,8 @@ function M.install(choices,controls,pages,options)
     local keyColumn=options and options.keyColumn
     -- Where a keybind's key box (and a cycle button) starts: centred on a picker's value column.
     local function keyLeft() return pickerValueLeft+(pickerValueWidth-keyColumn.key)/2 end
-    -- textSources[name].poll() returns lines and whether they changed, for mcText rows.
-    local textSources=options and options.textSources or {}
-    local textArea={height=360,poll=1,format=function(lines) return table.concat(lines,'\n') end}
-    if options and options.textFormat then textArea.format=options.textFormat end
+    -- An mcTable row taller than this scrolls.
+    local tableMaxHeight=360
     -- textTable(text,columns) decodes an mcTable row: menu_contributions.textTable.
     local textTable=options and options.textTable or function() error('table decoder unavailable',0) end
     -- An mcTable line: codes 12pt muted, texts 18pt, each centred in a cell with tablePad
@@ -848,30 +838,12 @@ function M.install(choices,controls,pages,options)
                     row.mcTabs={{widget=button,label=label,value=setting.values[1],pressed=false,pointer=false,
                         cycle=true,box=box}}
                     for _,part in ipairs(row.parts) do part.widget:GetParent():SetVisibility(1) end
-                elseif setting.mcText then
-                    -- A source's text in a fixed-height area across the row, scrolled to
-                    -- its newest line at the bottom; tick() refreshes it while it shows.
-                    local text=api.caption(tree,'')
-                    api.Theme.font(text,api.theme,12);text:SetFont(text.Font)
-                    text:SetJustification(0);text:SetAutoWrapText(true)
-                    local scroll=new('ScrollBox')
-                    add(scroll,text)
-                    local box=new('SizeBox');box:SetWidthOverride(PAGE_WIDTH-2*pickerRightMargin)
-                    box:SetHeightOverride(textArea.height)
-                    api.need(box:SetContent(scroll),'MCS text area')
-                    local overlay=row.background:GetParent()
-                    local slot=add(overlay,box);slot:SetHorizontalAlignment(1);slot:SetVerticalAlignment(2)
-                    slot:SetPadding({Left=pickerRightMargin,Top=0,Right=0,Bottom=0})
-                    row.wrapper:SetHeightOverride(textArea.height+16)
-                    row.mcLabel:SetVisibility(1)
-                    for _,part in ipairs(row.parts) do part.widget:GetParent():SetVisibility(1) end
-                    row.mcText={source=textSources[setting.mcText],label=text,scroll=scroll,polled=nil}
                 elseif setting.mcTable then
                     -- Code and text pairs across the row in columns filled top to bottom.
                     -- Every code and every text sits centred in a cell of fixed size, at
                     -- least a line tall, so nothing is clipped off-centre, the columns stay
                     -- level and the texts line up whatever the codes' widths. Each pair is
-                    -- centred in its column. Taller than textArea.height, the table scrolls.
+                    -- centred in its column. Taller than tableMaxHeight, the table scrolls.
                     local width=PAGE_WIDTH-2*pickerRightMargin
                     local ok,entries,columns=pcall(textTable,setting.mcTable.text,setting.mcTable.columns)
                     local content,height
@@ -909,7 +881,7 @@ function M.install(choices,controls,pages,options)
                             end
                             add(content,column)
                         end
-                        height=math.min(lines*tableLine,textArea.height)
+                        height=math.min(lines*tableLine,tableMaxHeight)
                     else
                         content=api.caption(tree,'Unavailable: '..tostring(entries))
                         api.Theme.font(content,api.theme,12);api.Theme.textColor(content,'muted')
@@ -974,7 +946,7 @@ function M.install(choices,controls,pages,options)
                 -- value in the row's bottom pixels, below any choice note.
                 if setting.kind=='picker' and row.value and row.background and row.parts and #row.parts==3
                     and not row.mcTabs and not row.mcHeaderTabs and not setting.mcTabs and not setting.mcCycle
-                    and not setting.mcText and not setting.mcTable and not setting.mcWrap
+                    and not setting.mcTable and not setting.mcWrap
                     and not setting.mcReadOnly and #(setting.values or {})>=2 then
                     local function boxWidth(widget,fallback)
                         local ok,width=pcall(function() return widget:GetParent().WidthOverride end)
@@ -1440,7 +1412,7 @@ function M.install(choices,controls,pages,options)
                 end
                 if group and (group.labelRule or group.label) then
                     local text=dynamic(group.labelRule,self.model,group.label or setting.group)
-                    if heading.mcText~=text then api.setText(heading.widget,text);heading.mcText=text end
+                    if heading.text~=text then api.setText(heading.widget,text);heading.text=text end
                 end
                 -- A subgroup heading has no rule.
                 local rule=headingRules[heading.widget]
@@ -1680,17 +1652,6 @@ function M.install(choices,controls,pages,options)
                             if row.mcArrowsHot~=hot then
                                 for _,arrow in ipairs(row.mcArrowBoxes) do arrow.box:SetVisibility(hot and arrow.shown or 2) end
                                 row.mcArrowsHot=hot
-                            end
-                        end
-                        local area=row.mcText
-                        if area and (not area.polled or os.time()-area.polled>=textArea.poll) then
-                            area.polled=os.time()
-                            local lines,changed
-                            if area.source then lines,changed=area.source.poll() end
-                            if not area.shown or changed then
-                                api.setText(area.label,area.source and textArea.format(lines) or 'Unavailable.')
-                                area.scroll:ScrollToEnd()
-                                area.shown=true
                             end
                         end
                         -- A click on a picker's value zone steps like its arrow, while that

@@ -135,7 +135,6 @@ local function widget()
     function w:SetBrushColor(v) self.BrushColor=v end
     function w:SetColorAndOpacity(v) self.colorAndOpacity=v;self.color=nil end
     function w:SetRenderTranslation(v) self.RenderTranslation=v end
-    function w:ScrollToEnd() self.scrolledToEnd=(self.scrolledToEnd or 0)+1 end
     return setmetatable(w,{__index=function(_,key)
         if key:match('^Set') or key=='ForceVolatile' or key=='ScrollToStart' or key=='ScrollWidgetIntoView' then return function() end end
     end})
@@ -267,10 +266,7 @@ local controls={build=function(tree,providers,a)
     function ui:select(i) self.current=i end
     return ui
 end}
-local textLines,textChanged,textPolls={},false,0
-local textSource={poll=function() textPolls=textPolls+1;return textLines,textChanged end}
-assert(M.install(choices,controls,pages,{keyColumn={key=96,keyOffset=408},textSources={errors=textSource},
-    textFormat=function(lines) return #lines==0 and 'None' or table.concat(lines,'\n') end,
+assert(M.install(choices,controls,pages,{keyColumn={key=96,keyOffset=408},
     textTable=require('menu_contributions').textTable}))
 assert(not M.install(choices,controls,pages))
 local browserProviders={
@@ -822,39 +818,8 @@ local before=readOnly.model.pending[1]
 readOnly:tick({},function(w) local clicked=w.clicked;w.clicked=false;return clicked,false,false end,false)
 assert(readOnly.model.pending[1]==before, 'Reference clicks cannot change the pending value')
 
--- mcText shows a source's text in a scrollable area across the row, newest at the bottom.
 items[1].values,items[1].labels={0,1},{'Errors','Errors'}
-assert(not pcall(M.parse,'[Setting.Primary]\nId=Primary\nmcText=errors\n',items),'mcText requires a read-only row')
-assert(not pcall(M.parse,'[Setting.Primary]\nId=Primary\nmcReadOnly=1\nmcText=bad name\n',items))
-M.parse('[Setting.Primary]\nId=Primary\nmcReadOnly=1\nmcText=errors\n',items)
-local textPage=controls.build(widget(),{{choices=items}},api)
-textPage:show(1)
-local textRow=textPage.panels[1].rows[1]
-local area=assert(textRow.mcText,'an mcText row gets a text area')
-assert(area.scroll.children[1]==area.label and area.label.AutoWrapText and area.label.Font.Size==12
-    and area.scroll:GetParent().HeightOverride==360 and textRow.wrapper.HeightOverride==376
-    and textRow.mcLabel.visible==1 and not textRow.mcTabs,'the area replaces the row label and value')
-local noClick=function() return false,false,false end
-textPage:tick({},noClick,false)
-assert(area.label.text=='None' and area.scroll.scrolledToEnd==1 and textPolls==1,'the first tick shows the source')
-textPage:tick({},noClick,false)
-assert(textPolls==1,'the source is polled at most once a second')
-textLines,textChanged={'first error','second error'},true;area.polled=nil
-textPage:tick({},noClick,false)
-assert(area.label.text=='first error\nsecond error' and area.scroll.scrolledToEnd==2,
-    'new lines show at the bottom, scrolled into view')
-textChanged=false;area.polled=nil
-textPage:tick({},noClick,false)
-assert(textPolls==3 and area.scroll.scrolledToEnd==2,'unchanged text keeps the reader where they scrolled')
-textRow.visible=false;area.polled=nil
-textPage:tick({},noClick,false)
-assert(textPolls==3,'a hidden text area is not polled')
-M.parse('[Setting.Primary]\nId=Primary\nmcReadOnly=1\nmcText=missing\n',items)
-local unavailable=controls.build(widget(),{{choices=items}},api)
-unavailable:show(1);unavailable:tick({},noClick,false)
-assert(unavailable.panels[1].rows[1].mcText.label.text=='Unavailable.','an unknown source says so')
 M.parse('[Setting.Primary]\nId=Primary\nmcReadOnly=1\n',items)
-assert(items[1].mcText==nil,'a reparse without mcText clears it')
 -- A read-only row cannot be selected: it is left out of navigation, a selection of it is
 -- refused or moved, and the pointer passes through its buttons.
 assert(items[1].mcReadOnly==true)
@@ -866,14 +831,14 @@ assert(fixed.panels[1].rows[1].widget.visible==3,'its label button takes no poin
 for _,part in ipairs(fixed.panels[1].rows[1].parts) do assert(part.widget.visible==3,'nor do its value buttons') end
 fixed.current=nil;fixed:select(1);assert(fixed.current==nil,'selecting it is refused')
 fixed.current=1;fixed:refresh();assert(fixed.current==fixed.visibleRows[1],'a selection on it moves to a selectable row')
-print('PASS mcText shows a source in a scrollable area, newest at the bottom')
+print('PASS a read-only row cannot be selected')
 
 -- mcTable shows static code and text pairs in columns filled top to bottom, every line
 -- the same height and every code the same width.
 local function tableManifest(fields) return '[Setting.Primary]\nId=Primary\n'..fields..'\n' end
 assert(not pcall(M.parse,tableManifest('mcTable=A:a'),items),'mcTable requires a read-only row')
 assert(not pcall(M.parse,tableManifest('mcReadOnly=1\nmcColumns=2'),items),'mcColumns requires mcTable')
-for _,other in ipairs({'mcText=errors','mcWrap=1','mcType=tab'}) do
+for _,other in ipairs({'mcWrap=1','mcType=tab'}) do
     assert(not pcall(M.parse,tableManifest('mcReadOnly=1\nmcTable=A:a\n'..other),items),other)
 end
 local glyphs={}

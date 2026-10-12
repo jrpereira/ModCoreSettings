@@ -98,11 +98,7 @@ extension={
             end)()})
         navigation.install(dmm.choices)
         mapped.install(dmm.choices,dmm.controls)
-        -- UE4SS.log sits in the ue4ss folder, above Mods/<this mod>/Scripts/.
-        local errorLog=module('error_log')
-        local ue4ss=directory:match('^(.*[/\\])[^/\\]+[/\\][^/\\]+[/\\]Scripts[/\\]$')
         presentation.install(dmm.choices,dmm.controls,dmm.pages,{keyColumn=keybind.layout,
-            textSources={errors=ue4ss and errorLog.reader(ue4ss..'UE4SS.log') or nil},textFormat=errorLog.text,
             textTable=contributions.textTable,playerExists=playerExists})
         local mods=directory:match('^(.*[/\\])[^/\\]+[/\\]Scripts[/\\]$')
         local folderManifest=browserGroups.folderManifest(mods)

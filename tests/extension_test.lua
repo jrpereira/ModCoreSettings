@@ -57,9 +57,6 @@ loadfile=function(path)
             return 'sort button'
         end} end
         if name=='menu_contributions' then return {textTable='table decoder'} end
-        if name=='error_log' then
-            return {reader=function(path) return {path=path} end,text=function() return 'text' end}
-        end
         if name=='dmm_lifecycle' then
             return {publisher=function() return {publish=function(_,event) installs[#installs+1]={name='publish',event=event} end} end}
         end
@@ -78,7 +75,7 @@ local settingsApi={}
 extension.install({version=1,choices=choices,controls=controls,pages=pages,events=events,settingsApi=settingsApi})
 local order={'mc_ini','mcs_manifest','safe_file','mcs_protocols','navigation','mapped_presets','menu_contributions','presentation','browser_groups','module_categories','mcs_taxonomy','mcs_module_json',
  'init_config','dmm_lifecycle','menu_pages','page_links','menu_slots','page_hooks','field_types','keybind_editor','standard_keys','standard_controls',
- 'error_log','sort_button','menu_data','index_refresh'}
+ 'sort_button','menu_data','index_refresh'}
 assert(#loaded==#order)
 for n,name in ipairs(order) do assert(loaded[n]:match(name..'%.lua$'),'load '..n) end
 -- Copied files load from Scripts/vendor; the extension's own modules from Scripts.
@@ -92,9 +89,7 @@ assert(fieldTypes.order==0 and fieldTypes.registered.keybind and fieldTypes.modu
 assert(installs[1].args[1]==choices)
 assert(installs[2].args[1]==choices and installs[2].args[2]==controls)
 assert(installs[3].args[1]==choices and installs[3].args[2]==controls and installs[3].args[3]==pages)
-assert(installs[3].args[4].textSources.errors.path=='C:/UE4SS.log' and installs[3].args[4].textFormat()=='text'
-    and installs[3].args[4].textTable=='table decoder',
-    'the Errors source reads UE4SS.log in the ue4ss folder, above Mods')
+assert(installs[3].args[4].textTable=='table decoder','presentation gets the mcTable decoder')
 local playerExists=installs[3].args[4].playerExists
 local function object(fields) fields.IsValid=function() return true end;return fields end
 local pawn

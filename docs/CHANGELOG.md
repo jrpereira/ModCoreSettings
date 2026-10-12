@@ -65,6 +65,7 @@
   settings of its own, not only a detected placeholder without settings. A contributor can
   therefore replace several mods' entries with one page. The entry returns when the
   contributor withdraws or does not load.
+- `mcText` rows and the UE4SS.log reader are removed with the Errors tab.
 
 ## v1.1.0
 
