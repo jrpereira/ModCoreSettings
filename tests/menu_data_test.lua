@@ -9,13 +9,13 @@ local function fails(pattern,menu,options)
 end
 local function menu()
     return {storage={file='config.ini',section='Settings'},
-        groups={{id='MCT_1',label='Layout',level=3},{id='Notes',heading=false,visible={field='Style',values={1}}}},
+        groups={{id='MCT_1',label='Layout',level=3},{id='Notes',heading=false,conditions={visible={field='Style',values={1}}}}},
         fields={
             {id='Style',group='MCT_1',label='Style',default=0,tabs=true,heading=true,
                 choices={{value=0,label='Swap'},{value=1,label='Stack',note='Two rows'},
                     {value=2,label='Ring',module='9_ModCore_Example'}}},
             {id='Size',group='MCT_1',label='Size',default=100,range={min=10,max=200,step=5,suffix='%'},
-                description='How large; really.',relabel={field='Style',values={[1]='Stack size',[2]='Ring size'}}},
+                description='How large; really.',conditions={label={field='Style',values={[1]='Stack size',[2]='Ring size'}}}},
             {id='Open',group='Notes',label='Open the slot',default=0,link='controls:visuals',
                 choices={{value=0,label='Open'}},tabs=true,level=5},
             {id='Info',group='Notes',label='Info',default=0,readOnly=true,choices={{value=0,label='Ready'}}},
@@ -82,11 +82,95 @@ fails('tabs take at most eight',with(function(m)
     for n=3,9 do m.fields[1].choices[#m.fields[1].choices+1]={value=n,label='C'..n} end end))
 fails('only one heading',with(function(m) m.fields[4].heading=true end))
 fails('invalid level',with(function(m) m.fields[3].level=1 end))
-fails('source must be a picker',with(function(m) m.fields[2].relabel.field='Size' end))
-fails('value outside the source choices',with(function(m) m.groups[2].visible.values={9} end))
+fails('source must be a picker',with(function(m) m.fields[2].conditions.label.field='Size' end))
+fails('value outside the source choices',with(function(m) m.groups[2].conditions.visible.values={9} end))
 fails('invalid Style label',with(function(m) m.fields[1].label='A|B' end))
 fails('storage file must be relative',with(function(m) m.storage.file='../x.ini' end))
 fails('a choice has a note or a module',with(function(m) m.fields[1].choices[2].module='X' end))
+-- A choice's sound becomes the picker's mcChoiceSounds; 'none' silences that choice.
+local voiced=menu()
+voiced.fields[1].choices[1].sound='/Game/Audio/Swoosh'
+voiced.fields[1].choices[3].sound='none'
+local voicedText=Data.manifest(voiced)
+assert(voicedText:find('mcChoiceSounds=0:/Game/Audio/Swoosh;2:none',1,true),'choice sounds are written')
+assert(not text:find('mcChoiceSounds',1,true),'no sounds, no key')
+if choicesPath then
+    local items=dofile(choicesPath).parse(voicedText)
+    Presentation.parse(voicedText,items)
+    assert(items[1].mcChoiceSounds[0]=='/Game/Audio/Swoosh.Swoosh' and items[1].mcChoiceSounds[2]==false
+        and items[1].mcChoiceSounds[1]==nil,'presentation reads the choice sounds')
+end
+fails('invalid choice sound',with(function(m) m.fields[1].choices[1].sound='Audio/Swoosh' end))
+fails('invalid choice sound',with(function(m) m.fields[1].choices[1].sound=1 end))
+-- Every presentation key a row or group takes is a menu-data property too.
+local shown=menu()
+shown.groups[1].help='What these do.';shown.groups[1].silent=true
+shown.groups[1].conditions={visible={playerExists=false},order={field='Style',values={[{0,2}]=20,[1]=10}}}
+shown.groups[1].parent={label='Display',level=3}
+shown.fields[1].silent=true;shown.fields[1].conditions={dim={2}}
+shown.fields[2].conditions.visible={field='Style',values={1,2},playerExists=true}
+shown.fields[3].tabsWidth=200
+shown.fields[4].table={entries={{code='2192',text='→'},{code='25CF',text='●'}},columns=2}
+shown.fields[#shown.fields+1]={id='List',group='Notes',label='List',default=0,readOnly=true,wrap=true,
+    choices={{value=0,label='a, b, c'}}}
+shown.fields[#shown.fields+1]={id='Mode',group='Notes',label='Mode',default=0,cycle=true,category=true,
+    choices={{value=0,label='A'},{value=1,label='B'}}}
+shown.fields[#shown.fields+1]={id='Ref',group='Notes',label='Ref',default=0,readOnly=true,tabs=true,
+    referenceLabel='Key',choices={{value=0,label='Q'}}}
+local shownText=Data.manifest(shown)
+local function shownSection(name)
+    return assert((shownText..'\n'):match('%['..name:gsub('%.','%%.')..'%]\n(.-)\n\n'),'missing section '..name)
+end
+local function has(name,...)
+    local body=shownSection(name)
+    for _,line in ipairs({...}) do assert(body:find(line,1,true),name..' lacks '..line) end
+end
+has('Category.MCT_1','mcHelp=What these do.','mcSilent=1','mcPlayerExists=0','mcParent=Display',
+    'mcParentLevel=3','mcOrderWhen=Style','mcOrders=0:20;1:10;2:20')
+has('Setting.Style','mcSilent=1','mcDimValues=2')
+has('Setting.Size','VisibleWhen=Style','VisibleValues=1|2','mcPlayerExists=1')
+has('Setting.Open','mcTabsWidth=200')
+has('Setting.Info','mcTable=2192:→|25CF:●','mcColumns=2')
+has('Setting.List','mcWrap=1')
+has('Setting.Mode','mcType=cycle','mcCategory=1')
+has('Setting.Ref','mcType=tab','mcReferenceLabel=Key')
+local entries,columns=require('menu_contributions').textTable('2192:→|25CF:●',2)
+assert(#entries==2 and columns==2,'the table decodes as ModCoreSettings decodes it')
+if choicesPath then
+    local items=dofile(choicesPath).parse(shownText)
+    Presentation.parse(shownText,items)
+    local byId={}
+    for _,item in ipairs(items) do byId[item.id]=item end
+    assert(byId.Style.mcSilent and byId.Style.mcDimValues[2] and byId.Size.mcPlayerExists==true
+        and byId.Open.mcTabsWidth==200 and byId.Info.mcTable and byId.List.mcWrap and byId.Mode.mcCycle
+        and byId.Mode.mcCategory and byId.Ref.mcReferenceLabel=='Key','presentation reads the row properties')
+    local group=byId.Style.mcGroup
+    assert(group.help=='What these do.' and group.silent and group.playerExists==false
+        and group.parent.label=='Display' and group.order.values[0]==20,'presentation reads the group properties')
+end
+fails('cycle needs choices and no tabs',with(function(m) m.fields[1].cycle=true end))
+fails('tabsWidth is 160 through 440',with(function(m) m.fields[3].tabsWidth=100 end))
+fails('a category row takes no level',with(function(m) m.fields[3].category=true end))
+fails('wrap needs a read-only row',with(function(m) m.fields[1].wrap=true end))
+fails('dim value outside the choices',with(function(m) m.fields[1].conditions={dim={7}} end))
+fails('a table is a read-only row',with(function(m) m.fields[1].table={entries={{code='a',text='b'}}} end))
+fails('invalid table entry 1',with(function(m) m.fields[4].table={entries={{code='a:b',text='c'}}} end))
+fails('table columns are 1 through 6',with(function(m) m.fields[4].table={entries={{code='a',text='b'}},columns=7} end))
+fails('referenceLabel needs read-only tabs',with(function(m) m.fields[4].referenceLabel='K' end))
+fails('invalid MCT_1 silent',with(function(m) m.groups[1].silent=1 end))
+fails('value outside the source choices',with(function(m) m.groups[1].conditions={order={field='Style',values={[9]=1}}} end))
+-- A label or order key may list values sharing one entry; a value appears once.
+local folded=Data.manifest(with(function(m)
+    m.fields[2].conditions.label.values={[{1,2}]='Shaped size'} end))
+assert(folded:find('mcLabels=1:Shaped size;2:Shaped size',1,true),'a value list unfolds')
+fails('value 1 appears twice',with(function(m)
+    m.fields[2].conditions.label.values={[1]='A',[{1,2}]='B'} end))
+fails('empty value list',with(function(m) m.fields[2].conditions.label.values={[{}]='A'} end))
+fails('needs a field or playerExists',with(function(m) m.groups[2].conditions.visible={} end))
+fails('field and values go together',with(function(m) m.groups[2].conditions.visible={field='Style'} end))
+fails('unknown field visible',with(function(m) m.fields[1].visible={field='Style',values={1}} end))
+fails('unknown field order',with(function(m) m.fields[1].conditions={order={field='Style',values={[0]=1}}} end))
+fails('unknown field parent',with(function(m) m.groups[1].groups={{id='Sub',parent={label='X'}}} end))
 fails('a read-only row needs choices and no action',with(function(m) m.fields[4].action=true end))
 -- A read-only field can be the page's slot for other contributors' rows.
 local slotted=menu();slotted.fields[4].slot='extras';slotted.fields[4].slotLabel=true
@@ -123,8 +207,8 @@ assert(nestedText:find('[Category.Inner]\nmcWithin=Outer\n',1,true)
     and nestedText:find('[Category.Outer]\n\n',1,true))
 fails('unknown field groups',{groups={{id='X',groups={{id='Y',groups={}}}}},fields={}})
 fails('duplicate group X',{groups={{id='X',groups={{id='X'}}}},fields={}})
-fails('Bare: a group without rows takes no visible or relabel',{groups={{id='Bare',
-    visible={field='C',values={0}},groups={{id='Only'}}}},
+fails('Bare: a group without rows takes no rules or presentation',{groups={{id='Bare',
+    conditions={visible={field='C',values={0}}},groups={{id='Only'}}}},
     fields={{id='C',group='Only',label='C',default=0,choices={{value=0,label='A'},{value=1,label='B'}}}}})
 -- Presentation reads the subgroups: subgroups of a category without rows (which DMM would
 -- refuse as a section) share a heading drawn from mcWithinLabel.

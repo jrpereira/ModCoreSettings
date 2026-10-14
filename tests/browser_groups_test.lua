@@ -13,8 +13,8 @@ end
 
 -- Without a taxonomy, mods sharing a mod.json group form a collection and mods sharing an
 -- author an author group; groups of one join the plain list. Groups follow the load order
--- of their first mod. A child page follows its parent; mods without settings fold into a
--- final entry. Every mod follows the same rules: there is no ModCore group of its own.
+-- of their first mod. A child page follows its parent; mods without settings fold into one
+-- entry at the end of the page. Every mod follows the same rules: there is no ModCore group of its own.
 local providers={
     {id='Other',name='Other',author='Solo'},
     {id='ModCoreControls',name='Controls',mcListGroup='ModCore'},
@@ -29,8 +29,8 @@ local providers={
 Groups.arrange(providers)
 local listed='ModCore.browser.group.list:ModCore,ModCoreControls,ModCoreSettings,'
     ..'ModCore.browser.group.list:Bob,Bob.one,Bob.two,'
-    ..'ModCore.browser.group.list:alpha,Declared,Declared.child,Quiet,ModCore.browser.group.list:alpha.more,'
-    ..'ModCore.browser.group.various,Other,Detected,ModCore.browser.group.various.more'
+    ..'ModCore.browser.group.list:alpha,Declared,Declared.child,Quiet,'
+    ..'ModCore.browser.group.various,Other,Detected,ModCore.browser.group.all,ModCore.browser.group.all.more'
 expect(providers,listed)
 local byId={};for _,provider in ipairs(providers) do byId[provider.id]=provider end
 local modcore=byId['ModCore.browser.group.list:ModCore']
@@ -43,11 +43,14 @@ assert(byId.ModCoreControls.mcBrowserLine=='cell' and byId['Bob.one'].mcBrowserL
 local function foldOf(list,id)
     for index,provider in ipairs(list) do if provider.id==id then return list.mcFoldedAt[index] end end
 end
-assert(foldOf(providers,'Quiet')=='list:alpha' and foldOf(providers,'Detected')=='various'
+assert(foldOf(providers,'Quiet')=='all' and foldOf(providers,'Detected')=='all'
     and not foldOf(providers,'Declared'),'mods without settings fold')
-local more=byId['ModCore.browser.group.list:alpha.more']
-assert(more.mcBrowserMore=='list:alpha' and more.name=='and 1 more with no settings' and not more.noSettings
-    and more.mcBrowserLine=='cell','the folded entry closes its group, filling a grid place like a mod')
+local more=byId['ModCore.browser.group.all.more']
+assert(more.mcBrowserMore=='all' and more.name=='and 2 more with no settings' and not more.noSettings
+    and more.mcBrowserLine=='cell','one folded entry for every group')
+local tail=byId['ModCore.browser.group.all']
+assert(tail.mcBrowserBare and tail.mcBrowserHidden and tail.mcBrowserLine=='head',
+    'it ends the page under a heading that is never shown')
 assert(byId['ModCore.browser.group.various'].name=='Various Authors' and providers.mcModuleCount==8)
 Groups.arrange(providers)
 expect(providers,listed,'arranging again is stable')
@@ -271,7 +274,7 @@ local function browserPages(withHint)
     end
     return pages
 end
--- Mods without settings stay folded until the group's last entry is selected.
+-- Mods without settings stay folded until the entry ending the page is selected.
 local folding=browserPages()
 assert(Groups.install(folding) and not Groups.install(folding))
 local browsingItems={{id='A',name='A',author='X',choices={{id='a'}}},{id='B',name='B',author='X',noSettings=true},
@@ -283,11 +286,12 @@ local function shown(page)
     return #out
 end
 assert(shown(browsing)==3 and browsing.allRows[3].wrapper.visibility==1 and browsing.allRows[4].wrapper.visibility==1
-    and browsing.allRows[5].wrapper.visibility==0,'a heading, the mod with settings and the folded entry')
+    and browsing.allRows[5].wrapper.visibility==1 and browsing.allRows[6].wrapper.visibility==0,
+    'a heading, the mod with settings and the folded entry, its own heading never shown')
 assert(browsing.allRows[1].widget.rule3==browsing.allRows[2].widget,'navigation links the shown rows')
 browsing:showDetail(3)
 assert(#browsing.opened==0 and shown(browsing)==4 and browsing.allRows[3].wrapper.visibility==0
-    and browsing.allRows[5].wrapper.visibility==1,'selecting the folded entry lists the mods and opens nothing')
+    and browsing.allRows[6].wrapper.visibility==1,'selecting the folded entry lists the mods and opens nothing')
 browsing:showDetail(2)
 assert(browsing.opened[1]=='A','other entries open their page')
 browsing:setFilter(true)
@@ -440,7 +444,7 @@ assert(titled.filterLabel.text=='Modules','the filter label is the page title')
 local unchanged={{id='Off',name='Off',mcFolder='Off',choices={{id='o'}}}}
 Groups.modules(unchanged,nil);Groups.modules(unchanged,{})
 assert(#unchanged==1,'without a register the list is left as DMM built it')
--- A mod without settings in two groups unfolds only where its group's entry is chosen.
+-- A mod without settings in two groups is counted once and unfolds in both.
 local twicePages=browserPages()
 Groups.install(twicePages,nil,nil,nil,nil,function()
     return {taxonomy=Tax,categoryRegister={Twice=Tax:entry({categories={'gear','layout'},tags={}}),
@@ -456,12 +460,14 @@ for _,row in ipairs(twice.allRows) do
     if provider.id=='Twice' then placements[#placements+1]=row end
     if provider.mcBrowserMore then mores[#mores+1]=row end
 end
-assert(#placements==2 and #mores==2,'listed and folded in both groups')
+assert(#placements==2 and #mores==1,'listed and folded in both groups, under one entry')
+assert(twiceItems[mores[1].providerIndex].name=='and 1 more with no settings','a mod is counted once')
+assert(placements[1].wrapper.visibility==1 and placements[2].wrapper.visibility==1,'folded until chosen')
 local first
 for index,row in ipairs(twice.rows) do if row==mores[1] then first=index end end
 twice:showDetail(first)
-assert(placements[1].wrapper.visibility==0 and placements[2].wrapper.visibility==1,
-    'only the chosen group shows its folded mod')
+assert(placements[1].wrapper.visibility==0 and placements[2].wrapper.visibility==0
+    and mores[1].wrapper.visibility==1,'choosing the entry unfolds every group and hides it')
 print('PASS the folded entry lists mods without settings and opens nothing')
 
 -- Taxonomy filtering combines independent category and tag sets.

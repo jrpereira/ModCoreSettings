@@ -322,9 +322,9 @@ do
     assert(Slots.load(page,{visuals={{contributor='ModCoreTemplates',source=mctLabel,settings={'MCT_Other'}}}},
         read,Choices.parse,report)==false and logs[1]:find('mcLabelWhen must name',1,true),tostring(logs[1]))
 end
--- A picker's choice notes are carried into the slot, so its second line shows there too.
+-- A picker's choice notes and sounds are carried into the slot, so they show and play there too.
 do
-    local noted=source:gsub('mcHeading=true\n','mcHeading=true\nmcChoiceNotes=5:Ringer;7:Barista\n')
+    local noted=source:gsub('mcHeading=true\n','mcHeading=true\nmcChoiceNotes=5:Ringer;7:Barista\nmcChoiceSounds=5:none\n')
     local mctNotes=provider('ModCoreTemplates','/mct/mod_settings.ini',noted,true)
     local page=provider('ModCoreControls','/mcc/mod_settings.ini',host)
     local text
@@ -335,7 +335,7 @@ do
     assert(text:find('mcChoiceNotes=5:Ringer;7:Barista',1,true),text)
     assert(not text:find('mcHeading=true',1,true),'other presentation keys stay behind')
     local items=require('presentation').parse(text,Choices.parse(text))
-    assert(items[2].id=='MCT_Template' and items[2].mcChoiceNotes[7]=='Barista')
+    assert(items[2].id=='MCT_Template' and items[2].mcChoiceNotes[7]=='Barista' and items[2].mcChoiceSounds[5]==false)
 end
 assert(not pcall(Choices.parse,host:gsub('mcSlot=visuals\n','mcSlotLabel=1\n')),'mcSlotLabel requires mcSlot')
 assert(not pcall(Choices.parse,host:gsub('mcSlot=visuals\n','mcSlot=visuals\nmcSlotLabel=yes\n')),'mcSlotLabel is 1')

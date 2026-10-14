@@ -252,6 +252,7 @@ local controls={build=function(tree,providers,a)
         p.built=true
     end
     function ui:show(i) self.active=i;self:prepare(i);self:refresh() end
+    function ui:hide() self.active=nil end
     function ui:refresh()
         local visible=self.model:visibility()
         for i,row in ipairs(self.panels[self.active].rows) do
@@ -266,8 +267,12 @@ local controls={build=function(tree,providers,a)
     function ui:select(i) self.current=i end
     return ui
 end}
+-- DMM's lifecycle bus; the presentation listens for the menu closing.
+local lifecycle={}
+local lifecycleEvents={on=function(_,name,callback) lifecycle[name]=callback end}
 assert(M.install(choices,controls,pages,{keyColumn={key=96,keyOffset=408},
-    textTable=require('menu_contributions').textTable}))
+    textTable=require('menu_contributions').textTable,events=lifecycleEvents}))
+assert(type(lifecycle.hostClosing)=='function','the presentation listens for the menu closing')
 assert(not M.install(choices,controls,pages))
 local browserProviders={
     {name='Templates',choices=items},
@@ -331,7 +336,7 @@ assert(categoryLabel.Slot.Padding.Left==0
     and page.allRows[2].wrapper.Slot.Padding.Left==20
     and page.allRows[2].wrapper.WidthOverride==544,
     'Submodule button and highlight must both start at the browser indentation')
--- A group: a header with a horizontal line, then barred lines of its pages; hidden and
+-- A group: a header with a horizontal line, then lines of its pages; hidden and
 -- ungrouped rows keep their place.
 local lineProviders={
     {name='Before',choices=items},
@@ -375,13 +380,13 @@ local headerRow=header:GetContent()
 local iconBox,text,headerRule=headerRow.children[1],headerRow.children[2],headerRow.children[3]
 assert(#headerRow.children==3 and iconBox.WidthOverride==20 and iconBox:GetContent().text=='⁂'
     and iconBox:GetContent().Slot.HorizontalAlignment==2 and iconBox:GetContent().Slot.VerticalAlignment==2,
-    'the icon sits centred in a box as wide as the line bar, over its line')
+    'the icon sits centred in a box as wide as the left margin, over it')
 assert(iconBox.Slot.Padding.Right==8,'the title follows the icon closely')
-assert(iconBox:GetContent().Slot.Padding.Top==12,'the icon sits level with the title')
+assert(iconBox:GetContent().Slot.Padding.Top==10,'the icon sits level with the title')
 assert(type(text.Slot.Size)~='table' or text.Slot.Size.SizeRule~=1,'the text column is as wide as its widest line')
 assert(headerRule.HeightOverride==2 and headerRule:GetContent() and headerRule.Slot.Size.SizeRule==1
-    and headerRule.Slot.VerticalAlignment==1 and headerRule.Slot.Padding.Top==35 and headerRule.Slot.Padding.Left==8,
-    'the rule sits 35 down, 8 right of the wider of title and kind, filling the rest')
+    and headerRule.Slot.VerticalAlignment==1 and headerRule.Slot.Padding.Top==35 and headerRule.Slot.Padding.Left==8
+    and headerRule.Slot.Padding.Right==6,'the rule sits 35 down, 8 right of the wider of title and kind, filling the rest but 6')
 -- The title row (the highlight box) comes first; the kind line follows so it draws
 -- over the box, pulled up into it.
 local title,kind=text.children[1],text.children[2]
@@ -393,14 +398,14 @@ assert(kind.text=='Collection' and kind.Font.Size==10 and kind.color=='muted' an
     and kind.Slot.Padding.Top==-35 and kind.Slot.Padding.Left==10 and kind.opacity==0.6,
     'a small faint line names the kind of group, drawn over the box')
 assert(math.abs(kind.Slot.Padding.Bottom-15.6)<0.01,'the kind line keeps the column as tall as the box')
-assert(#grid.children==4 and grid.children[1].HeightOverride==34 and grid.children[1].WidthOverride==20
-    and grid.children[1]:GetContent(),'a grid row starts with its vertical line')
+assert(#grid.children==4 and grid.children[1].HeightOverride==34 and grid.children[1].WidthOverride==20+18
+    and grid.children[1]:GetContent()==nil,'a grid row starts with a blank margin 18 wider than the icon column, no vertical line')
 for n,index in ipairs({3,5,6}) do
     local frame=grid.children[n+1]
     assert(frame:GetContent()==lineRows[index].wrapper and frame.BrushColor and frame.BrushColor.A<0.2
-        and lineRows[index].wrapper.WidthOverride==180 and lineRows[index].wrapper.HeightOverride==34
-        and frame.Slot.Padding.Right==8 and frame.Slot.Padding.Bottom==4,
-        'pages fill three columns in order, each on a faint background, rows 4 px apart')
+        and lineRows[index].wrapper.WidthOverride==math.floor((584-38)/3)-9 and lineRows[index].wrapper.HeightOverride==34
+        and frame.Slot.Padding.Right==9 and frame.Slot.Padding.Bottom==6,
+        'pages fill three columns in order, each on a faint background, columns 9 and rows 6 px apart')
     local label=lineRows[index].widget:GetContent()
     assert(label.AutoWrapText==true,'a grid name wraps to a second line before it is cut off')
 end
@@ -442,8 +447,9 @@ assert(moreRow.widget:GetContent().Font.Size==11 and modRow.widget:GetContent().
     'grouped mod names are 12 points, the folded entry two sizes smaller')
 assert(modRow.mcFrame:GetContent().HeightOverride==34 and modRow.widget:GetContent().Slot.Padding.Top==1
     and modRow.widget:GetContent().Slot.Padding.Bottom==1,'a grouped mod row is 3 shorter above and below')
-assert(modRow.mcFrame.Slot.Padding.Left==2 and modRow.mcFrame.Slot.Padding.Right==6
-    and modRow.widget:GetContent().Slot.Padding.Left==6,'a mod row box sits 2 right of its line, its text 6 in')
+assert(modRow.mcFrame.Slot.Padding.Left==2 and modRow.mcFrame.Slot.Padding.Right==7
+    and modRow.mcFrame.Slot.Padding.Bottom==10 and modRow.widget:GetContent().Slot.Padding.Left==6,
+    'a mod row box sits 2 right of its margin, its text 6 in, 10 above the next line')
 assert(modRow.mcFrame.BrushColor.R==0.62 and modRow.mcFrame.BrushColor.A==0.14,'a module has a faint warm backdrop')
 -- Ungrouped, each mod line has the same backdrop with a gap under it; the folded entry none.
 do
@@ -513,7 +519,7 @@ assert(#bob.children==4 and #various.children==3 and bob.parent==various.parent,
 assert(various.Slot.Padding.Top==bob.Slot.Padding.Top+14,'every group after the first starts 14 further down')
 local rowLine=bob.children[4]
 assert(#rowLine.children==2 and rowLine.children[1].HeightOverride==34
-    and rowLine.children[2]:GetContent()==mixedRows[3].wrapper and mixedRows[3].wrapper.WidthOverride==556
+    and rowLine.children[2]:GetContent()==mixedRows[3].wrapper and mixedRows[3].wrapper.WidthOverride==584-38-9
     and mixedRows[3].wrapper.HeightOverride==34 and not mixedRows[3].widget:GetContent().AutoWrapText,
     'a row page is one line across the group')
 assert(various.children[3].children[2]:GetContent()==mixedRows[5].wrapper,'the next group lists its own pages')
@@ -611,6 +617,40 @@ for _,silent in ipairs({false,true}) do
     assert(#sounds==(silent and 1 or 4),(silent and 'a silent row plays no interface sound' or 'a row plays its sounds'))
 end
 items[1].mcSilent=nil
+-- mcChoiceSounds: on a Change to a choice with its own sound, that sound plays instead of
+-- DMM's; none plays nothing; other choices and other sounds stay DMM's.
+do
+    local played={}
+    local playerFor=M.choiceSoundPlayer
+    local stops=0
+    M.choiceSoundPlayer=function() return {play=function(_,path) played[#played+1]=path end,
+        stop=function() stops=stops+1 end} end
+    items[1].mcChoiceSounds={[0]='/Game/Zero.Zero',[1]=false}
+    sounds={}
+    local page=controls.build(widget(),{{id='ModCoreTemplates.module.VisualExample',choices=items}},soundApi)
+    page.mcHeaderHost=widget()
+    page:show(1)
+    page.current=1
+    page.model.pending[1]=0;page.mcTestFeedback('Change')
+    page.model.pending[1]=1;page.mcTestFeedback('Change')
+    page.mcTestFeedback('Select')
+    assert(#played==1 and played[1]=='/Game/Zero.Zero' and #sounds==1 and sounds[1]=='Select',
+        'a choice\'s own sound replaces DMM\'s Change sound')
+    assert(stops==1,'changing to a silent choice stops the previous choice\'s sound')
+    items[1].mcChoiceSounds={[1]='/Game/One.One'}
+    page.model.pending[1]=0;page.mcTestFeedback('Change')
+    assert(#played==1 and sounds[2]=='Change' and stops==2,
+        'a choice without its own sound keeps DMM\'s, and stops the previous choice\'s')
+    -- The sound a choice started stops on another page, on hiding and on the menu closing.
+    page:show(1)
+    assert(stops==3,'showing a page stops the previous choice\'s sound')
+    page:hide()
+    assert(stops==4,'hiding the settings stops the previous choice\'s sound')
+    lifecycle.hostClosing({})
+    assert(stops==5,'closing the menu stops the previous choice\'s sound')
+    items[1].mcChoiceSounds=nil
+    M.choiceSoundPlayer=playerFor
+end
 items[1].mcNavigation,items[1].labels=nil,labels
 -- mcDimValues fades the whole row while its own value is one of them.
 items[1].mcDimValues={[1]=true}
@@ -992,6 +1032,16 @@ do
     assert(heading.mcLabel.Font.Size==18 and heading.mcLabel.color=='muted'
         and heading.mcLabel.Slot.Padding.Left==-2
         and heading.wrapper.Slot.Padding.Top==24,'the category row looks like a category heading')
+    -- Its rule follows it as a heading's does, and shows and hides with it.
+    local children=built.panels[1].scroll.children
+    local at
+    for n,child in ipairs(children) do if child==heading.wrapper then at=n end end
+    local rule=at and children[at+1]
+    assert(rule and rule.HeightOverride==1 and rule.Slot.Padding.Left==-2 and rule.Slot.Padding.Bottom==4
+        and rule.visible==4,'the category row is ruled beneath like a heading')
+    local rules=0
+    for _,child in ipairs(children) do if child.HeightOverride==1 and child.visible~=1 then rules=rules+1 end end
+    assert(rules==1,'one rule shows: the hidden heading\'s stays hidden')
     for i=2,3 do
         local row=built.panels[1].rows[i]
         assert(row.mcLabel.Font.Size==14 and row.mcLabel.color=='body'
@@ -1015,6 +1065,7 @@ do
     local row=built.panels[1].rows[2]
     assert(row.mcLabel.Font.Size==18 and row.widget:GetContent().Slot.Padding.Left==-2,
         'a hidden category row indents nothing')
+    assert(rule.visible==1,'a hidden category row hides its rule')
     assert(not pcall(M.parse,'[Setting.Visual1]\nId=Visual1\nmcCategory=1\nmcLevel=2\n',list),
         'mcCategory excludes mcLevel')
     for i=1,3 do items[i]=saved[i] end
@@ -1223,13 +1274,13 @@ assert(noteBox.visible==1 and noteRow.value.Slot.Padding.Bottom==4 and noteRow.v
 local pipBox=noteRow.mcPipBox
 assert(pipBox and #noteRow.mcPips==3 and pipBox:GetParent()==noteRow.background:GetParent()
     and pipBox.WidthOverride==142 and pipBox.HeightOverride==4 and pipBox.Slot.Padding.Left==362+24
-    and pipBox.Slot.VerticalAlignment==3 and pipBox.Slot.Padding.Bottom==-1+5 and pipBox.HeightOverride==4 and pipBox.visible==3,
+    and pipBox.Slot.VerticalAlignment==3 and pipBox.Slot.Padding.Bottom==-1+6 and pipBox.HeightOverride==4 and pipBox.visible==3,
     'the indicator spans 75% of the value\'s width, centred, in the bottom pixels, never hit-tested')
 local widths={}
 for n,b in ipairs(noteRow.mcPipBoxes) do widths[n]=b.WidthOverride end
-assert(table.concat(widths,',')=='45,46,45' and noteRow.mcPipBoxes[2].Slot.Padding.Left==3,
-    'the pips fill it, 3 pixels apart, differing by a pixel at most: '..table.concat(widths,','))
-assert(pipBox.Slot.Padding.Bottom+pipBox.HeightOverride<=noteBox.Slot.Padding.Bottom,'it sits below the note')
+assert(table.concat(widths,',')=='45,44,45' and noteRow.mcPipBoxes[2].Slot.Padding.Left==4,
+    'the pips fill it, 4 pixels apart, differing by a pixel at most: '..table.concat(widths,','))
+assert(-1+pipBox.HeightOverride<=noteBox.Slot.Padding.Bottom,'under a note, at its lowest, it sits below the note')
 local function lit() local out={} for n,pip in ipairs(noteRow.mcPips) do if pip.BrushColor.A>0.5 then out[#out+1]=n end end return table.concat(out,',') end
 assert(lit()=='1','the first choice is current')
 local function heights() local out={} for n,b in ipairs(noteRow.mcPipBoxes) do out[n]=b.HeightOverride end return table.concat(out,',') end
@@ -1307,8 +1358,8 @@ do
         and surface.children[1].visible==1,'one control in place of the track and value column')
     assert(row.widget:GetParent().WidthOverride==362,'the control takes a picker\'s value column')
     assert(row.value.Font.Size==12 and row.value.Slot.HorizontalAlignment==0 and row.value.Justification==1
-        and row.value.Slot.VerticalAlignment==2 and row.value.Slot.Padding.Bottom==4 and row.value.visible==3,
-        'the value is 2 points smaller, its text centred across the control, 2 pixels up, never hit-tested')
+        and row.value.Slot.VerticalAlignment==2 and row.value.Slot.Padding.Bottom==6 and row.value.visible==3,
+        'the value is 2 points smaller, its text centred across the control, 3 pixels up, never hit-tested')
     assert(bar.span==142 and bar.bar.WidthOverride==142 and bar.bar.HeightOverride==10 and bar.bar.Slot.Padding.Bottom==4
         and row.slider.Slot.Padding.Left==24 and row.slider.Slot.Padding.Right==24 and row.slider.opacity==0,
         'the bar takes 75% of the control, centred, and the invisible native slider spans it')

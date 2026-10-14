@@ -2,8 +2,11 @@
 local M={version=1}
 local Manifest=require('mcs_manifest')
 local Protocols=require('mcs_protocols')
+local ChoiceSound=require('mcs_choice_sound')
 local dirtySignalPrefix=Protocols.valueDirty
 local function trim(s) return (s or ''):match('^%s*(.-)%s*$') end
+-- The player of choice sounds (mcChoiceSounds); report(event,detail) receives failures.
+function M.choiceSoundPlayer(report) return ChoiceSound.player(nil,report) end
 local function identityText(value)
     return tostring(value):gsub('%%','%%25'):gsub('\n','%%0A'):gsub('\r','%%0D')
 end
@@ -64,7 +67,7 @@ local headerUnderSoftHeight,headerUnderSoftDrop,headerUnderEdgeHeight,headerUnde
 -- current one (or the thumb) grows downwards while its row is hot. Below a choice note.
 -- The indicator spans pipShare of the value's width, centred; the pips share it, pipGap
 -- apart, each as wide as its place allows (they differ by a pixel at most).
-local pipLimit,pipHeight,pipActiveHeight,pipBottom,pipGap,pipShare=16,2,4,-1,3,0.75
+local pipLimit,pipHeight,pipActiveHeight,pipBottom,pipGap,pipShare=16,2,4,-1,4,0.75
 -- A click on the outer stepZone of a picker's value, either side, steps like the arrow there.
 local stepZone=0.4
 local pipOn,pipOff={R=0.95,G=0.63,B=0.08,A=0.9},{R=0.62,G=0.55,B=0.42,A=0.35}
@@ -76,7 +79,7 @@ local pipOn,pipOff={R=0.95,G=0.63,B=0.08,A=0.9},{R=0.62,G=0.55,B=0.42,A=0.35}
 -- the row's bottom.
 local sliderValueShrink,sliderShare,sliderMarkHeight,sliderMarkAbove,sliderBottom=2,0.75,10,2,4
 -- The slider's value sits sliderValueLift pixels above the control's centre.
-local sliderValueLift=2
+local sliderValueLift=3
 -- A picker's value column in DMM's row: 330 of label and a 32-pixel arrow before it, 190
 -- wide. A toggle's value takes the same column, so every value lines up.
 local pickerLabelWidth,pickerArrowWidth,pickerValueWidth=330,32,190
@@ -92,7 +95,7 @@ local noteSize,noteRaise=10,8
 -- DMM centres a picker's value, so bottom padding raises it by half: noteValueLift raises
 -- it 5 pixels over a note. An arrow picker showing no note raises its value 2 pixels
 -- (plainValueLift), plainValueShrink points smaller, while its indicator sits plainPipLift higher.
-local noteValueLift,plainValueLift,plainValueShrink,plainPipLift=10,4,1,5
+local noteValueLift,plainValueLift,plainValueShrink,plainPipLift=10,4,1,6
 -- The indicator's opacity while its row is not hovered: half of full.
 local pipIdleOpacity=0.5
 -- The current pip (or thumb) is pipHotHeight tall while its row is hovered or selected,
@@ -261,6 +264,9 @@ function M.parse(content,items)
                 s.mcReferenceLabel=r.mcReferenceLabel
                 s.mcLabelRule=labelRule(r)
                 s.mcChoiceNotes=choiceNotes(r,s)
+                -- mcChoiceSounds=<value>:<event path>;... plays a choice's own sound
+                -- instead of DMM's when the row changes to it.
+                s.mcChoiceSounds=ChoiceSound.parse(r.mcChoiceSounds,s)
                 s.mcDimValues=dimValues(r,s)
                 s.mcTabs,s.mcCycle,s.mcTabsWidth,s.mcHeader=nil,nil,nil,nil
                 local hasLevel=r.mcLevel~=nil
@@ -353,6 +359,13 @@ function M.install(choices,controls,pages,options)
     local function em(points) return points*4/3 end
     local tableLine=math.ceil(em(math.max(tableCode,tableText))*4/3)+2*tablePad
     local parse,build=choices.parse,controls.build
+    -- One player of choice sounds (mcChoiceSounds) for every page and menu: a sound a
+    -- choice started stops on the next change, on another page, and when the menu closes
+    -- (options.events, DMM's lifecycle bus: hostClosing).
+    local choicePlayer
+    local function stopChoiceSound() if choicePlayer then choicePlayer:stop() end end
+    local events=options and options.events
+    if events then events:on('hostClosing',stopChoiceSound) end
     choices.parse=function(content) return M.parse(content,parse(content)) end
     -- mcPlayerExists works like a hidden Yes|No picker that follows whether a player is in
     -- the world: rows and categories marked with it show only on its value, alongside their
@@ -401,11 +414,16 @@ function M.install(choices,controls,pages,options)
         local rowButtonInset=setmetatable({},{__mode='k'})
         local helpWidgets=setmetatable({},{__mode='k'})
         local headingRules=setmetatable({},{__mode='k'})
+        -- The rule under a row that stands in for its group's heading (mcCategory), by
+        -- the row's label button.
+        local categoryRules=setmetatable({},{__mode='k'})
         local valueSignals=setmetatable({},{__mode='k'})
         local ui
         -- While DMM builds a page: the provider, the last row whose label button was
         -- seen, and how many of that row's value buttons follow before the next label.
         local constructing,pendingHeading,buttonSettingIndex,buttonsToSkip
+        -- The label button of an mcCategory row whose rule waits for DMM to add the row.
+        local pendingCategoryRule
         for k,v in pairs(api) do adapted[k]=v end
         -- A page-tab row is not highlighted as a whole when it has focus: its selected tab
         -- takes DMM's focus highlight instead. headerFocus maps the row's highlighted widget
@@ -428,12 +446,24 @@ function M.install(choices,controls,pages,options)
             end
         end
         -- DMM plays a sound after making the row its own: hovered for Hover, current for
-        -- Select and Change. A silent row (mcSilent, or its category's) plays none.
+        -- Select and Change. A silent row (mcSilent, or its category's) plays none. On a
+        -- Change the new value is already set: a choice with its own sound (mcChoiceSounds)
+        -- plays that instead, or none. Any change on such a row first stops the sound the
+        -- previous choice started.
         if api.feedback then
             adapted.feedback=function(action,...)
                 local index=ui and ui.active and (action=='Hover' and ui.hovered or ui.current)
                 local setting=index and ui.model and ui.model.items and ui.model.items[index]
                 if setting and (setting.mcSilent or setting.mcGroup and setting.mcGroup.silent) then return end
+                local sound
+                if action=='Change' and setting and setting.mcChoiceSounds and ui.model.pending then
+                    sound=setting.mcChoiceSounds[ui.model.pending[index]]
+                    if sound or choicePlayer then
+                        choicePlayer=choicePlayer or M.choiceSoundPlayer(api.log)
+                        if sound then choicePlayer:play(sound) else choicePlayer:stop() end
+                    end
+                end
+                if sound~=nil then return end
                 return api.feedback(action,...)
             end
         end
@@ -448,11 +478,31 @@ function M.install(choices,controls,pages,options)
             api.setText(signal.marker,dirtySignalPrefix..(dirty and '1' or '0')..'\n'..display)
             return api.setText(widget,display)
         end
+        -- A rule like a heading's, under an mcCategory row: DMM adds the row to the page
+        -- after building its buttons, so the rule follows once the next heading or row
+        -- starts, or the page is built.
+        local function headingRule()
+            local rule=api.construct('/Script/UMG.Border',tree);rule:SetBrushColor(headerSeparatorDim)
+            local box=api.construct('/Script/UMG.SizeBox',tree);box:SetHeightOverride(1)
+            api.need(box:SetContent(rule),'MCS heading rule')
+            return box
+        end
+        local function addCategoryRule()
+            local button=pendingCategoryRule
+            pendingCategoryRule=nil
+            local panel=button and ui and ui.panels and ui.panels[constructing]
+            if not panel then return end
+            local box=headingRule()
+            api.need(panel.scroll:AddChild(box),'MCS category rule')
+                :SetPadding({Left=categoryLeft,Top=0,Right=0,Bottom=categoryRuleBottom})
+            categoryRules[button]=box
+        end
         adapted.caption=function(owner,text)
             local label=api.caption(owner,text)
             if constructing then
                 for _,s in ipairs(providers[constructing].choices or {}) do
                     if text==s.group then
+                        addCategoryRule()
                         local help=s.mcGroup and s.mcGroup.heading and s.mcGroup.help
                         pendingHeading={heading=label,help=help or nil};break
                     end
@@ -465,9 +515,7 @@ function M.install(choices,controls,pages,options)
         adapted.button=function(...)
             if pendingHeading then
                 local parent=pendingHeading.heading:GetParent()
-                local rule=api.construct('/Script/UMG.Border',tree);rule:SetBrushColor(headerSeparatorDim)
-                local box=api.construct('/Script/UMG.SizeBox',tree);box:SetHeightOverride(1)
-                api.need(box:SetContent(rule),'MCS heading rule')
+                local box=headingRule()
                 api.need(parent:AddChild(box),'MCS heading rule')
                     :SetPadding({Left=categoryLeft,Top=0,Right=0,Bottom=categoryRuleBottom})
                 headingRules[pendingHeading.heading]=box
@@ -489,8 +537,10 @@ function M.install(choices,controls,pages,options)
                 local nextSetting=providers[constructing].choices[buttonSettingIndex+1]
                 if not nextSetting or select(2,...)~=nextSetting.label then buttonsToSkip=math.huge
                 else
+                    addCategoryRule()
                     buttonSettingIndex=buttonSettingIndex+1
                     buttonsToSkip=nextSetting.kind=='picker' and 3 or 0
+                    if nextSetting.mcCategory then pendingCategoryRule=button end
                     if nextSetting.mcFont==nil and not nextSetting.mcHeader then
                         local style=button.WidgetStyle
                         local normal,pressed=style.NormalPadding,style.PressedPadding
@@ -506,7 +556,7 @@ function M.install(choices,controls,pages,options)
             return button,label
         end
         ui=build(tree,providers,adapted)
-        local prepare,show,refresh,tick,clearPresses,isPressed=ui.prepare,ui.show,ui.refresh,ui.tick,ui.clearPresses,ui.isPressed
+        local prepare,show,hide,refresh,tick,clearPresses,isPressed=ui.prepare,ui.show,ui.hide,ui.refresh,ui.tick,ui.clearPresses,ui.isPressed
         local select=ui.select
         local function new(kind) return api.construct('/Script/UMG.'..kind,tree) end
         local function add(parent,child) return api.need(parent:AddChild(child),'MCS presentation child') end
@@ -1188,7 +1238,10 @@ function M.install(choices,controls,pages,options)
                     capture(block,heading.widget)
                     if headingRules[heading.widget] then capture(block,headingRules[heading.widget]) end
                     if helpWidgets[heading.widget] then capture(block,helpWidgets[heading.widget]) end
-                    for i=heading.first,heading.last do capture(block,panel.rows[i].mcPlaceholder or panel.rows[i].wrapper) end
+                    for i=heading.first,heading.last do
+                        capture(block,panel.rows[i].mcPlaceholder or panel.rows[i].wrapper)
+                        if categoryRules[panel.rows[i].widget] then capture(block,categoryRules[panel.rows[i].widget]) end
+                    end
                 end
                 local extra={children={}}
                 -- Parent headings were added only to obtain real UMG widgets.
@@ -1223,14 +1276,19 @@ function M.install(choices,controls,pages,options)
         end
         -- Construction state never outlives DMM's build, even when the build fails.
         function ui:prepare(index,...)
-            constructing,buttonSettingIndex,buttonsToSkip,pendingHeading=index,0,0,nil
+            constructing,buttonSettingIndex,buttonsToSkip,pendingHeading,pendingCategoryRule=index,0,0,nil,nil
             local results=table.pack(pcall(prepare,self,index,...))
-            constructing,pendingHeading=nil,nil
+            if results[1] then
+                local ruled,why=pcall(addCategoryRule)
+                if not ruled then results={false,why,n=2} end
+            end
+            constructing,pendingHeading,pendingCategoryRule=nil,nil,nil
             if not results[1] then error(results[2],0) end
             decorate(index)
             return table.unpack(results,2,results.n)
         end
-        function ui:show(index,...) self:prepare(index);return show(self,index,...) end
+        function ui:show(index,...) stopChoiceSound();self:prepare(index);return show(self,index,...) end
+        if hide then function ui:hide(...) stopChoiceSound();return hide(self,...) end end
         local function readOnly(self,index)
             local setting=self.model and self.model.items and self.model.items[index]
             return setting~=nil and setting.mcReadOnly==true
@@ -1494,6 +1552,11 @@ function M.install(choices,controls,pages,options)
                         -- the heading's look, and the rows after it indent beneath it.
                         local beforeCategory=setting.mcCategory or not categoryAdded
                         if setting.mcCategory and row.visible then categoryAdded=true end
+                        -- Its rule shows with it.
+                        local rule=categoryRules[row.widget]
+                        if rule and row.mcCategoryRuleVisible~=(row.visible==true) then
+                            rule:SetVisibility(row.visible and 4 or 1);row.mcCategoryRuleVisible=row.visible==true
+                        end
                         -- A subgroup's rows indent further, a little smaller.
                         local nested=not beforeCategory and setting.mcGroup and setting.mcGroup.within~=nil
                         local style=beforeCategory and 'category' or nested and 'nested' or 'row'
@@ -1848,9 +1911,9 @@ function M.install(choices,controls,pages,options)
             -- horizontal line, then its pages: a 'cell' page in a grid (three columns, or its
             -- heading's mcBrowserColumns) on a faint background, its name left-aligned and
             -- wrapping to two lines before it is cut off; a 'row' page on a line of its own,
-            -- also left-aligned. A thin vertical line marks each line on its left. Hidden
+            -- also left-aligned. Each line keeps a blank margin on its left. Hidden
             -- pages keep their place in the list.
-            local ICON,ICON_HEIGHT,BAR,CELL,GAP,CELLS,WIDTH=40,54,20,180,8,3,PAGE_WIDTH
+            local ICON,ICON_HEIGHT,BAR,GAP,CELLS,WIDTH=40,54,20,8,3,PAGE_WIDTH
             local KIND_INDENT,CELL_LINE_HEIGHT=10,0.8
             -- A grid cell's height and its name's padding above and below. The "and N
             -- more" cell takes a grid place like a mod; starting a row, its smaller text sits
@@ -1871,12 +1934,15 @@ function M.install(choices,controls,pages,options)
             -- the box so its glow does not cover it. KIND_LINE is the kind text's height.
             local BOX_TOP,BOX_HEIGHT,KIND_TOP,KIND_LINE=20,34,19,19.4
             -- The header's rule is 2 pixels tall, RULE_TOP down, and starts RULE_GAP right
-            -- of the wider of the title and the kind line.
-            local RULE_TOP,RULE_GAP=35,8
+            -- of the wider of the title and the kind line, ending RULE_END short of the right.
+            local RULE_TOP,RULE_GAP,RULE_END=35,8,6
             -- The header is drawn HEADER_RAISE up from its place in the group, with
-            -- HEADER_GAP of bottom padding; a mod row's box sits ROW_SHIFT right of the line bar.
-            -- HEADER_INDENT moves the header's icon and title right of the line bar's column.
+            -- HEADER_GAP of bottom padding; a mod row's box sits ROW_SHIFT right of the left margin.
+            -- HEADER_INDENT moves the header's icon and title right of the left margin's column.
             local HEADER_RAISE,HEADER_GAP,ROW_SHIFT,HEADER_INDENT=4,8,2,2
+            -- Under a heading that is shown, how much further right than the icon column the
+            -- mods start, and how much more space they keep between columns and between lines.
+            local GROUP_INDENT,GROUP_COLUMN_GAP,GROUP_LINE_GAP=18,1,2
             local function frame(row,width,height)
                 local box=api.construct('/Script/UMG.Border',tree)
                 box:SetBrushColor(moduleBackground)
@@ -1894,30 +1960,33 @@ function M.install(choices,controls,pages,options)
             local function place(box,widget,padding)
                 api.need(box:AddChild(widget),'MCS mod-list cell'):SetPadding(padding or {Left=0,Top=0,Right=0,Bottom=0})
             end
-            local function bar(box,height)
-                local line=rule('vertical',height);line:SetWidthOverride(BAR);place(box,line)
-            end
             -- A group's grid columns: its heading's mcBrowserColumns (1-4), else CELLS. Cells
-            -- share the row's width: CELL wide at CELLS columns.
+            -- share the row's width left of the group's margin.
             local function columnsOf(head)
                 local provider=head and providers[head.providerIndex]
                 local columns=provider and tonumber(provider.mcBrowserColumns)
                 return columns and columns>=1 and columns<=4 and math.floor(columns) or CELLS
             end
-            local function cellWidth(columns)
-                return columns==CELLS and CELL or math.floor((WIDTH-BAR)/columns)-GAP
+            -- A group's spacing: its left margin (the icon column), the gap after each column
+            -- and the gap under each line, wider under a heading that is shown (a list
+            -- without one keeps the plain spacing).
+            local function spacingOf(head)
+                local provider=head and providers[head.providerIndex]
+                if provider and provider.mcBrowserBare then return BAR,GAP,0 end
+                return BAR+GROUP_INDENT,GAP+GROUP_COLUMN_GAP,GROUP_LINE_GAP
+            end
+            local function cellWidth(columns,margin,gap)
+                return math.floor((WIDTH-margin)/columns)-gap
             end
             local function groupLines(head,members)
                 local lines,grid={},nil
                 local columns=columnsOf(head)
-                local bare=providers[head.providerIndex].mcBrowserBare
+                local margin,gap,extra=spacingOf(head)
                 local function line(height)
                     local box=api.construct('/Script/UMG.HorizontalBox',tree)
-                    -- A list without a heading keeps the bar's margin but draws no line.
-                    if bare then
-                        local space=api.construct('/Script/UMG.SizeBox',tree)
-                        space:SetWidthOverride(BAR);space:SetHeightOverride(height);place(box,space)
-                    else bar(box,height) end
+                    -- The margin, with no line drawn in it.
+                    local space=api.construct('/Script/UMG.SizeBox',tree)
+                    space:SetWidthOverride(margin);space:SetHeightOverride(height);place(box,space)
                     lines[#lines+1]=box
                     return box
                 end
@@ -1942,13 +2011,13 @@ function M.install(choices,controls,pages,options)
                         -- A numbered name (load order) has its number's box before it instead.
                         label.Slot:SetPadding({Left=row.mcNumbered and 0 or 8,Top=CELL_TOP,Right=8,Bottom=CELL_BOTTOM+raise})
                         label.Slot:SetHorizontalAlignment(0);label.Slot:SetVerticalAlignment(2)
-                        place(grid.box,row.mcFrame,{Left=0,Top=0,Right=GAP,Bottom=CELL_ROW_GAP})
+                        place(grid.box,row.mcFrame,{Left=0,Top=0,Right=gap,Bottom=CELL_ROW_GAP+extra})
                     else
                         grid=nil
                         label:SetJustification(0)
                         label.Slot:SetPadding({Left=6,Top=ROW_PAD,Right=12,Bottom=ROW_PAD})
                         label.Slot:SetHorizontalAlignment(0)
-                        place(line(ROW_HEIGHT),row.mcFrame,{Left=ROW_SHIFT,Top=0,Right=GAP-ROW_SHIFT,Bottom=GAP})
+                        place(line(ROW_HEIGHT),row.mcFrame,{Left=ROW_SHIFT,Top=0,Right=gap-ROW_SHIFT,Bottom=GAP+extra})
                     end
                 end
                 return lines
@@ -2035,7 +2104,9 @@ function M.install(choices,controls,pages,options)
                     for _,row in ipairs(group.members) do
                         moved[row.wrapper:GetFullName()]=true
                         local cell=providers[row.providerIndex].mcBrowserLine=='cell'
-                        row.mcFrame=frame(row,cell and cellWidth(columnsOf(group.head)) or WIDTH-BAR-GAP,cell and CELL_HEIGHT or ROW_HEIGHT)
+                        local margin,gap=spacingOf(group.head)
+                        row.mcFrame=frame(row,cell and cellWidth(columnsOf(group.head),margin,gap) or WIDTH-margin-gap,
+                            cell and CELL_HEIGHT or ROW_HEIGHT)
                         -- The "and N more" entry has no background of its own.
                         if providers[row.providerIndex].mcBrowserMore then
                             row.mcFrame:SetBrushColor({R=0,G=0,B=0,A=0})
@@ -2049,15 +2120,15 @@ function M.install(choices,controls,pages,options)
                     group.bare=provider.mcBrowserBare==true
                     local header=api.construct('/Script/UMG.HorizontalBox',tree)
                     local iconBox=api.construct('/Script/UMG.SizeBox',tree)
-                    -- As wide as the line bar below, so the icon centres on its line; the
+                    -- As wide as the left margin below, so the icon centres over it; the
                     -- title's text then lines up with its mods' names.
                     iconBox:SetWidthOverride(BAR);iconBox:SetHeightOverride(ICON_HEIGHT)
                     local icon=api.caption(tree,provider.mcBrowserIcon or '')
                     api.Theme.font(icon,api.theme,20);icon:SetFont(icon.Font);icon:SetJustification(1)
                     local iconSlot=api.need(iconBox:SetContent(icon),'MCS mod-list group icon')
                     iconSlot:SetHorizontalAlignment(2);iconSlot:SetVerticalAlignment(2)
-                    -- Centred 6px below the box's middle, level with the title.
-                    iconSlot:SetPadding({Left=0,Top=12,Right=0,Bottom=0})
+                    -- Centred 5px below the box's middle, level with the title.
+                    iconSlot:SetPadding({Left=0,Top=10,Right=0,Bottom=0})
                     place(header,iconBox,{Left=HEADER_INDENT,Top=0,Right=8,Bottom=0})
                     local text=api.construct('/Script/UMG.VerticalBox',tree)
                     local kind=api.caption(tree,provider.mcBrowserKind or '')
@@ -2082,7 +2153,7 @@ function M.install(choices,controls,pages,options)
                     local line=rule('horizontal',2)
                     local lineSlot=api.need(header:AddChild(line),'MCS mod-list group header line')
                     lineSlot:SetVerticalAlignment(1);lineSlot:SetSize({SizeRule=1,Value=1})
-                    lineSlot:SetPadding({Left=RULE_GAP,Top=RULE_TOP,Right=0,Bottom=0})
+                    lineSlot:SetPadding({Left=RULE_GAP,Top=RULE_TOP,Right=RULE_END,Bottom=0})
                     local width=api.construct('/Script/UMG.SizeBox',tree)
                     width:SetWidthOverride(WIDTH)
                     api.need(width:SetContent(header),'MCS mod-list group header width')

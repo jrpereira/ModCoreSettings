@@ -73,7 +73,7 @@ local callbacks={}
 local events={on=function(_,name,callback) callbacks[name]=callback end}
 local settingsApi={}
 extension.install({version=1,choices=choices,controls=controls,pages=pages,events=events,settingsApi=settingsApi})
-local order={'mc_ini','mcs_manifest','safe_file','mcs_protocols','navigation','mapped_presets','menu_contributions','presentation','browser_groups','module_categories','mcs_taxonomy','mcs_module_json',
+local order={'mc_ini','mcs_manifest','safe_file','mcs_protocols','mcs_choice_sound','navigation','mapped_presets','menu_contributions','presentation','browser_groups','module_categories','mcs_taxonomy','mcs_module_json',
  'init_config','dmm_lifecycle','menu_pages','page_links','menu_slots','page_hooks','field_types','keybind_editor','standard_keys','standard_controls',
  'sort_button','menu_data','index_refresh'}
 assert(#loaded==#order)

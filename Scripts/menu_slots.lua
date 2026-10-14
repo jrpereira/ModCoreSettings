@@ -5,9 +5,9 @@
 local M={version=1}
 local Manifest=require('mcs_manifest')
 -- Inserted rows render as plain DMM controls; source presentation keys are not copied,
--- except a label rule naming an earlier inserted row and a picker's choice notes.
+-- except a label rule naming an earlier inserted row and a picker's choice notes and sounds.
 local COPIED={'Id','Type','Label','Description','PresetValues','PresetLabels','Presets','Default',
-    'Minimum','Maximum','Step','Decimals','Prefix','Suffix','mcChoiceNotes','mcReadOnly'}
+    'Minimum','Maximum','Step','Decimals','Prefix','Suffix','mcChoiceNotes','mcChoiceSounds','mcReadOnly'}
 
 -- Raw [Setting] sections with their line span, as DMM's parser reads them, and the lines.
 local function sections(content)

@@ -41,7 +41,7 @@ local function heading(key, title, kind, icon, columns)
         mcBrowserColumns=columns or GROUP_COLUMNS}
 end
 
--- The entry that folds a group's mods without settings; selecting it lists them.
+-- The entry that folds mods without settings; selecting it lists them.
 local function more(key, count)
     return {id=GROUP_PREFIX .. key .. '.more', name='and ' .. count .. ' more with no settings',
         author='', version='', description='',
@@ -213,8 +213,8 @@ end
 -- Every listed mod lands in groups: valid collections, then top categories in taxonomy
 -- order (or, without a taxonomy, each mod.json group or author shared by several mods),
 -- then Various Authors. Within a group, mods with settings come first, walked by
--- category in taxonomy order and then load order; mods without settings fold into a
--- final entry that lists them when selected.
+-- category in taxonomy order and then load order; mods without settings fold, and one
+-- entry at the end of the page lists them all when selected.
 -- options: folderManifest(folder), folderVersion(folder), pageVersions, categoryRegister,
 -- taxonomy, preferredMinimum, groupModules, read(path) (to extend the host page),
 -- recent (folder -> {added=,updated=,baseline=}: list ungrouped mods by their latest install
@@ -507,6 +507,9 @@ function M.arrange(providers, parse, report, options)
         foldedAt[#result] = fold
     end
     local folded = {}
+    -- Grouped, every group folds into one entry at the end of the page, counting each
+    -- folded mod once however many groups list it; ungrouped, the one list keeps its own.
+    local pooled, pooledSeen = 0, {}
     local function members(found, list, line)
         local without = {}
         local function one(provider)
@@ -517,13 +520,15 @@ function M.arrange(providers, parse, report, options)
             end
         end
         for _, provider in ipairs(list) do one(provider) end
-        local fold = found and found.key or 'plain'
+        local fold = found and 'all' or 'plain'
         for _, provider in ipairs(without) do
             add(provider, line, nil, fold)
             for _, child in ipairs(provider.mcChildren or {}) do add(child, line, nil, fold) end
+            local folder = folderOf(provider) or provider.id
+            if found and not pooledSeen[folder] then pooledSeen[folder] = true;pooled = pooled + 1 end
         end
-        if #without > 0 then
-            local entry = more(found and found.key or 'plain', #without)
+        if #without > 0 and not found then
+            local entry = more('plain', #without)
             folded[#folded + 1] = entry
             -- In a grid it fills a place like any mod; in a plain list it is a line.
             add(entry, line)
@@ -593,6 +598,15 @@ function M.arrange(providers, parse, report, options)
             if options.loadOrder and folderOf(provider) then number = number + 1;provider.mcLoadIndex = number end
         end
         members(found, plain, 'cell')
+    end
+    if pooled > 0 then
+        -- Under a heading that is never shown, so it follows the last group, not inside it.
+        local bare = heading('all', '', '', '', columns)
+        bare.mcBrowserBare, bare.mcBrowserHidden = true, true
+        add(bare, 'head')
+        local entry = more('all', pooled)
+        folded[#folded + 1] = entry
+        add(entry, 'cell')
     end
     -- Tool pages stay among the providers so their links open them; while the index tabs
     -- reach them they are never listed, otherwise they are listed like any mod.
@@ -671,7 +685,7 @@ function M.install(pages, report, parse, folderVersion, folderManifest, grouping
             -- Compatible-only filtering keeps the group headings, which have no settings of
             -- their own, and mods that declare they have none; pages opened only through
             -- links (mcBrowserHidden) are never listed. Mods without settings stay folded
-            -- until their group's last entry is selected. A failure leaves DMM's own filtering.
+            -- until the "and X more" entry is selected. A failure leaves DMM's own filtering.
             page.mcModuleCount=providers.mcModuleCount
             page.mcExpanded={}
             local categoryFilter,tagFilter=options.categoryFilter,options.tagFilter
@@ -755,7 +769,7 @@ function M.install(pages, report, parse, folderVersion, folderManifest, grouping
                 end)
                 if not ok then report('BROWSER_GROUPS_FAILED', err) end
             end
-            -- Selecting a group's "and X more" entry lists its mods without settings.
+            -- Selecting the "and X more" entry lists the mods without settings.
             if type(page.showDetail)=='function' then
                 local showDetail=page.showDetail
                 function page:showDetail(rowIndex)

@@ -214,3 +214,18 @@ for _,bad in ipairs({{'',nil},{'A',nil},{':a',nil},{'A:',nil},{'A:a|',nil},{'A:a
     assert(not pcall(Menu.textTable,bad[1],bad[2]),tostring(bad[1])..' / '..tostring(bad[2]))
 end
 print('PASS textTable decodes mcTable entries and columns')
+-- unfold expands value lists: each value takes its list's entry, and appears once.
+do
+    local map=Menu.unfold({[{1,2}]='A',[3]='B'},'labels')
+    assert(map[1]=='A' and map[2]=='A' and map[3]=='B','value lists unfold')
+    local again=Menu.unfold(map,'labels')
+    assert(again[1]=='A' and again[3]=='B','unfolding twice changes nothing')
+    for _,bad in ipairs({{{[1]='A',[{1}]='B'},'appears twice'},{{[{}]='A'},'empty value list'},
+            {{[{x=1}]='A'},'must be a list'},{{['a']='A'},'invalid value'}}) do
+        local ok,err=pcall(Menu.unfold,bad[1],'labels')
+        assert(not ok and tostring(err):find(bad[2],1,true),bad[2]..': '..tostring(err))
+    end
+    local ok,err=pcall(Menu.serialize,{values={[{1,2}]='A'}})
+    assert(not ok and tostring(err):find('unfold value lists',1,true),'folded keys never travel')
+end
+print('PASS unfold expands value lists')

@@ -7,13 +7,13 @@ return {
     groups={
         {id='Pages',heading=false},
         -- The Modules tab's settings, under a Listing heading.
-        {id='Listing',visible={field='MCS_Page',values={0}}},
+        {id='Listing',conditions={visible={field='MCS_Page',values={0}}}},
         -- Then slots that UE4SS Lua Extensions fills from its own hidden pages: how many
         -- extensions are installed, and, in a subgroup, each one's startup verification switch.
-        {id='Extensions',label='Lua Extensions',visible={field='MCS_Page',values={0}},groups={
-            {id='Verifications',label='Verify Extensions on Startup',visible={field='MCS_Page',values={0}}}}},
+        {id='Extensions',label='Lua Extensions',conditions={visible={field='MCS_Page',values={0}}},groups={
+            {id='Verifications',label='Verify Extensions on Startup',conditions={visible={field='MCS_Page',values={0}}}}}},
         -- The Templates tab: one slot that ModCore Templates fills with every loaded template.
-        {id='Templates',heading=false,visible={field='MCS_Page',values={1}}},
+        {id='Templates',heading=false,conditions={visible={field='MCS_Page',values={1}}}},
     },
     fields={
         {id='MCS_Page',group='Pages',label='Page',heading=true,action=true,default=0,
@@ -24,12 +24,12 @@ return {
             choices={{value=2,label='Recently Added'},{value=1,label='Categories'},{value=0,label='Alphabetical'},
                 {value=3,label='Load Order'}}},
         {id='PreferredCategoryMinimum',group='Listing',label='Collections valid with # modules',default=2,
-            visible={field='SortBy',values={1}},
+            conditions={visible={field='SortBy',values={1}}},
             choices={{value=0,label='No'},{value=2,label='2'},{value=3,label='3'}}},
         -- A mod whose categories span several top categories is listed under each, or only
         -- under the one holding most of them (ties: the first declared).
         {id='SingleCategory',group='Listing',label='Modules appear in a single category',default=0,
-            visible={field='SortBy',values={1}},
+            conditions={visible={field='SortBy',values={1}}},
             choices={{value=0,label='Off'},{value=1,label='On'}}},
         -- Grid columns of every group, shown in every sort; the ungrouped lists are one mod per line.
         {id='ModulesPerRow',group='Listing',label='Modules per row',default=2,

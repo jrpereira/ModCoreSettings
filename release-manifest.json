@@ -27,6 +27,7 @@
     "Scripts/mcs_folder_info.lua": "Scripts/mcs_folder_info.lua",
     "Scripts/mcs_files.lua": "Scripts/mcs_files.lua",
     "Scripts/mcs_protocols.lua": "Scripts/mcs_protocols.lua",
+    "Scripts/mcs_choice_sound.lua": "Scripts/mcs_choice_sound.lua",
     "Scripts/vendor/mc_ini.lua": "Scripts/vendor/mc_ini.lua",
     "Scripts/vendor/mc_log.lua": "Scripts/vendor/mc_log.lua",
     "Scripts/vendor/safe_file.lua": "Scripts/vendor/safe_file.lua",

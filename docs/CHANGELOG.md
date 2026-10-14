@@ -2,6 +2,18 @@
 
 ## v1.2.0
 
+- An `mcCategory` row is ruled beneath like the heading it stands in for.
+- `mcChoiceSounds=<value>:<event path>;...` gives a picker's choices their own sound,
+  played instead of DMM's change sound when the row changes to them (`none` plays nothing).
+  The next change, another page or closing the menu stops the previous choice's sound, so
+  long sounds work as previews.
+- Menu data takes a choice's `sound` (an event path or `'none'`) and writes it as `mcChoiceSounds`.
+- Menu data covers the rest of the presentation metadata: `silent`, `category`, `cycle`,
+  `tabsWidth`, `wrap`, `table` and `referenceLabel` on fields; `help`, `silent` and `parent` on groups.
+- Menu data's state-dependent rules move under `conditions`: `visible` (a picker rule,
+  `playerExists`, or both), `label` (was `relabel`), `dim` and, on groups, `order`. A `label` or
+  `order` key may list values sharing one entry (`[{1,2}]='text'`); `menu_contributions.unfold`
+  (client version 7) expands them.
 - The browser's title-line links are declared by the mods themselves: a `mod.json`
   `title_link` gives the link text (ModCore Settings and ModCore Controls declare theirs),
   where the browser used to name those two pages itself.

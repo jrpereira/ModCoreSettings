@@ -76,13 +76,13 @@ menu={
     storage={file='config.ini',section='Settings'},   -- optional
     groups={
         {id='Layout',label='Layout'},
-        {id='Advanced',heading=false,visible={field='Style',values={1}}},
+        {id='Advanced',heading=false,conditions={visible={field='Style',values={1}}}},
     },
     fields={
         {id='Style',group='Layout',label='Style',default=0,tabs=true,
             choices={{value=0,label='Swap'},{value=1,label='Stack',note='Two rows'}}},
         {id='Size',group='Layout',label='Size',default=100,range={min=10,max=200,step=5,suffix='%'},
-            relabel={field='Style',values={[1]='Stack size'}}},
+            conditions={label={field='Style',values={[1]='Stack size'}}}},
         {id='Gap',group='Advanced',label='Gap',default=4,range={min=0,max=20}},
     },
 }
@@ -97,22 +97,56 @@ menu={
   `{id='Quickslots',label='Player Quickslots',groups={{id='Fangdango',label='Fangdango'}}}`.
   A subgroup's heading is smaller and sits at the row indent; its fields indent
   further, 3pt smaller (`mcWithin`). A group whose fields are all in subgroups still
-  shows its heading, but cannot take `visible` or `relabel`.
+  shows its heading, but takes no `conditions` or presentation properties.
 - A field has `choices` (a picker; up to 64) or a whole-number `range`, and a
   `default` among them. One choice makes a button or, `readOnly`, a shown value.
   `tabs=true` shows up to eight choices side by side.
 - `heading=true` puts a picker in the page's title row (one per page); `level` 0
   or 2–6 sets the label size.
-- `visible={field=,values={...}}` shows a field or group only while that picker
-  on the page holds one of the values. `relabel={field=,values={[value]='text'}}`
-  names it after that picker's value.
+- `conditions` holds everything that changes while the menu is open; a rule's
+  `field` is a picker on the page:
+
+  | Condition | On | Effect | Key |
+  |---|---|---|---|
+  | `visible={field=,values={...},playerExists=}` | fields, groups | shown only while all given parts hold: the picker holds one of the values, and a player is (`true`) or is not (`false`) in the world | `VisibleWhen`, `VisibleValues`, `mcPlayerExists` |
+  | `label={field=,values={[value]='text'}}` | fields, groups | named after the picker's value; unlisted values keep the label | `mcLabelWhen`, `mcLabels` |
+  | `dim={<value>,...}` | fields | faded while the row's own value is one of these | `mcDimValues` |
+  | `order={field=,values={[value]=rank}}` | groups | ordered groups exchange places by rank | `mcOrderWhen`, `mcOrders` |
+
+  A `label` or `order` key may be a list of values sharing one entry:
+  `values={[{1,2}]='Side Keys',[3]='Top Keys'}`. Each value appears once. Readers
+  unfold lists once with `menu_contributions.unfold(map, where)`, so published
+  menu data holds single values only.
 - A choice's `note` is shown small under it. `module='<mod folder>'` notes that
   mod's name, as the mod browser shows it.
+- A choice's `sound` is a Wwise event path under `/Game/`, or `'none'`: it plays
+  instead of DMM's change sound when the row changes to that choice
+  (`mcChoiceSounds` on the picker; see [presentation metadata](#presentation-metadata)).
 - `slot='<name>'` makes a read-only field the page's [slot](#slot-rows) for other
   contributors' rows; `slotLabel=true` lets it name the first of them, and
   `slotGroups=true` lets the rows keep their own groups (`mcSlotGroups`).
 - `action=true` makes a navigation row (never stored; see [page hooks](#page-hooks));
   `link='<page id>'` or `'<provider>:<slot>'` opens that page.
+- The [presentation metadata](#presentation-metadata) is available as properties,
+  checked with the field's or group's id:
+
+  | Field property | Key |
+  |---|---|
+  | `silent=true` | `mcSilent=1` |
+  | `category=true` | `mcCategory=1` |
+  | `cycle=true` | `mcType=cycle` |
+  | `tabsWidth=<160–440>` (with `tabs`) | `mcTabsWidth` |
+  | `wrap=true` (read-only) | `mcWrap=1` |
+  | `table={entries={{code=,text=},...},columns=}` (read-only) | `mcTable`, `mcColumns` |
+  | `referenceLabel='<text>'` (read-only `tabs`) | `mcReferenceLabel` |
+
+  | Group property | Key |
+  |---|---|
+  | `help='<text>'` | `mcHelp` |
+  | `silent=true` | `mcSilent=1` |
+  | `parent={label=,level=}` (not on subgroups) | `mcParent`, `mcParentLevel` |
+
+  A group without rows of its own (one that only heads subgroups) takes none of them.
 - Ids are letters, digits and `_ . : -`; text has no `| ; [ ]` or control
   characters. Invalid data names the offending id.
 
@@ -374,6 +408,19 @@ contain `;` and has at most 64 characters. A choice without a note shows one
 line as before. The note is presentation only: saved values are unchanged. Tab,
 cycle and header-tab pickers show no notes.
 
+`mcChoiceSounds=<value>:<event path>;<value>:<event path>` on a picker gives choices
+a sound of their own. When the row changes to such a choice, its sound plays instead
+of DMM's change sound; `none` in place of a path plays nothing. Choices not listed,
+and hover and select, keep DMM's sounds, and `mcSilent` still silences the row. A
+path is a Wwise event under `/Game/`, either `/Game/Path/Event` or
+`/Game/Path/Event.Event`, at most 256 characters. Each value must be one of the
+picker's `PresetValues` and appear once. Sounds play at the player's character, at
+most one every 0.06 seconds. Any change on such a row first stops the sound the
+previous choice started, with a 0.1-second fade, so long sounds work as previews;
+opening another page or closing the menu stops it too. The game's own sounds are not
+touched. An event that cannot be loaded or played is logged
+once as `CHOICE_SOUND_FAILED`. Slot rows keep their choice sounds.
+
 Set `mcNavigation=1` on a picker to use its choices only for menu navigation.
 The picker can drive ordinary `VisibleWhen` / `VisibleValues` rules, but has no
 config key, never marks the menu dirty, and is omitted from Apply events. Its
@@ -394,8 +441,9 @@ is 20pt, larger than a level-2 heading, because it names the page's main choice.
 `mcLevel=1` on a setting gives it the title style, like `mcHeading=true`.
 
 Set `mcCategory=1` on a setting to make it stand in for its group's heading. Its
-label takes the Category heading's look: 16pt muted, unindented, with the
-heading's spacing. While it shows, the rows after it indent beneath it as they
+label takes the Category heading's look: 18pt muted, unindented, with the
+heading's spacing and the 1-pixel rule beneath, which shows and hides with the row.
+While it shows, the rows after it indent beneath it as they
 would under a visible heading. Pair it with `mcHeading=0` on the group so the
 heading does not show twice. It cannot be combined with `mcLevel` or `mcHeading`.
 

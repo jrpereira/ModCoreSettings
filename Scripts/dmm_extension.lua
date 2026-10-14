@@ -63,9 +63,13 @@ extension={
         package.loaded.safe_file=io_
         -- The hidden-widget text formats MCS's two states share.
         package.loaded.mcs_protocols=module('mcs_protocols')
+        -- A picker choice's own sound (mcChoiceSounds), for the presentation below.
+        package.loaded.mcs_choice_sound=module('mcs_choice_sound')
         local navigation=module('navigation')
         local mapped=module('mapped_presets')
         local contributions=module('vendor/menu_contributions')
+        -- Menu data unfolds value lists with the contributors' own client.
+        package.loaded.menu_contributions=contributions
         local presentation=module('presentation')
         local browserGroups=module('browser_groups')
         local moduleCategories=module('module_categories')
@@ -99,7 +103,7 @@ extension={
         navigation.install(dmm.choices)
         mapped.install(dmm.choices,dmm.controls)
         presentation.install(dmm.choices,dmm.controls,dmm.pages,{keyColumn=keybind.layout,
-            textTable=contributions.textTable,playerExists=playerExists})
+            textTable=contributions.textTable,playerExists=playerExists,events=dmm.events})
         local mods=directory:match('^(.*[/\\])[^/\\]+[/\\]Scripts[/\\]$')
         local folderManifest=browserGroups.folderManifest(mods)
         -- DMM's mod-list filter button becomes Sort by, saved in this mod's config.ini.
