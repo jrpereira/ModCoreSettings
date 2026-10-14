@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.2.0
+## v1.3.0
 
 - An `mcCategory` row is ruled beneath like the heading it stands in for.
 - `mcChoiceSounds=<value>:<event path>;...` gives a picker's choices their own sound,
@@ -14,6 +14,9 @@
   `playerExists`, or both), `label` (was `relabel`), `dim` and, on groups, `order`. A `label` or
   `order` key may list values sharing one entry (`[{1,2}]='text'`); `menu_contributions.unfold`
   (client version 7) expands them.
+
+## v1.2.0
+
 - The browser's title-line links are declared by the mods themselves: a `mod.json`
   `title_link` gives the link text (ModCore Settings and ModCore Controls declare theirs),
   where the browser used to name those two pages itself.
