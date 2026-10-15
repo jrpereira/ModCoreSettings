@@ -1,7 +1,7 @@
 -- Generated M-to-C folder categories; keys use normalized folder names.
 return {
     version = 4,
-    revision = 1,
+    revision = 2,
     folders = {
         ["15xcrouchmovementspeed"] = {"movement"},
         ["1modcoresettings"] = {"features","frameworks"},
@@ -11,6 +11,7 @@ return {
         ["90days"] = {"quests"},
         ["9modcorefangdango"] = {"layout"},
         ["abilitiesunbound"] = {"abilities","access"},
+        ["alwaysfinishers"] = {"combat"},
         ["amdhighend"] = {"engine","performance"},
         ["analogmovement"] = {"movement"},
         ["armorpreview"] = {"features"},
@@ -25,6 +26,7 @@ return {
         ["bettersorting"] = {"features"},
         ["bettersortingjournal"] = {"features"},
         ["bettertargeting"] = {"combat","layout"},
+        ["bitesaber"] = {"weapons","effects"},
         ["bloodvials"] = {"survival","consumables"},
         ["bodfirstperson"] = {"camera"},
         ["bodparrycolors"] = {"style"},
@@ -60,6 +62,7 @@ return {
         ["dawnwalkerescape"] = {"combat","movement"},
         ["dawnwalkerformtoggle"] = {"abilities","bodies"},
         ["dawnwalkerheadgear"] = {"stealth","clothing"},
+        ["dawnwalkerinventorysearch"] = {"features"},
         ["dawnwalkermistfly"] = {"movement"},
         ["dawnwalkermodmenucontrolgallery"] = {"frameworks","tools"},
         ["dawnwalkermodmerger"] = {"tools"},
@@ -134,6 +137,7 @@ return {
         ["localization"] = {"translations"},
         ["lootraritysort"] = {"features"},
         ["mapsettings"] = {"layout","features"},
+        ["maratintimatescenecamera"] = {"camera"},
         ["mesmerizetoggle"] = {"abilities"},
         ["minimapown"] = {"world","layout","features"},
         ["mookchivalry"] = {"combat"},
@@ -224,6 +228,7 @@ return {
         ["universalweakpointriposte"] = {"combat","layout"},
         ["unleashmobs"] = {"combat"},
         ["unlimitedshadowstep"] = {"movement"},
+        ["unlockallshrines"] = {"movement"},
         ["valesangoramap"] = {"features"},
         ["vampiremagic"] = {"abilities","features"},
         ["vampirephials"] = {"levelling","consumables"},

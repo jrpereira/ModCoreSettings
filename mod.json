@@ -13,12 +13,10 @@
   "dependencies": [
     {
       "id": "UE4SS",
-      "name": "UE4SS compatible with The Blood of Dawnwalker",
       "url": "https://github.com/UE4SS-RE/RE-UE4SS"
     },
     {
       "id": "DawnwalkerModMenu",
-      "name": "Dawnwalker Mod Menu",
       "version": "1.0.7.1+",
       "url": "https://www.nexusmods.com/thebloodofdawnwalker/mods/271"
     }

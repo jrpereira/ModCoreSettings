@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.3.1
+
+- The browser places five more mods in categories by their folder name.
+
 ## v1.3.0
 
 - An `mcCategory` row is ruled beneath like the heading it stands in for.
