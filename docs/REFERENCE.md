@@ -97,7 +97,8 @@ menu={
   `{id='Quickslots',label='Player Quickslots',groups={{id='Fangdango',label='Fangdango'}}}`.
   A subgroup's heading is smaller and sits at the row indent; its fields indent
   20 pixels further, their labels 1pt smaller, in compact rows: 4 pixels shorter,
-  values 2pt smaller (`mcWithin`). A group whose fields are all in subgroups still
+  values 1pt smaller (`mcWithin`). A subgroup with `heading=false` shows no heading,
+  so its fields are drawn as the group's own. A group whose fields are all in subgroups still
   shows its heading, but takes no `conditions` or presentation properties.
 - A field has `choices` (a picker; up to 64) or a whole-number `range`, and a
   `default` among them. One choice makes a button or, `readOnly`, a shown value.

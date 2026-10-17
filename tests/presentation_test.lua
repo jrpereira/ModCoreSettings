@@ -1104,17 +1104,17 @@ do
     assert(top.mcLabel.Font.Size==14 and nested.mcLabel.Font.Size==13 and panel.rows[4].mcLabel.Font.Size==13,
         'subgroup rows are 1pt smaller')
     assert(nested.mcLabel.Slot.Padding.Left==top.mcLabel.Slot.Padding.Left+20,'subgroup rows indent 20 pixels further')
-    -- Subgroup rows are compact: 4 pixels shorter throughout, the value raised a pixel more.
+    -- Subgroup rows are compact: 4 pixels shorter throughout, the value's padding unchanged.
     local kept={}
     for i,item in ipairs(items) do kept[i]=item end
     for i=#items,1,-1 do items[i]=nil end
-    for i,group in ipairs({'Outer','Inner'}) do
+    for i,group in ipairs({'Outer','Inner','Plain'}) do
         items[i]={id='Row'..i,kind='picker',group=group,label='Row '..i,values={0,1,2},labels={'A','B','C'}}
     end
-    M.parse('[Category.Outer]\n[Category.Inner]\nmcWithin=Outer\n',items)
+    M.parse('[Category.Outer]\n[Category.Inner]\nmcWithin=Outer\n[Category.Plain]\nmcWithin=Outer\nmcHeading=0\n',items)
     local compact=controls.build(widget(),{{choices=items}},api)
-    function compact.model:visibility() return {true,true} end
-    compact.model.pending[1],compact.model.pending[2]=0,0
+    function compact.model:visibility() return {true,true,true} end
+    compact.model.pending[1],compact.model.pending[2],compact.model.pending[3]=0,0,0
     compact.mcTestRowHeight=40
     compact:show(1)
     local plainRow,compactRow=compact.panels[1].rows[1],compact.panels[1].rows[2]
@@ -1125,7 +1125,12 @@ do
     end
     assert(compactRow.mcPipBox.Slot.Padding.Bottom==plainRow.mcPipBox.Slot.Padding.Bottom,
         'its indicator keeps its place above the row\'s bottom')
-    assert(compactRow.value.Slot.Padding.Bottom==plainRow.value.Slot.Padding.Bottom+1,'its value sits a pixel higher')
+    assert(compactRow.value.Slot.Padding.Bottom==plainRow.value.Slot.Padding.Bottom,'its value keeps its bottom padding')
+    -- A subgroup without a heading reads as its parent's own rows: drawn as theirs.
+    local headless=compact.panels[1].rows[3]
+    assert(headless.wrapper.HeightOverride==43 and headless.mcLabel.Font.Size==plainRow.mcLabel.Font.Size
+        and headless.mcLabel.Slot.Padding.Left==plainRow.mcLabel.Slot.Padding.Left,
+        'a headless subgroup\'s rows are regular rows')
     for i=#items,1,-1 do items[i]=nil end
     for i,item in ipairs(kept) do items[i]=item end
     local drawn

@@ -20,8 +20,10 @@
   wraps around to the first, and before the first to the last. Keys and controller still stop
   at the ends.
 - Subgroup rows indent 20 pixels beyond the row indent (was 14). They are also compact: 4
-  pixels shorter, their values 2 points smaller, with indicators, notes and slider bars kept
+  pixels shorter, their values 1 point smaller, with indicators, notes and slider bars kept
   where they were above the row's bottom.
+- A subgroup without a heading (`heading=false`, `mcHeading=0`) draws its rows as its parent
+  group's own: regular indent, size and height.
 - Outlines draw their side bars between the top and bottom bars, so no corner is drawn twice.
 
 ## v1.3.1

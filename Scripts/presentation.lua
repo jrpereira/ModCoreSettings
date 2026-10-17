@@ -45,10 +45,14 @@ local categorySize,categoryLeft,categoryTop,categoryRuleBottom,rowIndent=18,-2,2
 local subheadingSize,subheadingShift,subheadingTop,nestedIndent,nestedShrink=15,12,10,20,1
 -- Subgroup rows are compact (provisional; zero all three to undo): nestedRowShrink pixels
 -- shorter, their values nestedValueShrink points smaller. Indicators, notes and slider bars
--- keep their place above the row's bottom; a value is raised nestedValueLift more pixels of
--- bottom padding so its bottom edge keeps its distance from them (the smaller text, about
--- 3 pixels shorter, would otherwise drop half that while the shorter row lifts it 2).
-local nestedRowShrink,nestedValueShrink,nestedValueLift=4,2,1
+-- keep their place above the row's bottom; a value gets nestedValueLift more pixels of bottom
+-- padding (2 raise it a pixel). 0 keeps it aligned in the game.
+local nestedRowShrink,nestedValueShrink,nestedValueLift=4,1,0
+-- A subgroup row: one in a subgroup (mcWithin) that shows its heading. A subgroup without
+-- a heading reads as its parent's own rows, so its rows are drawn as theirs.
+local function subgroupRow(setting)
+    return setting.mcGroup~=nil and setting.mcGroup.within~=nil and setting.mcGroup.heading~=false
+end
 -- A parent heading's place; one drawn for a category sits where its heading would.
 local function parentPadding(parent)
     if parent.category then return {Left=categoryLeft,Top=categoryTop,Right=0,Bottom=0} end
@@ -1292,7 +1296,7 @@ function M.install(choices,controls,pages,options)
             for i,row in ipairs(panel.rows) do
                 local setting=providers[index].choices[i]
                 local height=tonumber(row.wrapper.HeightOverride)
-                if setting.mcGroup and setting.mcGroup.within and height and nestedRowShrink>0 then
+                if subgroupRow(setting) and height and nestedRowShrink>0 then
                     local function shrink(widget)
                         if tonumber(widget.HeightOverride)==height then widget:SetHeightOverride(height-nestedRowShrink) end
                         local ok,count=pcall(function() return widget:GetChildrenCount() end)
@@ -1300,7 +1304,7 @@ function M.install(choices,controls,pages,options)
                     end
                     shrink(row.wrapper)
                 end
-                if setting.mcGroup and setting.mcGroup.within and nestedValueShrink>0 then
+                if subgroupRow(setting) and nestedValueShrink>0 then
                     for _,text in ipairs({row.value,row.mcOnOff and row.mcOnOff.text}) do
                         api.Theme.font(text,api.theme,(tonumber(text.Font and text.Font.Size) or 14)-nestedValueShrink)
                         text:SetFont(text.Font)
@@ -1782,7 +1786,7 @@ function M.install(choices,controls,pages,options)
                             rule:SetVisibility(row.visible and 4 or 1);row.mcCategoryRuleVisible=row.visible==true
                         end
                         -- A subgroup's rows indent further, a little smaller.
-                        local nested=not beforeCategory and setting.mcGroup and setting.mcGroup.within~=nil
+                        local nested=not beforeCategory and subgroupRow(setting)
                         local style=beforeCategory and 'category' or nested and 'nested' or 'row'
                         if row.mcCategoryStyle~=style then
                             api.Theme.font(row.mcLabel,api.theme,beforeCategory and categorySize
