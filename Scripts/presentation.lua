@@ -42,7 +42,13 @@ local categorySize,categoryLeft,categoryTop,categoryRuleBottom,rowIndent=18,-2,2
 -- A subgroup's heading (mcWithin): subheadingSize points in the title color, subheadingShift
 -- pixels right of the row indent, subheadingTop pixels above, with no rule. Its rows indent
 -- nestedIndent pixels further, their labels nestedShrink points smaller.
-local subheadingSize,subheadingShift,subheadingTop,nestedIndent,nestedShrink=15,12,10,14,1
+local subheadingSize,subheadingShift,subheadingTop,nestedIndent,nestedShrink=15,12,10,20,1
+-- Subgroup rows are compact (provisional; zero all three to undo): nestedRowShrink pixels
+-- shorter, their values nestedValueShrink points smaller. Indicators, notes and slider bars
+-- keep their place above the row's bottom; a value is raised nestedValueLift more pixels of
+-- bottom padding so its bottom edge keeps its distance from them (the smaller text, about
+-- 3 pixels shorter, would otherwise drop half that while the shorter row lifts it 2).
+local nestedRowShrink,nestedValueShrink,nestedValueLift=4,2,1
 -- A parent heading's place; one drawn for a category sits where its heading would.
 local function parentPadding(parent)
     if parent.category then return {Left=categoryLeft,Top=categoryTop,Right=0,Bottom=0} end
@@ -88,7 +94,8 @@ local pickerValueLeft=pickerLabelWidth+pickerArrowWidth
 -- labelDrop pixels lower; a toggle-shell row's button starts toggleShift pixels left, so its
 -- selection background starts where headings do.
 local pickerRowHeight,notedPickerRowHeight,labelDrop,toggleShift=43,42,1,14
--- A picker arrow at the first or last choice: shown faint, not hidden.
+-- A picker arrow at the first or last choice: shown faint, not hidden. A click on it wraps
+-- around to the other end, as does a click on that side of the value.
 local edgeArrowOpacity=0.5
 -- A choice note's size, and how far up the note sits while the current choice has one.
 local noteSize,noteRaise=10,8
@@ -102,6 +109,16 @@ local pipIdleOpacity=0.5
 -- else pipHeight like the others. Every pip starts pipTop from the strip's top, so the
 -- current one grows downwards.
 local pipHotHeight,pipTop=3,(pipActiveHeight-pipHeight)//2
+-- On a change a slider's fill slides to its new length over valueSlide seconds too. On a
+-- change an arrow picker's new value slides in valueSlideDistance pixels from the side
+-- it was stepped towards, fading in, over valueSlide seconds; the indicator fades the old
+-- place out and the new one in over the same time (a thumb fades out, moves, fades back in).
+local valueSlide,valueSlideDistance=0.2,12
+-- An animation tick with no clock counts as one 60 Hz frame.
+local animationFrame=0.016
+local function mix(from,to,t)
+    return {R=from.R+(to.R-from.R)*t,G=from.G+(to.G-from.G)*t,B=from.B+(to.B-from.B)*t,A=from.A+(to.A-from.A)*t}
+end
 local function sizePips(row)
     local height=row.mcPipHot and pipHotHeight or pipHeight
     for n,box in ipairs(row.mcPipBoxes or {}) do box:SetHeightOverride(n==row.mcPipShown and height or pipHeight) end
@@ -126,6 +143,34 @@ end
 local headerStatusMinWidth,headerStatusGap,headerTabHeight,headerGap=160,12,29,12
 -- A cycle button's background matches the keybind editor's Mode control.
 local cycleBackground={R=0.12,G=0.12,B=0.12,A=0.09}
+-- An on/off switch (mcType=onoff) is an onOffWidth by onOffHeight outline, onOffLine pixels
+-- thick. Inside it, onOffMargin pixels clear, the toggle fills the left half (off) or the
+-- right half (on). Off is grey, on is gold (the indicators' colors). The outline is dimmed
+-- unless its row is hovered or selected, when a dim glow also fills the switch. Each side bar
+-- runs between the top and bottom bars. On a change the toggle slides across in onOffSlide
+-- seconds, easing out like DMM's highlights, and its colors blend along the way.
+local onOffWidth,onOffHeight,onOffLine,onOffMargin=44,20,2,3
+local onOffGold,onOffGrey={R=0.95,G=0.63,B=0.08},{R=0.62,G=0.55,B=0.42}
+local onOffOutlineIdle,onOffOutlineHot,onOffToggle,onOffGlow=0.4,0.9,0.9,0.1
+local onOffSlide=0.2
+-- Off, every part of the switch is drawn at onOffDim of its strength; it brightens to full
+-- as the toggle slides on. The choice's label, onOffTextShrink points smaller than DMM's
+-- value, vertically centred and at onOffTextOpacity, sits onOffTextGap pixels left of the switch.
+local onOffTextShrink,onOffTextOpacity=2,0.75
+local onOffDim,onOffTextGap=0.6,12
+local function blend(position,alpha)
+    local function channel(key) return onOffGrey[key]+(onOffGold[key]-onOffGrey[key])*position end
+    return {R=channel('R'),G=channel('G'),B=channel('B'),A=alpha*(onOffDim+(1-onOffDim)*position)}
+end
+-- Paints an on/off switch with its toggle at position (0 off, 1 on, between while sliding)
+-- and its outline and glow for whether its row is hot.
+local function paintOnOff(switch)
+    local position,hot=switch.position,switch.hot
+    for _,bar in ipairs(switch.bars) do bar:SetBrushColor(blend(position,hot and onOffOutlineHot or onOffOutlineIdle)) end
+    switch.glow:SetBrushColor(blend(position,hot and onOffGlow or 0))
+    switch.toggle:SetBrushColor(blend(position,onOffToggle))
+    switch.toggleBox:SetRenderTranslation({X=math.floor(position*switch.travel+0.5),Y=0})
+end
 -- A module's faint backdrop in the mod list, grouped or not: the separators' warm grey.
 local moduleBackground={R=0.62,G=0.55,B=0.42,A=0.14}
 -- A navigation picker's choice while it separates two colliding keybinds.
@@ -268,10 +313,12 @@ function M.parse(content,items)
                 -- instead of DMM's when the row changes to it.
                 s.mcChoiceSounds=ChoiceSound.parse(r.mcChoiceSounds,s)
                 s.mcDimValues=dimValues(r,s)
-                s.mcTabs,s.mcCycle,s.mcTabsWidth,s.mcHeader=nil,nil,nil,nil
+                s.mcTabs,s.mcCycle,s.mcOnOff,s.mcTabsWidth,s.mcHeader=nil,nil,nil,nil,nil
                 local hasLevel=r.mcLevel~=nil
                 local decoration=r.mcType
-                if decoration~=nil then assert(decoration=='tab' or decoration=='cycle','mcType must be tab or cycle') end
+                if decoration~=nil then
+                    assert(decoration=='tab' or decoration=='cycle' or decoration=='onoff','mcType must be tab, cycle or onoff')
+                end
                 if decoration=='tab' then
                     assert(s.kind=='picker','mcType=tab requires a picker')
                     assert(#s.values<=8,'mcType=tab supports at most eight choices')
@@ -279,6 +326,11 @@ function M.parse(content,items)
                 elseif decoration=='cycle' then
                     assert(s.kind=='picker','mcType=cycle requires a picker')
                     s.mcCycle=true
+                elseif decoration=='onoff' then
+                    -- An on/off switch: the picker's choices are 0 (off) and 1 (on).
+                    assert(s.kind=='picker','mcType=onoff requires a picker')
+                    assert(#s.values==2 and s.values[1]==0 and s.values[2]==1,'mcType=onoff requires the choices 0 and 1')
+                    s.mcOnOff=true
                 end
                 if r.mcTabsWidth~=nil then
                     local width=tonumber(r.mcTabsWidth)
@@ -589,6 +641,43 @@ function M.install(choices,controls,pages,options)
             style.PressedPadding={Left=side,Top=0,Right=side,Bottom=bottom}
         end
         local pickerRightMargin=24
+        -- Real seconds for animations, read as DMM reads its own (api.clock in tests); nil
+        -- when the engine cannot answer.
+        local gameplay
+        local function clock()
+            if api.clock then return api.clock() end
+            local find=rawget(_G,'StaticFindObject')
+            if not find then return nil end
+            local ok,now=pcall(function()
+                gameplay=gameplay or find('/Script/Engine.Default__GameplayStatics')
+                return gameplay:GetRealTimeSeconds(api.pc or tree)
+            end)
+            return ok and type(now)=='number' and now or nil
+        end
+        -- The arrow of an arrow picker at its first or last choice, which DMM disabled; nil
+        -- elsewhere, and on a disabled picker (both arrows off).
+        local function edgeArrow(row)
+            if not (row.left and row.right) or row.renderLeft==row.renderRight then return nil end
+            return row.renderLeft and row.right or row.left
+        end
+        -- Running animations by key: apply(t) draws progress t (0 to 1, eased out like DMM's
+        -- highlights) for each tick until duration has passed. A tick with no clock counts as
+        -- one 60 Hz frame. A new animation under a key replaces the running one.
+        local animations={}
+        local function animate(key,duration,apply)
+            animations[key]={start=clock(),elapsed=0,duration=duration,apply=apply}
+            apply(0)
+        end
+        local function stepAnimations()
+            if next(animations)==nil then return end
+            local now=clock()
+            for key,animation in pairs(animations) do
+                animation.elapsed=now and animation.start and now-animation.start or animation.elapsed+animationFrame
+                local t=math.max(0,math.min(1,animation.elapsed/animation.duration))
+                animation.apply(1-(1-t)^3)
+                if t>=1 then animations[key]=nil end
+            end
+        end
         -- Label column of a wrapped read-only row; the value takes the rest.
         local wrapLabelWidth=230
         -- Field-type editors are built on DMM's toggle row, whose label sits in the
@@ -639,18 +728,20 @@ function M.install(choices,controls,pages,options)
             row.mcStar:SetFont(row.mcLabel.Font)
             pcall(function() row.mcStar:SetColorAndOpacity(row.mcLabel.ColorAndOpacity) end)
         end
-        -- A 1-pixel frame of four bars around a tab choice. The fill stays clear so
-        -- the row's own background shows through.
-        local function outlined(child)
+        -- A frame of four bars, thickness pixels (default 1) wide, around a tab choice or
+        -- an on/off switch. The fill stays clear so the row's own background shows through.
+        local function outlined(child,thickness)
             local overlay=new('Overlay')
             local slot=add(overlay,child);slot:SetHorizontalAlignment(0);slot:SetVerticalAlignment(0)
             local bars={}
             for _,edge in ipairs({{h=0,v=1},{h=0,v=3},{h=1,v=0},{h=3,v=0}}) do
                 local bar=new('Border');bar:SetBrushColor(headerSeparatorDim)
                 local box=new('SizeBox')
-                if edge.h==0 then box:SetHeightOverride(1) else box:SetWidthOverride(1) end
+                if edge.h==0 then box:SetHeightOverride(thickness or 1) else box:SetWidthOverride(thickness or 1) end
                 api.need(box:SetContent(bar),'MCS tab outline')
                 local barSlot=add(overlay,box);barSlot:SetHorizontalAlignment(edge.h);barSlot:SetVerticalAlignment(edge.v)
+                -- The side bars run between the top and bottom ones, so no corner is drawn twice.
+                if edge.h~=0 then barSlot:SetPadding({Left=0,Top=thickness or 1,Right=0,Bottom=thickness or 1}) end
                 bars[#bars+1]=bar
             end
             return overlay,bars
@@ -888,6 +979,55 @@ function M.install(choices,controls,pages,options)
                     row.mcTabs={{widget=button,label=label,value=setting.values[1],pressed=false,pointer=false,
                         cycle=true,box=box}}
                     for _,part in ipairs(row.parts) do part.widget:GetParent():SetVisibility(1) end
+                elseif setting.mcOnOff and row.value then
+                    -- The value column, after DMM's label column and left arrow, holds the
+                    -- current choice's label, right-aligned, then the switch, centred in the
+                    -- column. One clear button across the column, row-high, takes the pointer
+                    -- and flips it; DMM's arrows and value stay alive, hidden, for keys and
+                    -- controller.
+                    local function boxWidth(widget,fallback)
+                        local ok,width=pcall(function() return widget:GetParent().WidthOverride end)
+                        return ok and tonumber(width) or fallback
+                    end
+                    local left=boxWidth(row.widget,pickerLabelWidth)+boxWidth(row.parts[1].widget,pickerArrowWidth)
+                    local width=boxWidth(row.parts[2].widget,pickerValueWidth)
+                    local glow=new('Border');glow:SetBrushColor(headerGlowOff)
+                    local frame,bars=outlined(glow,onOffLine)
+                    local switch=new('Overlay')
+                    local frameSlot=add(switch,frame);frameSlot:SetHorizontalAlignment(0);frameSlot:SetVerticalAlignment(0)
+                    local inset=onOffLine+onOffMargin
+                    local toggle=new('Border');toggle:SetBrushColor(headerGlowOff)
+                    local toggleBox=sized(toggle,(onOffWidth-2*inset)//2,onOffHeight-2*inset)
+                    -- The toggle rests at the left; its render translation carries it right.
+                    local toggleSlot=add(switch,toggleBox)
+                    toggleSlot:SetHorizontalAlignment(1);toggleSlot:SetVerticalAlignment(2)
+                    toggleSlot:SetPadding({Left=inset,Top=0,Right=inset,Bottom=0})
+                    local switchBox=sized(switch,onOffWidth,onOffHeight)
+                    local text=api.caption(tree,'')
+                    api.Theme.font(text,api.theme,(tonumber(row.value.Font and row.value.Font.Size) or 14)-onOffTextShrink)
+                    text:SetFont(text.Font);api.Theme.textColor(text,'body')
+                    text:SetJustification(2);text:SetTextOverflowPolicy(1);text:SetRenderOpacity(onOffTextOpacity)
+                    local lane=new('HorizontalBox')
+                    local textSlot=add(lane,text)
+                    textSlot:SetSize({SizeRule=1,Value=1});textSlot:SetVerticalAlignment(2)
+                    textSlot:SetPadding({Left=0,Top=0,Right=onOffTextGap,Bottom=0})
+                    add(lane,switchBox):SetVerticalAlignment(2)
+                    local button,label=api.button(tree,'');button.IsFocusable=false
+                    local area=new('Overlay')
+                    for _,child in ipairs({lane,button}) do
+                        local childSlot=add(area,child);childSlot:SetHorizontalAlignment(0);childSlot:SetVerticalAlignment(0)
+                    end
+                    lane.Slot:SetPadding({Left=0,Top=0,Right=width-onOffWidth-(width-onOffWidth)//2,Bottom=0})
+                    local box=new('SizeBox');box:SetWidthOverride(width)
+                    local areaSlot=api.need(box:SetContent(area),'MCS on/off area')
+                    areaSlot:SetHorizontalAlignment(0);areaSlot:SetVerticalAlignment(0)
+                    local slot=add(row.background:GetParent(),box)
+                    slot:SetHorizontalAlignment(1);slot:SetVerticalAlignment(0)
+                    slot:SetPadding({Left=left,Top=0,Right=0,Bottom=0})
+                    row.mcOnOff={bars=bars,glow=glow,toggle=toggle,toggleBox=toggleBox,box=switchBox,text=text,
+                        travel=onOffWidth-2*inset-(onOffWidth-2*inset)//2,position=0,hot=false}
+                    row.mcTabs={{widget=button,label=label,value=1,pressed=false,pointer=false,onOff=true,box=box}}
+                    for _,part in ipairs(row.parts) do part.widget:GetParent():SetVisibility(1) end
                 elseif setting.mcTable then
                     -- Code and text pairs across the row in columns filled top to bottom.
                     -- Every code and every text sits centred in a cell of fixed size, at
@@ -996,6 +1136,7 @@ function M.install(choices,controls,pages,options)
                 -- value in the row's bottom pixels, below any choice note.
                 if setting.kind=='picker' and row.value and row.background and row.parts and #row.parts==3
                     and not row.mcTabs and not row.mcHeaderTabs and not setting.mcTabs and not setting.mcCycle
+                    and not setting.mcOnOff
                     and not setting.mcTable and not setting.mcWrap
                     and not setting.mcReadOnly and #(setting.values or {})>=2 then
                     local function boxWidth(widget,fallback)
@@ -1144,6 +1285,32 @@ function M.install(choices,controls,pages,options)
                     barSlot:SetPadding({Left=0,Top=0,Right=0,Bottom=sliderBottom})
                     bar:SetVisibility(3);bar:SetRenderOpacity(pipIdleOpacity)
                     row.mcSlider={bar=bar,filled=filled,mark=mark,markSlot=markSlot,span=span,hot=false,shown=nil}
+                end
+            end
+            -- Subgroup rows are compact: every box as tall as the row loses nestedRowShrink
+            -- pixels, and the value text nestedValueShrink points, raised nestedValueLift.
+            for i,row in ipairs(panel.rows) do
+                local setting=providers[index].choices[i]
+                local height=tonumber(row.wrapper.HeightOverride)
+                if setting.mcGroup and setting.mcGroup.within and height and nestedRowShrink>0 then
+                    local function shrink(widget)
+                        if tonumber(widget.HeightOverride)==height then widget:SetHeightOverride(height-nestedRowShrink) end
+                        local ok,count=pcall(function() return widget:GetChildrenCount() end)
+                        for n=0,(ok and tonumber(count) or 0)-1 do shrink(widget:GetChildAt(n)) end
+                    end
+                    shrink(row.wrapper)
+                end
+                if setting.mcGroup and setting.mcGroup.within and nestedValueShrink>0 then
+                    for _,text in ipairs({row.value,row.mcOnOff and row.mcOnOff.text}) do
+                        api.Theme.font(text,api.theme,(tonumber(text.Font and text.Font.Size) or 14)-nestedValueShrink)
+                        text:SetFont(text.Font)
+                    end
+                    row.mcValueLift=nestedValueLift
+                    if row.mcSlider then
+                        local padding=row.value.Slot.Padding
+                        row.value.Slot:SetPadding({Left=padding.Left,Top=padding.Top,Right=padding.Right,
+                            Bottom=padding.Bottom+nestedValueLift})
+                    end
                 end
             end
             -- A read-only row is never selected: the pointer passes through its buttons, so it is
@@ -1319,28 +1486,42 @@ function M.install(choices,controls,pages,options)
                 end
             end
             local result=refresh(self,...)
-            -- A slider's bar fills to its pending value; the mark stands at the fill's end.
+            -- A slider's bar fills to its pending value; the mark stands at the fill's end. The
+            -- first value shows at rest; a change slides the fill from where it is, like a
+            -- picker's value. A drag restarts the slide each tick, so the fill follows closely.
             for i,row in ipairs(self.panels[self.active].rows) do
                 local bar=row.mcSlider
                 local setting=bar and self.model.items[i]
                 local value=bar and self.model.pending[i]
                 if bar and setting and type(value)=='number' and setting.maximum~=setting.minimum then
                     local share=math.max(0,math.min(1,(value-setting.minimum)/(setting.maximum-setting.minimum)))
-                    local filled=math.floor(share*bar.span+0.5)
-                    if bar.shown~=filled then
-                        bar.filled:SetWidthOverride(filled)
-                        bar.markSlot:SetPadding({Left=math.max(0,math.min(bar.span-3,filled-1)),Top=0,Right=0,Bottom=0})
-                        bar.shown=filled
+                    local target=math.floor(share*bar.span+0.5)
+                    local function fill(width)
+                        local filled=math.floor(width+0.5)
+                        if bar.shown~=filled then
+                            bar.filled:SetWidthOverride(filled)
+                            bar.markSlot:SetPadding({Left=math.max(0,math.min(bar.span-3,filled-1)),Top=0,Right=0,Bottom=0})
+                            bar.shown=filled
+                        end
+                        bar.width=width
                     end
+                    if bar.target==nil then fill(target)
+                    elseif bar.target~=target then
+                        local from=bar.width
+                        animate(bar,valueSlide,function(t) fill(from+(target-from)*t) end)
+                    end
+                    bar.target=target
                 end
             end
-            -- At the first or last choice DMM hides that arrow; it shows faint instead, still
-            -- disabled. Both hidden (a disabled picker) stays hidden.
+            -- At the first or last choice DMM disables and hides that arrow; it shows faint
+            -- instead and stays enabled, so a click on it can wrap around (see wrapEdge). Both
+            -- hidden (a disabled picker) stays hidden.
             for _,row in ipairs(self.panels[self.active].rows) do
-                -- DMM sets an arrow's opacity only when its state changes, so the faint one is
-                -- set again on every refresh rather than remembered.
-                if row.left and row.right and row.renderLeft~=row.renderRight then
-                    local arrow=row.renderLeft and row.right or row.left
+                -- DMM sets an arrow's state only when it changes, so the faint one is set
+                -- again on every refresh rather than remembered.
+                local arrow=edgeArrow(row)
+                if arrow then
+                    arrow.widget:SetIsEnabled(true)
                     arrow.widget:SetRenderOpacity(edgeArrowOpacity)
                 end
             end
@@ -1375,7 +1556,7 @@ function M.install(choices,controls,pages,options)
                         row.mcNoteBox:SetVisibility(note and 3 or 1)
                         local padding=row.value.Slot.Padding
                         row.value.Slot:SetPadding({Left=padding.Left,Top=padding.Top,
-                            Right=padding.Right,Bottom=note and noteValueLift or 0})
+                            Right=padding.Right,Bottom=(note and noteValueLift or 0)+(row.mcValueLift or 0)})
                         row.mcNoteText=note
                     end
                 end
@@ -1388,7 +1569,7 @@ function M.install(choices,controls,pages,options)
                         row.value:SetFont(row.value.Font)
                         local padding=row.value.Slot.Padding
                         row.value.Slot:SetPadding({Left=padding.Left,Top=padding.Top,Right=padding.Right,
-                            Bottom=noted and noteValueLift or plainValueLift})
+                            Bottom=(noted and noteValueLift or plainValueLift)+(row.mcValueLift or 0)})
                         row.mcPipBox.Slot:SetPadding({Left=row.mcPipLeft,Top=0,Right=0,
                             Bottom=noted and pipBottom or pipBottom+plainPipLift})
                         row.mcPipNoted=noted
@@ -1396,13 +1577,35 @@ function M.install(choices,controls,pages,options)
                     local current=1
                     for n,value in ipairs(setting.values) do if value==self.model.pending[i] then current=n end end
                     if row.mcPipShown~=current then
-                        for n,pip in ipairs(row.mcPips) do pip:SetBrushColor(n==current and pipOn or pipOff) end
-                        local thumb=row.mcPipThumb
-                        if thumb then
-                            local offset=math.floor((current-1)*(thumb.span-thumb.width)/math.max(1,#setting.values-1))
+                        local previous,thumb,value=row.mcPipShown,row.mcPipThumb,row.value
+                        local function place(n)
+                            local offset=math.floor((n-1)*(thumb.span-thumb.width)/math.max(1,#setting.values-1))
                             thumb.slot:SetPadding({Left=offset,Top=pipTop,Right=0,Bottom=0})
                         end
-                        row.mcPipShown=current
+                        for n,pip in ipairs(row.mcPips) do pip:SetBrushColor(n==current and pipOn or pipOff) end
+                        if previous then
+                            -- The new value slides in from the side it was stepped towards, which
+                            -- a wrap around reverses.
+                            local side=row.mcStepSide or (current>previous and 1 or -1)
+                            animate(value,valueSlide,function(t)
+                                value:SetRenderTranslation({X=side*valueSlideDistance*(1-t),Y=0})
+                                value:SetRenderOpacity(t)
+                            end)
+                            local pips=row.mcPips
+                            if pips[previous] then
+                                animate(pips,valueSlide,function(t)
+                                    pips[previous]:SetBrushColor(mix(pipOn,pipOff,t))
+                                    pips[current]:SetBrushColor(mix(pipOff,pipOn,t))
+                                end)
+                            end
+                            if thumb then
+                                animate(thumb,valueSlide,function(t)
+                                    thumb.box:SetRenderOpacity(math.abs(1-2*t))
+                                    place(t<0.5 and previous or current)
+                                end)
+                            end
+                        elseif thumb then place(current) end
+                        row.mcPipShown,row.mcStepSide=current,nil
                         sizePips(row)
                     end
                 end
@@ -1413,6 +1616,26 @@ function M.install(choices,controls,pages,options)
                         if tab.shown~=shown then api.setText(tab.label,setting.labels[shown]);tab.shown=shown end
                         tab.value=setting.values[shown%#setting.values+1]
                     end
+                    if tab.onOff then
+                        -- A click sets the other value.
+                        local on=self.model.pending[i]==1
+                        tab.value=on and 0 or 1
+                        local text=setting.labels[on and 2 or 1]
+                        if row.mcOnOff.shownText~=text then api.setText(row.mcOnOff.text,text);row.mcOnOff.shownText=text end
+                        -- The first value shows at rest; a change slides from where the toggle is.
+                        local switch=row.mcOnOff
+                        if switch.on==nil then
+                            switch.position=on and 1 or 0
+                            paintOnOff(switch)
+                        elseif switch.on~=on then
+                            local from,to=switch.position,on and 1 or 0
+                            animate(switch,onOffSlide,function(t)
+                                switch.position=from+(to-from)*t
+                                paintOnOff(switch)
+                            end)
+                        end
+                        switch.on=on
+                    end
                     local mapping=self.model.items[i].mcMapping
                     local enabled=not setting.mcReadOnly and not self.model.error and (not mapping or tab.value~=mapping.custom)
                     local current=self.model.pending[i]
@@ -1421,6 +1644,7 @@ function M.install(choices,controls,pages,options)
                         api.Theme.textColor(tab.label,selected and 'menuActive' or 'body')
                         tab.widget:SetIsEnabled(enabled)
                         tab.widget:SetRenderOpacity((enabled or selected) and 1 or fadedOpacity)
+                        if tab.onOff then tab.box:SetRenderOpacity(enabled and 1 or fadedOpacity) end
                         for _,bar in ipairs(tab.outline or {}) do
                             bar:SetBrushColor(selected and headerSeparatorBright or headerSeparatorDim)
                         end
@@ -1601,7 +1825,9 @@ function M.install(choices,controls,pages,options)
                         end
                         local wrapperSlot=row.wrapper.Slot
                         local wrapperPadding=wrapperSlot.Padding
-                        local top,bottom=beforeCategory and categoryTop or 0,beforeCategory and 4 or 0
+                        -- An mcCategory row's rule hugs it, with no space between.
+                        local top=beforeCategory and categoryTop or 0
+                        local bottom=beforeCategory and not setting.mcCategory and 4 or 0
                         if wrapperPadding.Top~=top or wrapperPadding.Bottom~=bottom then
                             wrapperSlot:SetPadding({Left=wrapperPadding.Left,Top=top,
                                 Right=wrapperPadding.Right,Bottom=bottom})
@@ -1668,7 +1894,18 @@ function M.install(choices,controls,pages,options)
             end
             return result
         end
+        -- Steps picker i one choice in DMM's direction (1 left, 2 right), wrapping around at
+        -- either end, as a click does.
+        local function step(self,i,direction)
+            local setting,row=self.model.items[i],self.panels[self.active].rows[i]
+            local count,index=#setting.values,1
+            for n,value in ipairs(setting.values) do if value==self.model.pending[i] then index=n end end
+            row.mcStepSide=direction==1 and -1 or 1
+            self:select(i,false);self.model:set(i,setting.values[(index-1+row.mcStepSide)%count+1]);self:refresh()
+            if adapted.feedback then adapted.feedback('Change') end
+        end
         function ui:tick(queued,released,controller)
+            stepAnimations()
             if self.active and not self.model.error then
                 for i,row in ipairs(self.panels[self.active].rows) do
                     if row.visible then
@@ -1710,6 +1947,10 @@ function M.install(choices,controls,pages,options)
                                 row.mcSlider.hot=hot
                             end
                         end
+                        if row.mcOnOff then
+                            local hot=self.hovered==i or self.current==i
+                            if row.mcOnOff.hot~=hot then row.mcOnOff.hot=hot;paintOnOff(row.mcOnOff) end
+                        end
                         if row.mcArrowBoxes then
                             local hot=self.hovered==i or self.current==i
                             if row.mcArrowsHot~=hot then
@@ -1718,14 +1959,25 @@ function M.install(choices,controls,pages,options)
                             end
                         end
                         -- A click on a picker's value zone steps like its arrow, while that
-                        -- arrow could be clicked.
+                        -- arrow could be clicked, wrapping around at either end.
                         for _,zone in ipairs(row.mcZones or {}) do
                             local clicked
                             clicked,zone.pressed,zone.pointer=released(zone.widget,zone.pressed,zone.pointer,
                                 not controller and zone.widget:IsHovered()==true)
                             if clicked and row.parts[zone.arrow].widget:GetIsEnabled() then
-                                self:select(i,false);self.model:change(i,zone.direction);self:refresh()
-                                if adapted.feedback then adapted.feedback('Change') end
+                                step(self,i,zone.direction)
+                                return tick(self,queued,released,controller)
+                            end
+                        end
+                        -- A click on the faint arrow at an end wraps around. It is taken here,
+                        -- before DMM sees it, sharing DMM's press state for that arrow.
+                        local edge=edgeArrow(row)
+                        if edge then
+                            local clicked
+                            clicked,edge.pressed,edge.pointer=released(edge.widget,edge.pressed,edge.pointer,
+                                not controller and edge.widget:IsHovered()==true)
+                            if clicked then
+                                step(self,i,edge==row.left and 1 or 2)
                                 return tick(self,queued,released,controller)
                             end
                         end

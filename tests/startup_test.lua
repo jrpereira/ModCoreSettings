@@ -2,7 +2,10 @@ package.path='Scripts/?.lua;Scripts/vendor/?.lua;'..package.path
 local captured={}
 local installed=false
 local scans=0
-package.loaded.mcs_mod_registry={boot=function() scans=scans+1 end,mkdir=function() end}
+-- The registry publishes module ids through the set function main.lua passes it.
+local published_ids={}
+package.loaded.mcs_mod_registry={boot=function() scans=scans+1;return {modules={}} end,mkdir=function() end,
+    publishModuleIds=function(index,set) published_ids[#published_ids+1]=index end}
 local originalPrint=print
 print=function(value) captured[#captured+1]=value end
 package.loaded.dmm_binding={install=function() installed=true;return true end}
@@ -17,6 +20,7 @@ package.loaded.dmm_binding={install=function() installed=true;return true end}
 package.loaded.dmm_bootstrap={run=function(_,start) assert(scans==2,'one scan per startup');return start() end}
 dofile('Scripts/main.lua')
 assert(installed,'ready DMM handshake must initialize presentation')
+assert(#published_ids==2,'module ids are published after each scan')
 print('PASS ready DMM handshake initializes presentation')
 
 installed=false
@@ -33,7 +37,8 @@ print('PASS identification failure is logged without blocking DMM integration')
 local getinfo=debug.getinfo
 debug.getinfo=function() return {source='@C:/Mods/1_ModCore_Settings/Scripts/main.lua'} end
 local made,published
-package.loaded.mcs_mod_registry={boot=function() end,mkdir=function(path) made=path end}
+package.loaded.mcs_mod_registry={boot=function() return {modules={}} end,mkdir=function(path) made=path end,
+    publishModuleIds=function() end}
 package.loaded.menu_contributions={publisher=function(shared,options)
     assert(shared==ModRef and options.id=='ModCoreSettings' and options.directory=='C:/Mods/1_ModCore_Settings/cache')
     return {publish=function(_,contribution) published=contribution end}

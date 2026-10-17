@@ -30,10 +30,15 @@ end
 local files=require('mcs_files').open(function(_,why) log('FILE_BRIDGE_UNAVAILABLE',why) end)
 -- Identify installed folders in MCS's state before DMM builds its module browser.
 local mods=root and root:match('^(.*)[/\\][^/\\]+$')
+-- Each folder's module id is shared for other modules' states (ModCoreTemplates reads them
+-- when the bridge loop starts); a failed scan leaves the ready flag unset.
 local scanned,scanError=pcall(function()
-    require('mcs_mod_registry').boot(root,mods,IterateGameDirectories,{files=files,
-        report=function(folder,why) log('MODULE_IDENTIFICATION_SKIPPED',folder..': '..why) end,
-    })
+    local Registry=require('mcs_mod_registry')
+    local function report(folder,why) log('MODULE_IDENTIFICATION_SKIPPED',folder..': '..why) end
+    local index=Registry.boot(root,mods,IterateGameDirectories,{files=files,report=report})
+    Registry.publishModuleIds(index,function(key,value)
+        assert(rawget(_G,'ModRef'),'ModRef unavailable'):SetSharedVariable(key,value)
+    end,report)
 end)
 if not scanned then log('MODULE_IDENTIFICATION_FAILED',tostring(scanError)) end
 -- MCS's own page is contributed like any module's. Attached to this folder, the browser

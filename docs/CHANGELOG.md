@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.4.0
+
+- Each enabled module's `mod.json` `id` is shared at load as `MCS_ModuleId_v1.<folder>`,
+  followed by `MCS_ModuleId_v1.ready`, so other modules (ModCore Templates) can key their
+  settings by module id. An invalid id, or one two folders declare, is logged and not shared.
+- `mcType=onoff` renders a picker with the choices 0 and 1 as an on/off switch centred in
+  the value column, the current choice's label to its left: a 44×20 outline with a toggle in its
+  left half (off, grey, drawn dimmer) or right half (on, gold). A change slides the toggle
+  across in 0.2 seconds, blending grey and gold on the way. A click anywhere across the value
+  column flips it; the outline brightens and a dim glow fills it while its row is hovered or
+  selected. Menu data takes it as `onOff=true`.
+- An arrow picker's new value slides in from the side it was stepped towards, fading in, over
+  0.2 seconds; its indicator fades the old pip out and the new one in (a thumb fades out,
+  moves and fades back in).
+- A slider's fill and mark slide to a new value over 0.2 seconds, easing out; while dragging
+  they follow the pointer closely.
+- A click past an arrow picker's last choice, on its faint arrow or that side of its value,
+  wraps around to the first, and before the first to the last. Keys and controller still stop
+  at the ends.
+- Subgroup rows indent 20 pixels beyond the row indent (was 14). They are also compact: 4
+  pixels shorter, their values 2 points smaller, with indicators, notes and slider bars kept
+  where they were above the row's bottom.
+- Outlines draw their side bars between the top and bottom bars, so no corner is drawn twice.
+
 ## v1.3.1
 
 - The browser places five more mods in categories by their folder name.

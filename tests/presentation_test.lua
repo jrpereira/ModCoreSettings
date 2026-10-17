@@ -248,6 +248,11 @@ local controls={build=function(tree,providers,a)
             end
             local wrapper=widget();wrapper:SetContent(overlay);p.scroll:AddChild(wrapper)
             p.rows[i]={widget=b,value=value,background=bg,parts=parts,wrapper=wrapper,nav=widget(),visible=true,slider=slider}
+            -- mcTestRowHeight gives the row and its buttons' boxes DMM's fixed height.
+            if self.mcTestRowHeight then
+                wrapper:SetHeightOverride(self.mcTestRowHeight);box:SetHeightOverride(self.mcTestRowHeight)
+                for _,part in ipairs(parts) do part.widget:GetParent():SetHeightOverride(self.mcTestRowHeight) end
+            end
         end
         p.built=true
     end
@@ -1032,6 +1037,7 @@ do
     assert(heading.mcLabel.Font.Size==18 and heading.mcLabel.color=='muted'
         and heading.mcLabel.Slot.Padding.Left==-2
         and heading.wrapper.Slot.Padding.Top==24,'the category row looks like a category heading')
+    assert(heading.wrapper.Slot.Padding.Bottom==0,'its rule hugs it')
     -- Its rule follows it as a heading's does, and shows and hides with it.
     local children=built.panels[1].scroll.children
     local at
@@ -1097,7 +1103,31 @@ do
     local top,nested=panel.rows[1],panel.rows[2]
     assert(top.mcLabel.Font.Size==14 and nested.mcLabel.Font.Size==13 and panel.rows[4].mcLabel.Font.Size==13,
         'subgroup rows are 1pt smaller')
-    assert(nested.mcLabel.Slot.Padding.Left==top.mcLabel.Slot.Padding.Left+14,'subgroup rows indent 14 pixels further')
+    assert(nested.mcLabel.Slot.Padding.Left==top.mcLabel.Slot.Padding.Left+20,'subgroup rows indent 20 pixels further')
+    -- Subgroup rows are compact: 4 pixels shorter throughout, the value raised a pixel more.
+    local kept={}
+    for i,item in ipairs(items) do kept[i]=item end
+    for i=#items,1,-1 do items[i]=nil end
+    for i,group in ipairs({'Outer','Inner'}) do
+        items[i]={id='Row'..i,kind='picker',group=group,label='Row '..i,values={0,1,2},labels={'A','B','C'}}
+    end
+    M.parse('[Category.Outer]\n[Category.Inner]\nmcWithin=Outer\n',items)
+    local compact=controls.build(widget(),{{choices=items}},api)
+    function compact.model:visibility() return {true,true} end
+    compact.model.pending[1],compact.model.pending[2]=0,0
+    compact.mcTestRowHeight=40
+    compact:show(1)
+    local plainRow,compactRow=compact.panels[1].rows[1],compact.panels[1].rows[2]
+    assert(plainRow.wrapper.HeightOverride==43 and compactRow.wrapper.HeightOverride==39,
+        'a subgroup row is 4 pixels shorter: '..tostring(compactRow.wrapper.HeightOverride))
+    for _,w in ipairs({compactRow.widget,compactRow.parts[1].widget,compactRow.parts[2].widget}) do
+        assert(w:GetParent().HeightOverride==39,'and so is every box as tall as the row')
+    end
+    assert(compactRow.mcPipBox.Slot.Padding.Bottom==plainRow.mcPipBox.Slot.Padding.Bottom,
+        'its indicator keeps its place above the row\'s bottom')
+    assert(compactRow.value.Slot.Padding.Bottom==plainRow.value.Slot.Padding.Bottom+1,'its value sits a pixel higher')
+    for i=#items,1,-1 do items[i]=nil end
+    for i,item in ipairs(kept) do items[i]=item end
     local drawn
     for _,child in ipairs(panel.scroll.children) do
         if child.children[1] and child.children[1].text=='Bare' then drawn=child end
@@ -1210,6 +1240,97 @@ cycling:tick({},function(w) local clicked=w.clicked;w.clicked=false;return click
 assert(cycling.model.pending[1]==1 and cycleButton.label.text=='Abilities','a click moves to the next choice and wraps')
 print('PASS cycle pickers show one choice in the key column and advance on click')
 
+-- mcType=onoff: a 44x20 switch centred in the value column, the current choice's label to
+-- its left, holding 0 (off) or 1 (on). A 2-pixel outline whose side bars run between the top and
+-- bottom ones, and inside it 3 pixels clear a toggle in the left (off, grey, dimmer) or right
+-- (on, gold) half. A click anywhere across the value column flips it. The outline brightens
+-- and a dim glow fills the switch while its row is hovered or selected.
+-- A change slides the toggle across in 0.2 seconds, easing out, blending its colors.
+for i=#items,1,-1 do items[i]=nil end
+items[1]={id='Glow',kind='picker',group='After',label='Glow',values={0,1},labels={'Off','On'}}
+items[2]={id='Three',kind='picker',group='After',label='Three',values={0,1,2},labels={'A','B','C'}}
+assert(not pcall(M.parse,'[Setting.Three]\nId=Three\nmcType=onoff\n',items),'onoff needs the choices 0 and 1')
+items[2]=nil
+assert(not pcall(M.parse,'[Setting.Glow]\nId=Glow\nmcType=onoff\nmcTabsWidth=200\n',items),'mcTabsWidth is for tabs')
+M.parse('[Setting.Glow]\nId=Glow\nmcType=onoff\n',items)
+assert(items[1].mcOnOff and not items[1].mcTabs and not items[1].mcCycle)
+local now=10
+api.clock=function() return now end
+local switching=controls.build(widget(),{{choices=items}},api)
+switching.model.pending[1]=0
+switching:show(1)
+local switchRow=switching.panels[1].rows[1]
+local switch,flip=switchRow.mcOnOff,switchRow.mcTabs[1]
+assert(switch and #switchRow.mcTabs==1 and not switchRow.mcPipBox,'one switch and no indicator')
+assert(switch.box.WidthOverride==44 and switch.box.HeightOverride==20,'the switch is 44 by 20')
+assert(flip.box.WidthOverride==190 and flip.box.HeightOverride==nil and flip.box.Slot.HorizontalAlignment==1
+    and flip.box.Slot.VerticalAlignment==0 and flip.box.Slot.Padding.Left==362,'the clickable area is the value column, row-high')
+assert(flip.widget:GetParent()==switch.box:GetParent():GetParent(),'the button spans the switch and its label')
+local lane=switch.box:GetParent()
+assert(lane.children[2]==switch.box and lane.children[1]==switch.text,'the label, then the switch at the right')
+assert(switch.text.Slot.Size.SizeRule==1 and switch.text.Justification==2 and switch.text.Slot.Padding.Right==12
+    and switch.text.Slot.VerticalAlignment==2,'the label fills the rest, right-aligned and centred, 12 pixels from the switch')
+assert(lane.Slot.Padding.Right==(190-44)-(190-44)//2,'the switch is centred in the value column')
+assert(switch.text.text=='Off','the label shows the current choice')
+assert(switch.text.opacity==0.75,'the label is a little dimmer than a value')
+assert(#switch.bars==4,'a four-bar outline')
+for _,bar in ipairs(switch.bars) do
+    local box=bar:GetParent()
+    assert((box.HeightOverride or box.WidthOverride)==2,'the outline is 2 pixels thick')
+    local side=box.WidthOverride~=nil
+    assert(not side or box.Slot.Padding.Top==2 and box.Slot.Padding.Bottom==2,'side bars run between top and bottom')
+end
+local toggleBox=switch.toggle:GetParent()
+assert(toggleBox.WidthOverride==17 and toggleBox.HeightOverride==10,'the toggle fills half the inside, 3 pixels clear')
+assert(toggleBox.Slot.Padding.Left==5 and toggleBox.Slot.Padding.Right==5 and toggleBox.Slot.HorizontalAlignment==1)
+local function same(color,r,g,b,a)
+    return math.abs(color.R-r)<1e-6 and math.abs(color.G-g)<1e-6 and math.abs(color.B-b)<1e-6 and math.abs(color.A-a)<1e-6
+end
+local idle=function() return false,false,false end
+switching.hovered,switching.current=nil,nil
+switching:tick({},idle,false)
+assert(switch.on==false and toggleBox.RenderTranslation.X==0,'off sits left, without sliding there')
+assert(same(switch.toggle.BrushColor,0.62,0.55,0.42,0.9*0.6) and same(switch.bars[1].BrushColor,0.62,0.55,0.42,0.4*0.6)
+    and switch.glow.BrushColor.A==0,'off is grey, dimmer, with a dimmed outline and no glow')
+flip.widget.clicked=true
+switching:tick({},function(w) local clicked=w.clicked;w.clicked=false;return clicked,false,false end,false)
+assert(switching.model.pending[1]==1 and switch.on and toggleBox.RenderTranslation.X==0,'a click turns it on; the slide starts')
+now=now+0.05;switching:tick({},idle,false)
+local midway=toggleBox.RenderTranslation.X
+assert(midway>0 and midway<17,'partway across after 0.05 seconds: '..midway)
+assert(switch.toggle.BrushColor.R>0.62 and switch.toggle.BrushColor.R<0.95,'its color blends from grey to gold')
+now=now+0.05;switching:tick({},idle,false)
+assert(toggleBox.RenderTranslation.X>=midway,'it keeps going')
+now=now+0.15;switching:tick({},idle,false)
+assert(toggleBox.RenderTranslation.X==17 and same(switch.toggle.BrushColor,0.95,0.63,0.08,0.9),'on rests right, gold')
+assert(switch.text.text=='On','the label follows the value')
+switching.hovered,switching.current=nil,nil
+switching:tick({},idle,false)
+assert(same(switch.bars[1].BrushColor,0.95,0.63,0.08,0.4) and switch.glow.BrushColor.A==0,'a dimmed gold outline at rest')
+switching.hovered=1
+switching:tick({},idle,false)
+assert(same(switch.bars[1].BrushColor,0.95,0.63,0.08,0.9) and same(switch.glow.BrushColor,0.95,0.63,0.08,0.1),
+    'hovered: a brighter outline and a dim glow')
+switching.hovered=nil;switching.current=1
+switching:tick({},idle,false)
+assert(switch.hot and switch.glow.BrushColor.A>0,'selected glows like hovered')
+flip.widget.clicked=true
+switching:tick({},function(w) local clicked=w.clicked;w.clicked=false;return clicked,false,false end,false)
+assert(switching.model.pending[1]==0 and switch.on==false,'a second click turns it off')
+now=now+0.05;switching:tick({},idle,false)
+assert(toggleBox.RenderTranslation.X<17 and toggleBox.RenderTranslation.X>0,'and slides back')
+now=now+0.2;switching:tick({},idle,false)
+assert(toggleBox.RenderTranslation.X==0 and same(switch.toggle.BrushColor,0.62,0.55,0.42,0.54),'off rests left, grey')
+api.clock=nil
+local framed=controls.build(widget(),{{choices=items}},api)
+framed.model.pending[1]=0;framed:show(1)
+local framedRow=framed.panels[1].rows[1]
+framedRow.mcTabs[1].widget.clicked=true
+framed:tick({},function(w) local clicked=w.clicked;w.clicked=false;return clicked,false,false end,false)
+for _=1,20 do framed:tick({},idle,false) end
+assert(framedRow.mcOnOff.toggleBox.RenderTranslation.X==17,'without a clock each tick counts as a 60 Hz frame')
+print('PASS on/off switches draw their value and flip on click')
+
 -- mcWrap: a read-only value in a wider 13pt column, broken at commas below 34
 -- characters; the row grows with its lines.
 local wrapped,lineCount=M.wrapList('Attack, Block, Dodge, Heavy Attack, Interact, Quickslot Left',34)
@@ -1281,13 +1402,38 @@ for n,b in ipairs(noteRow.mcPipBoxes) do widths[n]=b.WidthOverride end
 assert(table.concat(widths,',')=='45,44,45' and noteRow.mcPipBoxes[2].Slot.Padding.Left==4,
     'the pips fill it, 4 pixels apart, differing by a pixel at most: '..table.concat(widths,','))
 assert(-1+pipBox.HeightOverride<=noteBox.Slot.Padding.Bottom,'under a note, at its lowest, it sits below the note')
+-- A change animates over ticks; settle runs enough of them for it to finish.
+local function settle(ui) for _=1,20 do ui:tick({},function() return false,false,false end,false) end end
+settle(noteUi)
 local function lit() local out={} for n,pip in ipairs(noteRow.mcPips) do if pip.BrushColor.A>0.5 then out[#out+1]=n end end return table.concat(out,',') end
 assert(lit()=='1','the first choice is current')
 local function heights() local out={} for n,b in ipairs(noteRow.mcPipBoxes) do out[n]=b.HeightOverride end return table.concat(out,',') end
 assert(heights()=='2,2,2' and noteRow.mcPipBoxes[2].Slot.VerticalAlignment==1
     and noteRow.mcPipBoxes[2].Slot.Padding.Top==1,
     'idle, the current pip is as tall as the others, all a pixel below the strip\'s top')
-noteUi.model.pending[1]=9;noteUi:refresh()
+-- A change slides the new value in from the side it was stepped towards, fading in, while
+-- the old pip fades out and the new one in; a step back comes from the other side.
+do
+    local now=20
+    api.clock=function() return now end
+    local value=noteRow.value
+    local function mid(color,from,to) return color.A<math.max(from.A,to.A) and color.A>math.min(from.A,to.A) end
+    noteUi.model.pending[1]=7;noteUi:refresh()
+    assert(value.RenderTranslation.X==12 and value.opacity==0,'the new value starts 12 pixels right, unseen')
+    now=now+0.05;noteUi:tick({},function() return false,false,false end,false)
+    assert(value.RenderTranslation.X>0 and value.RenderTranslation.X<12 and value.opacity>0 and value.opacity<1,
+        'partway in')
+    assert(mid(noteRow.mcPips[1].BrushColor,{A=0.9},{A=0.35}) and mid(noteRow.mcPips[2].BrushColor,{A=0.9},{A=0.35}),
+        'the old pip fading out, the new one in')
+    now=now+0.2;noteUi:tick({},function() return false,false,false end,false)
+    assert(value.RenderTranslation.X==0 and value.opacity==1 and lit()=='2','settled')
+    noteUi.model.pending[1]=0;noteUi:refresh()
+    assert(value.RenderTranslation.X==-12,'a step back comes from the left')
+    now=now+0.3;noteUi:tick({},function() return false,false,false end,false)
+    assert(value.RenderTranslation.X==0 and lit()=='1')
+    api.clock=nil
+end
+noteUi.model.pending[1]=9;noteUi:refresh();settle(noteUi)
 assert(lit()=='3' and heights()=='2,2,2','the indicator follows the choice')
 assert(pipBox.opacity==0.5,'half strength while the row is not hovered')
 noteUi.hovered=1;noteUi:tick({},function() return false,false,false end,false)
@@ -1373,10 +1519,21 @@ do
     assert(bar.bar.opacity==1 and bar.mark.visible==3,'selected: full strength, with its mark')
     sliding.current=nil;sliding:tick({},function() return false,false,false end,false)
     assert(bar.bar.opacity==0.5 and bar.mark.visible==1,'back to idle')
+    -- A change slides the fill, and the mark with it, to the new value.
+    local now=30
+    api.clock=function() return now end
+    local idle=function() return false,false,false end
     sliding.model.pending[1]=0;sliding:refresh()
+    assert(bar.filled.WidthOverride==71,'the slide starts where the fill is')
+    now=now+0.05;sliding:tick({},idle,false)
+    assert(bar.filled.WidthOverride<71 and bar.filled.WidthOverride>0
+        and bar.markSlot.Padding.Left==bar.filled.WidthOverride-1,'partway, the mark at the fill\'s end')
+    now=now+0.2;sliding:tick({},idle,false)
     assert(bar.filled.WidthOverride==0 and bar.markSlot.Padding.Left==0,'at the minimum the mark stays inside the bar')
     sliding.model.pending[1]=100;sliding:refresh()
+    now=now+0.25;sliding:tick({},idle,false)
     assert(bar.filled.WidthOverride==142 and bar.markSlot.Padding.Left==139,'at the maximum too')
+    api.clock=nil
     for n=#items,1,-1 do items[n]=nil end
     for n,item in ipairs(saved) do items[n]=item end
 end
@@ -1402,12 +1559,34 @@ end
 -- At an end, DMM's hidden arrow shows faint instead; a disabled picker keeps both hidden.
 noteRow.left,noteRow.right=noteRow.parts[1],noteRow.parts[3]
 noteRow.renderLeft,noteRow.renderRight=true,false;noteRow.parts[3].widget:SetRenderOpacity(0)
+noteRow.parts[3].widget:SetIsEnabled(false)
 noteUi:refresh()
 assert(noteRow.parts[3].widget.opacity==0.5,'the arrow at the last choice is faint, not hidden')
+-- Clicks wrap around: the faint arrow, or that side of the value, goes to the other end, and
+-- the new value slides in from the side clicked.
+do
+    local click=function(w) local clicked=w.clicked;w.clicked=false;return clicked,false,false end
+    assert(noteRow.parts[3].widget.enabled==true,'the faint arrow takes clicks')
+    noteUi.model.pending[1]=9;noteUi:refresh();settle(noteUi)
+    noteRow.parts[3].widget.clicked=true;noteUi:tick({},click,false)
+    assert(noteUi.model.pending[1]==0 and noteUi.current==1,'past the last choice comes the first')
+    assert(noteRow.value.RenderTranslation.X==12,'sliding in from the right, the side clicked')
+    settle(noteUi)
+    noteRow.renderLeft,noteRow.renderRight=false,true;noteUi:refresh()
+    noteRow.mcZones[1].widget.clicked=true;noteUi:tick({},click,false)
+    assert(noteUi.model.pending[1]==9 and noteRow.value.RenderTranslation.X==-12,
+        'before the first choice comes the last, from the left')
+    settle(noteUi)
+    noteRow.renderLeft,noteRow.renderRight=true,false;noteUi:refresh()
+    noteUi.current=nil
+end
 noteRow.renderLeft,noteRow.renderRight=false,false
 noteRow.parts[1].widget:SetRenderOpacity(0);noteRow.parts[3].widget:SetRenderOpacity(0)
+noteRow.parts[1].widget:SetIsEnabled(false);noteRow.parts[3].widget:SetIsEnabled(false)
 noteUi:refresh()
 assert(noteRow.parts[1].widget.opacity==0 and noteRow.parts[3].widget.opacity==0,'a disabled picker shows no arrows')
+assert(not noteRow.parts[1].widget.enabled and not noteRow.parts[3].widget.enabled,'and takes no clicks')
+noteRow.parts[1].widget:SetIsEnabled(true);noteRow.parts[3].widget:SetIsEnabled(true)
 noteRow.left,noteRow.right=nil,nil
 noteUi.model.pending[1]=0;noteUi:refresh()
 -- Many choices: a track with a thumb at the current choice's place.
@@ -1420,6 +1599,18 @@ manyUi.model.pending[1]=20;manyUi:show(1)
 local thumb=manyUi.panels[1].rows[1].mcPipThumb
 assert(thumb and #manyUi.panels[1].rows[1].mcPips==0 and thumb.width==7 and thumb.slot.Padding.Left==142-7 and thumb.slot.Padding.Top==1,
     'beyond sixteen choices a thumb marks the place along a track')
+-- A change fades the thumb out, moves it, and fades it back in.
+do
+    local now=50
+    api.clock=function() return now end
+    manyUi.model.pending[1]=1;manyUi:refresh()
+    assert(thumb.box.opacity==1 and thumb.slot.Padding.Left==142-7,'the thumb starts at its old place')
+    now=now+0.02;manyUi:tick({},function() return false,false,false end,false)
+    assert(thumb.box.opacity<1 and thumb.slot.Padding.Left==142-7,'fading out where it was')
+    now=now+0.25;manyUi:tick({},function() return false,false,false end,false)
+    assert(thumb.box.opacity==1 and thumb.slot.Padding.Left==0,'back at full strength at its new place')
+    api.clock=nil
+end
 for n=#items,1,-1 do items[n]=nil end;for n,item in ipairs(savedItems) do items[n]=item end
 -- A tab picker shows every choice itself and gets no note line.
 M.parse(notes..'mcType=tab\n',items)

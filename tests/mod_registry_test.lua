@@ -111,4 +111,33 @@ os.execute=execute
 assert(shells==1 and io.open(temp..'/.mcs-probe','rb')==nil,'one shell for a missing folder, none once it exists')
 os.remove(temp)
 
+-- Module ids: mod.json's id, a plain identifier, shared per installed folder; an id two
+-- folders declare goes to neither; the ready flag follows them all.
+do
+    local files={
+        ['/ids/9_Fang/mod.json']='{"id":"Fangdango","categories":["combat"]}',
+        ['/ids/Plain/mod.json']='{"categories":["combat"]}',
+        ['/ids/Spaced/mod.json']='{"id":"Not an id","categories":["combat"]}',
+        ['/ids/A/mod.json']='{"id":"Twin","categories":["combat"]}',
+        ['/ids/B/mod.json']='{"id":"Twin","categories":["combat"]}',
+    }
+    local idReports={}
+    local function snapshot()
+        return {__absolute_path='/ids',['9_Fang']=manifest(),Plain=manifest(),Spaced=manifest(),A=manifest(),B=manifest()}
+    end
+    local idIndex=R.boot('/ids/MCS','/ids',snapshot,{database=folderData,mkdir=function() end,
+        read=function(file) return files[file] end,write=function() end,
+        report=function(folder,why) idReports[folder]=(idReports[folder] or '')..why end})
+    assert(idIndex.modules['9_Fang'].id=='Fangdango' and idIndex.modules.Plain.id==nil,'mod.json id is kept')
+    assert(idIndex.modules.Spaced.id==nil and idReports.Spaced:find('identifier',1,true),'an id that is not an identifier is reported')
+    local shared,order={},{}
+    R.publishModuleIds(idIndex,function(key,value) shared[key]=value;order[#order+1]=key end,
+        function(folder,why) idReports[folder]=why end)
+    assert(shared['MCS_ModuleId_v1.9_Fang']=='Fangdango' and shared['MCS_ModuleId_v1.Plain']==nil
+        and shared['MCS_ModuleId_v1.Spaced']==nil,'each folder with an id is shared under its installed name')
+    assert(shared['MCS_ModuleId_v1.A']==nil and shared['MCS_ModuleId_v1.B']==nil
+        and idReports.A:find('A, B',1,true),'an id two folders declare goes to neither, reported')
+    assert(order[#order]=='MCS_ModuleId_v1.ready' and shared['MCS_ModuleId_v1.ready']=='1','ready comes last')
+end
+
 print('PASS mod.json, folder_categories and heuristic steps, remap and invalid categories, uncached rebuild')

@@ -96,7 +96,8 @@ menu={
 - A group's `groups` are its subgroups, one level deep, shown after its own fields:
   `{id='Quickslots',label='Player Quickslots',groups={{id='Fangdango',label='Fangdango'}}}`.
   A subgroup's heading is smaller and sits at the row indent; its fields indent
-  further, 3pt smaller (`mcWithin`). A group whose fields are all in subgroups still
+  20 pixels further, their labels 1pt smaller, in compact rows: 4 pixels shorter,
+  values 2pt smaller (`mcWithin`). A group whose fields are all in subgroups still
   shows its heading, but takes no `conditions` or presentation properties.
 - A field has `choices` (a picker; up to 64) or a whole-number `range`, and a
   `default` among them. One choice makes a button or, `readOnly`, a shown value.
@@ -135,6 +136,7 @@ menu={
   | `silent=true` | `mcSilent=1` |
   | `category=true` | `mcCategory=1` |
   | `cycle=true` | `mcType=cycle` |
+  | `onOff=true` (choices 0 and 1) | `mcType=onoff` |
   | `tabsWidth=<160–440>` (with `tabs`) | `mcTabsWidth` |
   | `wrap=true` (read-only) | `mcWrap=1` |
   | `table={entries={{code=,text=},...},columns=}` (read-only) | `mcTable`, `mcColumns` |
@@ -364,6 +366,16 @@ disabled button showing that text to the left of its choices, which then take
 keybind editor's key box and sits in its key column, so it lines up under keys.
 DMM's keyboard/controller navigation is retained.
 
+`mcType=onoff` renders a picker whose choices are 0 and 1 as an on/off switch
+centred in the value column, with the current choice's label to its left (2 points
+smaller than a picker's value at 75% opacity, right-aligned, 12 pixels from it). The switch is a 44×20 outline 2 pixels thick, and inside it, 3
+pixels clear, a toggle filling the left half (0, off, grey) or the right half
+(1, on, gold, the indicators' color). Off, the whole switch is drawn at 60% strength.
+The outline is dimmed until its row is hovered or selected, when it brightens and a
+dim glow fills the switch. A change slides the toggle across in 0.2 seconds, easing
+out, its color blending between grey and gold. A click anywhere across the value
+column flips it; DMM's keyboard/controller navigation is retained.
+
 `mcWrap=1` on an `mcReadOnly=1` picker shows its value as 13pt left-aligned
 text in a wider column, broken after commas so no line reaches 34 characters;
 the row grows to fit its lines.
@@ -570,6 +582,21 @@ all targets to a named preset selects it automatically. Custom cannot be chosen
 directly. Apply and Restore clear the visual baseline.
 Apply and Restore remain DMM operations. Opening an inconsistent saved preset
 preserves its keys and changes the pending picker to Custom.
+
+## Module ids
+
+While it loads, before the UE4SSLuaEventBridge loop starts, ModCore Settings shares
+each enabled module's `mod.json` `id` with every Lua state:
+
+```lua
+local id=ModRef:GetSharedVariable('MCS_ModuleId_v1.'..folder)  -- folder as installed, e.g. '9_ModCore_Fangdango'
+local ready=ModRef:GetSharedVariable('MCS_ModuleId_v1.ready')   -- '1' once all ids are shared
+```
+
+An id is a plain identifier: a letter, then letters, digits and underscores, at most
+64. A folder whose `mod.json` has no id, an invalid one, or one another folder also
+declares has none; the last two are logged. Without the ready flag ModCore Settings did
+not load or its scan failed.
 
 ## Module categories
 

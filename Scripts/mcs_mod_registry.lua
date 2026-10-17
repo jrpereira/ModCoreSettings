@@ -80,6 +80,11 @@ local function classify(folder,database,read,report)
     local preferred=manifest.preferred
     if preferred=='author' then preferred=manifest.author end
     local entry={tags=Taxonomy:tags(tags),preferred=text(preferred,120),icon=text(manifest.icon,16)}
+    -- The module id other modules key settings with: a plain identifier.
+    if manifest.id~=nil then
+        if type(manifest.id)=='string' and #manifest.id<=64 and manifest.id:match('^%a[%w_]*$') then entry.id=manifest.id
+        else note('mod.json id is not an identifier of at most 64 letters, digits and underscores') end
+    end
     if manifest.categories~=nil then
         local declared=Taxonomy:usable(manifest.categories,{author=true,report=note})
         if declared then
@@ -196,6 +201,29 @@ function M.folders(snapshot,mods)
 end
 
 M.mkdir=Io.mkdir
+-- Module ids are shared with other Lua states as SetSharedVariable(MODULE_ID..folder, id),
+-- folder as installed, then MODULE_ID..'ready' set to '1' once all are published.
+M.MODULE_ID='MCS_ModuleId_v1.'
+-- Each folder's module id from an index; an id two folders declare goes to neither.
+function M.moduleIds(index,report)
+    local byId,ids={},{}
+    for folder,entry in pairs(index.modules) do
+        if entry.id then byId[entry.id]=byId[entry.id] or {};table.insert(byId[entry.id],folder) end
+    end
+    for id,folders in pairs(byId) do
+        if #folders==1 then ids[folders[1]]=id
+        elseif report then
+            table.sort(folders)
+            for _,folder in ipairs(folders) do report(folder,'module id '..id..' is declared by '..table.concat(folders,', ')) end
+        end
+    end
+    return ids
+end
+-- Publishes every folder's module id, then the ready flag.
+function M.publishModuleIds(index,set,report)
+    for folder,id in pairs(M.moduleIds(index,report)) do set(M.MODULE_ID..folder,id) end
+    set(M.MODULE_ID..'ready','1')
+end
 
 function M.boot(root,mods,iterator,options)
     options=options or {}

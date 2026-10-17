@@ -7,12 +7,12 @@
 --  fields={{id=,group=,label=,description=,default=,
 --      choices={{value=,label=,note=,module=,sound=},...} | range={min=,max=,step=,suffix=},
 --      tabs=true,heading=true,level=,conditions=,action=true,link=,readOnly=true,slot=,slotLabel=true,
---      slotGroups=true,silent=true,category=true,cycle=true,tabsWidth=,wrap=true,
+--      slotGroups=true,silent=true,category=true,cycle=true,onOff=true,tabsWidth=,wrap=true,
 --      table={entries={{code=,text=},...},columns=},referenceLabel=},...}}
 --
 -- Groups also take help=, silent=true and parent={label=,level=}. Each property is one of
 -- ModCoreSettings' presentation keys (see REFERENCE.md: silent is mcSilent, table mcTable and
--- mcColumns, cycle mcType=cycle, and so on), checked here with the field's id.
+-- mcColumns, cycle mcType=cycle, onOff mcType=onoff, and so on), checked here with the field's id.
 --
 -- conditions holds everything that changes with state while the menu is open:
 --   visible={field=,values={...},playerExists=}  shown while all of these hold
@@ -122,7 +122,7 @@ function M.manifest(menu,options)
         local where='field '..n
         allowed(field,{id=true,group=true,label=true,description=true,default=true,choices=true,range=true,
             tabs=true,heading=true,level=true,conditions=true,action=true,link=true,readOnly=true,
-            slot=true,slotLabel=true,slotGroups=true,silent=true,category=true,cycle=true,
+            slot=true,slotLabel=true,slotGroups=true,silent=true,category=true,cycle=true,onOff=true,
             tabsWidth=true,wrap=true,table=true,referenceLabel=true},where)
         identifier(field.id,where..' id')
         assert(not byField[field.id],'duplicate field '..field.id)
@@ -136,7 +136,7 @@ function M.manifest(menu,options)
         end
         assert((field.choices==nil)~=(field.range==nil),where..': needs choices or range')
         if field.conditions~=nil then allowed(field.conditions,{visible=true,label=true,dim=true},where..' conditions') end
-        for _,name in ipairs({'tabs','action','readOnly','silent','category','cycle','wrap'}) do
+        for _,name in ipairs({'tabs','action','readOnly','silent','category','cycle','onOff','wrap'}) do
             flag(field[name],where..' '..name)
         end
         if field.link~=nil then text(field.link,where..' link',256) end
@@ -167,6 +167,8 @@ function M.manifest(menu,options)
                 end
                 values[choice.value]=true
             end
+            assert(not field.onOff or #field.choices==2 and field.choices[1].value==0 and field.choices[2].value==1,
+                where..': onOff takes the choices 0 and 1')
         else
             allowed(field.range,{min=true,max=true,step=true,suffix=true},where..' range')
             local range=field.range
@@ -374,7 +376,7 @@ function M.manifest(menu,options)
             add('PresetLabels',table.concat(labels,'|'))
             add('mcChoiceNotes',#notes>0 and table.concat(notes,';') or nil)
             add('mcChoiceSounds',#sounds>0 and table.concat(sounds,';') or nil)
-            add('mcType',field.tabs and 'tab' or field.cycle and 'cycle' or nil)
+            add('mcType',field.tabs and 'tab' or field.cycle and 'cycle' or field.onOff and 'onoff' or nil)
             add('mcTabsWidth',field.tabsWidth)
             local dimmed=field.conditions and field.conditions.dim
             if dimmed then

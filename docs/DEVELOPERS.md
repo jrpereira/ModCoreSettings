@@ -122,6 +122,7 @@ gamepad capture are unsupported.
 | Navigation picker | `mcNavigation=1` | Switch visible groups without saving a choice |
 | Tab choices | `mcType=tab` | Up to eight picker choices |
 | Compact cycling picker | `mcType=cycle` | Click to advance to the next choice |
+| On/off switch | `mcType=onoff` | A picker with the choices 0 and 1 |
 | Conditional rows | `VisibleWhen` / `VisibleValues` | Show a row when an earlier picker equals `1` |
 | Shared page area | `mcSlot` | Let MCT contribute visual settings to Controls |
 

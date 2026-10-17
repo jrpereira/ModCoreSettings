@@ -115,6 +115,8 @@ shown.fields[#shown.fields+1]={id='List',group='Notes',label='List',default=0,re
     choices={{value=0,label='a, b, c'}}}
 shown.fields[#shown.fields+1]={id='Mode',group='Notes',label='Mode',default=0,cycle=true,category=true,
     choices={{value=0,label='A'},{value=1,label='B'}}}
+shown.fields[#shown.fields+1]={id='Switch',group='Notes',label='Switch',default=0,onOff=true,
+    choices={{value=0,label='Off'},{value=1,label='On'}}}
 shown.fields[#shown.fields+1]={id='Ref',group='Notes',label='Ref',default=0,readOnly=true,tabs=true,
     referenceLabel='Key',choices={{value=0,label='Q'}}}
 local shownText=Data.manifest(shown)
@@ -133,6 +135,7 @@ has('Setting.Open','mcTabsWidth=200')
 has('Setting.Info','mcTable=2192:→|25CF:●','mcColumns=2')
 has('Setting.List','mcWrap=1')
 has('Setting.Mode','mcType=cycle','mcCategory=1')
+has('Setting.Switch','mcType=onoff')
 has('Setting.Ref','mcType=tab','mcReferenceLabel=Key')
 local entries,columns=require('menu_contributions').textTable('2192:→|25CF:●',2)
 assert(#entries==2 and columns==2,'the table decodes as ModCoreSettings decodes it')
@@ -143,12 +146,13 @@ if choicesPath then
     for _,item in ipairs(items) do byId[item.id]=item end
     assert(byId.Style.mcSilent and byId.Style.mcDimValues[2] and byId.Size.mcPlayerExists==true
         and byId.Open.mcTabsWidth==200 and byId.Info.mcTable and byId.List.mcWrap and byId.Mode.mcCycle
-        and byId.Mode.mcCategory and byId.Ref.mcReferenceLabel=='Key','presentation reads the row properties')
+        and byId.Mode.mcCategory and byId.Switch.mcOnOff and byId.Ref.mcReferenceLabel=='Key','presentation reads the row properties')
     local group=byId.Style.mcGroup
     assert(group.help=='What these do.' and group.silent and group.playerExists==false
         and group.parent.label=='Display' and group.order.values[0]==20,'presentation reads the group properties')
 end
 fails('cycle needs choices and no tabs',with(function(m) m.fields[1].cycle=true end))
+fails('onOff takes the choices 0 and 1',with(function(m) m.fields[1].onOff=true end))
 fails('tabsWidth is 160 through 440',with(function(m) m.fields[3].tabsWidth=100 end))
 fails('a category row takes no level',with(function(m) m.fields[3].category=true end))
 fails('wrap needs a read-only row',with(function(m) m.fields[1].wrap=true end))
