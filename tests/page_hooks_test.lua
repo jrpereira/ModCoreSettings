@@ -47,7 +47,7 @@ local sources={
     ['/m/half/hooks.lua']=function() return {contract=1,manifest=function() end,load=function() end} end,
     ['/m/menu/hooks.lua']=function() return {contract=1,menu=function(context)
         return {groups={{id='G'}},fields={{id='M',group='G',label=context.moduleName('9_Mod'),default=0,
-            choices={{value=0,label='Shown'}},readOnly=true}}}
+            values={{value=0,label='Shown'}},widget='text'}}}
     end} end,
     ['/m/both/hooks.lua']=function() return {contract=1,menu=function() end,manifest=function() end} end,
 }

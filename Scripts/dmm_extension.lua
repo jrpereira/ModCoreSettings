@@ -93,7 +93,16 @@ extension={
         local fieldTypes=module('field_types').new(report)
         local keybind=module('keybind_editor')
         fieldTypes:register('keybind',keybind)
+        -- Menu data checks span fields with the same editor.
+        package.loaded.range_editor=module('range_editor')
+        fieldTypes:register('range',package.loaded.range_editor)
+        -- Enter and A for editors that take the row's keys, and their footer hint.
+        local editorInput=module('editor_input').new({register=RegisterKeyBind,keys=Key,
+            key=type(FName)=='function' and function(name) return {KeyName=FName(name)} end or nil})
         fieldTypes:install({choices=dmm.choices,controls=dmm.controls,settingsApi=dmm.settingsApi,
+            confirm=editorInput,pointer=editorInput.pointer,
+            hint=module('editor_hint').install(require('nativeactions'),dmm.pages,
+                type(FName)=='function' and FName or nil),
             standardControls=(function()
                 -- The shared key rule, vendored like menu_contributions; DMM's require
                 -- resolves in DMM's folder, so standard_controls finds it here.
@@ -140,8 +149,11 @@ extension={
         -- Outermost open: inner wrappers only ever see the host's own unspliced settings.
         local slots=menuSlots.install(dmm.choices,report,contributions,read)
         -- Wrapped after browser groups so contributed pages exist before ModCore grouping runs.
+        local function stored(page)
+            return pageHooks.stored(page.menu),pageHooks.context(page)
+        end
         menuPages.install(dmm.pages,function(content) return dmm.choices.parse(content) end,
-            menuPages.reader(contributions,ModRef,read,report),report,slots,read,hooked,compile)
+            menuPages.reader(contributions,ModRef,read,report),report,slots,read,hooked,compile,stored)
         pageLinks.install(dmm.pages,slots)
         -- Outermost: a rebuild after Apply runs every wrapper above with DMM's arguments.
         module('index_refresh').install(dmm.pages,report)

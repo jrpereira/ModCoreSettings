@@ -74,6 +74,55 @@ function M.manifest(hooks,context,compile)
     return text
 end
 
+-- Storage hooks for a menu-data page whose storage DMM cannot keep: every stored field's
+-- value under menu.storage.section in menu.storage.file, relative to the page's
+-- configDirectory. A range's value is its text; every other value is a number. A missing
+-- file or key keeps the default; Apply adds missing keys and keeps every other byte.
+-- files (optional) is {read=,write=}, safe_file's by default.
+function M.stored(menu,files)
+    local Ini=require('mc_ini')
+    files=files or require('safe_file')
+    local storage=menu.storage
+    local fields={}
+    for _,field in ipairs(menu.fields or {}) do
+        local shown=field.widget=='text' or field.widget=='table'
+        if not (field.action or field.link or shown) then fields[#fields+1]=field end
+    end
+    local function path(context)
+        assert(type(context.directory)=='string' and context.directory~='','storage needs a configDirectory')
+        return context.directory:gsub('[/\\]+$','')..'/'..storage.file
+    end
+    local function text(value)
+        if type(value)=='string' then return value end
+        return math.type(value)=='integer' and tostring(value)
+            or value%1==0 and string.format('%d',value) or string.format('%.17g',value)
+    end
+    return {contract=M.contract,
+        load=function(context)
+            local content=files.read(path(context))
+            if not content then return {} end
+            local found,values={},{}
+            for _,entry in ipairs(Ini.entries(Ini.parse(content),storage.section)) do
+                if not found[entry.key] then found[entry.key]=entry.value end
+            end
+            for _,field in ipairs(fields) do
+                local value=found[field.id]
+                if value~=nil then values[field.id]=field.type=='range' and value or tonumber(value) or value end
+            end
+            return values
+        end,
+        apply=function(context,values)
+            local file=path(context)
+            local original=files.read(file) or ''
+            local content=original
+            for _,field in ipairs(fields) do
+                if values[field.id]~=nil then content=Ini.set(content,storage.section,field.id,text(values[field.id])) end
+            end
+            if content~=original then files.write(file,content) end
+            return values
+        end}
+end
+
 -- A loaded value the setting accepts, in canonical form; nil when it accepts none.
 local function accepted(choices,item,value)
     local ok,index=pcall(choices.index,item,value)

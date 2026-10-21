@@ -76,78 +76,98 @@ menu={
     storage={file='config.ini',section='Settings'},   -- optional
     groups={
         {id='Layout',label='Layout'},
-        {id='Advanced',heading=false,conditions={visible={field='Style',values={1}}}},
+        {id='Advanced',style='none',conditions={visible={field='Style',values={1}}}},
     },
     fields={
-        {id='Style',group='Layout',label='Style',default=0,tabs=true,
-            choices={{value=0,label='Swap'},{value=1,label='Stack',note='Two rows'}}},
-        {id='Size',group='Layout',label='Size',default=100,range={min=10,max=200,step=5,suffix='%'},
+        {id='Style',group='Layout',label='Style',default=0,widget='tabs',
+            values={{value=0,label='Swap'},{value=1,label='Stack',note='Two rows'}}},
+        {id='Size',group='Layout',label='Size',default=100,values={min=10,max=200,step=5,suffix='%'},
             conditions={label={field='Style',values={[1]='Stack size'}}}},
-        {id='Gap',group='Advanced',label='Gap',default=4,range={min=0,max=20}},
+        {id='Grow',group='Layout',label='Grow',type='range',default={10,50},
+            values={min=0,max=100,step=10,suffix='%',delta={10}}},
+        {id='Gap',group='Advanced',label='Gap',default=4,values={min=0,max=20}},
     },
 }
 ```
 
 - `storage`: values are saved under `section` in `file`, relative to the page's
-  `configDirectory`. Without it, DMM's default storage applies.
+  `configDirectory`. Without it, DMM's default storage applies. DMM stores numbers
+  only, so a page with `storage` that holds a range or keybind row is stored by
+  ModCoreSettings instead: every stored row under `section`, a missing or invalid
+  value keeping its default, missing keys added on Apply, every other byte kept.
 - Groups keep their order, and fields theirs within their group; only groups with
-  fields are shown. A group's heading is its `label`, else its `id`; `heading=false`
-  hides it; `level` (0–6) sets its size.
+  fields are shown. A group's heading is its `label`, else its `id`;
+  `style='none'` hides it (`style='category'`, the default, shows it).
 - A group's `groups` are its subgroups, one level deep, shown after its own fields:
   `{id='Quickslots',label='Player Quickslots',groups={{id='Fangdango',label='Fangdango'}}}`.
   A subgroup's heading is smaller and sits at the row indent; its fields indent
   20 pixels further, their labels 1pt smaller, in compact rows: 4 pixels shorter,
-  values 1pt smaller (`mcWithin`). A subgroup with `heading=false` shows no heading,
+  values 1pt smaller (`mcWithin`). A subgroup with `style='none'` shows no heading,
   so its fields are drawn as the group's own. A group whose fields are all in subgroups still
   shows its heading, but takes no `conditions` or presentation properties.
-- A field has `choices` (a picker; up to 64) or a whole-number `range`, and a
-  `default` among them. One choice makes a button or, `readOnly`, a shown value.
-  `tabs=true` shows up to eight choices side by side.
-- `heading=true` puts a picker in the page's title row (one per page); `level` 0
-  or 2–6 sets the label size.
+- A field's `type` is what it holds and its `widget` how it shows. `type` may be
+  left out when `values` says it (a list is an enum, `{min=,max=}` an integer); a
+  range is always declared.
+
+  | `type` | `values` | `default` | `widget` (first is the default) |
+  |---|---|---|---|
+  | `enum` | `{{value=,label=,note=,module=,sound=},...}`, up to 64 | a value | `picker`, `tabs` (up to 8), `cycler`, `switch` (values 0 and 1), `text`, `table` |
+  | `integer` | `{min=,max=,step=,suffix=}`, whole numbers | a number | `slider` |
+  | `range` | `{min=,max=,step=,suffix=,delta=}`, whole numbers | `{low,high}` | `range` |
+
+  A `text` or `table` row is a shown value, never stored; one value with `action`
+  or `link` makes a button. A range is ModCoreSettings' [range row](DEVELOPERS.md#add-a-range):
+  `min` and `max` are its edges, or `{low marker's, high marker's}` bounds; `delta` is
+  the smallest and largest `high-low`, `{min,max}`, `{min}` or one number for both;
+  `step` divides the track into 1 to 40 steps; `suffix` is at most 8 characters. It is
+  saved as `<low>|<high>`.
+- `style` makes a row stand out; sizes otherwise follow its place on the page:
+  `'title'` puts an enum in the page's title row (one per page), `'category'` lets
+  the row stand in for its group's heading (`mcCategory`), `'notice'` sets it in
+  small, muted text.
 - `conditions` holds everything that changes while the menu is open; a rule's
-  `field` is a picker on the page:
+  `field` is an enum on the page:
 
   | Condition | On | Effect | Key |
   |---|---|---|---|
-  | `visible={field=,values={...},playerExists=}` | fields, groups | shown only while all given parts hold: the picker holds one of the values, and a player is (`true`) or is not (`false`) in the world | `VisibleWhen`, `VisibleValues`, `mcPlayerExists` |
-  | `label={field=,values={[value]='text'}}` | fields, groups | named after the picker's value; unlisted values keep the label | `mcLabelWhen`, `mcLabels` |
-  | `dim={<value>,...}` | fields | faded while the row's own value is one of these | `mcDimValues` |
+  | `visible={field=,values={...},playerExists=}` | fields, groups | shown only while all given parts hold: the enum holds one of the values, and a player is (`true`) or is not (`false`) in the world | `VisibleWhen`, `VisibleValues`, `mcPlayerExists` |
+  | `label={field=,values={[value]='text'}}` | fields, groups | named after the enum's value; unlisted values keep the label | `mcLabelWhen`, `mcLabels` |
+  | `dim={<value>,...}` | enum fields | faded while the row's own value is one of these | `mcDimValues` |
   | `order={field=,values={[value]=rank}}` | groups | ordered groups exchange places by rank | `mcOrderWhen`, `mcOrders` |
 
   A `label` or `order` key may be a list of values sharing one entry:
   `values={[{1,2}]='Side Keys',[3]='Top Keys'}`. Each value appears once. Readers
   unfold lists once with `menu_contributions.unfold(map, where)`, so published
   menu data holds single values only.
-- A choice's `note` is shown small under it. `module='<mod folder>'` notes that
+- A value's `note` is shown small under it. `module='<mod folder>'` notes that
   mod's name, as the mod browser shows it.
-- A choice's `sound` is a Wwise event path under `/Game/`, or `'none'`: it plays
-  instead of DMM's change sound when the row changes to that choice
+- A value's `sound` is a Wwise event path under `/Game/`, or `'none'`: it plays
+  instead of DMM's change sound when the row changes to that value
   (`mcChoiceSounds` on the picker; see [presentation metadata](#presentation-metadata)).
-- `slot='<name>'` makes a read-only field the page's [slot](#slot-rows) for other
+- `slot='<name>'` makes a `text` field the page's [slot](#slot-rows) for other
   contributors' rows; `slotLabel=true` lets it name the first of them, and
   `slotGroups=true` lets the rows keep their own groups (`mcSlotGroups`).
 - `action=true` makes a navigation row (never stored; see [page hooks](#page-hooks));
   `link='<page id>'` or `'<provider>:<slot>'` opens that page.
-- The [presentation metadata](#presentation-metadata) is available as properties,
-  checked with the field's or group's id:
+- The rest of the [presentation metadata](#presentation-metadata) is available as
+  properties, checked with the field's or group's id:
 
   | Field property | Key |
   |---|---|
+  | `widget='tabs'`, `'cycler'`, `'switch'` | `mcType=tab`, `cycle`, `onoff` |
+  | `widget='text'`, `'table'` | `mcReadOnly=1` |
+  | `style='title'`, `'category'`, `'notice'` | `mcHeading=1`, `mcCategory=1`, `mcLevel=5` |
   | `silent=true` | `mcSilent=1` |
-  | `category=true` | `mcCategory=1` |
-  | `cycle=true` | `mcType=cycle` |
-  | `onOff=true` (choices 0 and 1) | `mcType=onoff` |
   | `tabsWidth=<160–440>` (with `tabs`) | `mcTabsWidth` |
-  | `wrap=true` (read-only) | `mcWrap=1` |
-  | `table={entries={{code=,text=},...},columns=}` (read-only) | `mcTable`, `mcColumns` |
-  | `referenceLabel='<text>'` (read-only `tabs`) | `mcReferenceLabel` |
+  | `wrap=true` (with `text`) | `mcWrap=1` |
+  | `table={entries={{code=,text=},...},columns=}` (with `table`) | `mcTable`, `mcColumns` |
 
   | Group property | Key |
   |---|---|
+  | `style='none'` | `mcHeading=0` |
   | `help='<text>'` | `mcHelp` |
   | `silent=true` | `mcSilent=1` |
-  | `parent={label=,level=}` (not on subgroups) | `mcParent`, `mcParentLevel` |
+  | `parent={label=}` (not on subgroups) | `mcParent` |
 
   A group without rows of its own (one that only heads subgroups) takes none of them.
 - Ids are letters, digits and `_ . : -`; text has no `| ; [ ]` or control

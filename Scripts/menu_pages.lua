@@ -54,7 +54,7 @@ function M.reader(Contributions,shared,read,report)
     end
 end
 
-local function generated(contribution,page,parse,hooked,compile)
+local function generated(contribution,page,parse,hooked,compile,stored)
     local choices={}
     local manifest,hooks,context=page.manifest,nil,nil
     if page.hooks then
@@ -65,6 +65,13 @@ local function generated(contribution,page,parse,hooked,compile)
         manifest=compile(page.menu,page)
     end
     if manifest then choices=parse(manifest) end
+    -- DMM stores numbers only; a menu-data page that stores a setting of ModCoreSettings' own
+    -- types (a range or keybind) has its storage kept by ModCoreSettings instead.
+    if page.menu and page.menu.storage and stored then
+        for _,choice in ipairs(choices) do
+            if choice.kind=='extension' then hooks,context=stored(page);break end
+        end
+    end
     local provider={id=page.id,name=page.name,author=page.author or contribution.id,
         version=page.version or '',description=page.description or '',
         authorURL='',modURL='',logoFile='',logoAsset='',testOnly=false,
@@ -111,7 +118,8 @@ end
 -- A hidden page whose rows have no available slot is shown instead, so its settings stay reachable.
 -- hooked(page) (optional) returns a hooks page's hooks, manifest text and context.
 -- compile(menu,page) (optional) turns a page's menu data into manifest text.
-function M.apply(providers,contributions,parse,state,report,slots,hooked,compile)
+-- stored(page) (optional) returns storage hooks and their context for a menu-data page.
+function M.apply(providers,contributions,parse,state,report,slots,hooked,compile,stored)
     local address=slots and slots.address
     for index=#providers,1,-1 do
         if providers[index].mcContribution then table.remove(providers,index) end
@@ -146,7 +154,7 @@ function M.apply(providers,contributions,parse,state,report,slots,hooked,compile
                 assert(not ids[page.id],'page id '..page.id..' is already in the menu')
                 local parent=page.under and built[page.under]
                 if shown[page.id] and (not page.under or parent) then
-                    built[page.id]={provider=generated(contribution,page,parse,hooked,compile),page=page}
+                    built[page.id]={provider=generated(contribution,page,parse,hooked,compile,stored),page=page}
                 end
             end
             -- Validate all attachments before changing the list; a contributor is all or nothing.
@@ -201,7 +209,7 @@ function M.apply(providers,contributions,parse,state,report,slots,hooked,compile
                 for _,page in ipairs(contribution.pages) do
                     if page.id==row.page then
                         source=built[page.id] and built[page.id].provider
-                            or generated(contribution,page,parse,hooked,compile)
+                            or generated(contribution,page,parse,hooked,compile,stored)
                     end
                 end
                 local target,slot=address(row.slot)
@@ -243,8 +251,8 @@ function M.apply(providers,contributions,parse,state,report,slots,hooked,compile
 end
 
 -- slots (optional): the menu_slots controller; read loads a disk manifest for splicing.
--- hooked and compile (optional): see M.apply.
-function M.install(pages,parse,contributions,report,slots,read,hooked,compile)
+-- hooked, compile and stored (optional): see M.apply.
+function M.install(pages,parse,contributions,report,slots,read,hooked,compile,stored)
     assert(type(pages)=='table' and type(pages.build)=='function','DMM pages API unavailable')
     if pages.mcMenuPagesVersion then return false end
     local state,build,reported={}, pages.build, {}
@@ -257,7 +265,7 @@ function M.install(pages,parse,contributions,report,slots,read,hooked,compile)
         -- Contributions must never take the menu down with them.
         local ok,list=pcall(contributions)
         if not ok then once('CONTRIBUTIONS_UNAVAILABLE',tostring(list));list={} end
-        M.apply(providers,list,parse,state,once,slots,hooked,compile)
+        M.apply(providers,list,parse,state,once,slots,hooked,compile,stored)
         -- Every contributed page's version by id, hidden pages included, for the ModCore page.
         local versions={}
         for _,contribution in ipairs(list) do

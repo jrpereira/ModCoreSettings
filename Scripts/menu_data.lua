@@ -3,39 +3,48 @@
 --
 -- {storage={file='config.ini',section='Settings'},    -- optional; file is relative to the
 --                                                      -- page's configDirectory
---  groups={{id=,label=,heading=false,level=,conditions=,groups={<subgroup>,...}},...},
---  fields={{id=,group=,label=,description=,default=,
---      choices={{value=,label=,note=,module=,sound=},...} | range={min=,max=,step=,suffix=},
---      tabs=true,heading=true,level=,conditions=,action=true,link=,readOnly=true,slot=,slotLabel=true,
---      slotGroups=true,silent=true,category=true,cycle=true,onOff=true,tabsWidth=,wrap=true,
---      table={entries={{code=,text=},...},columns=},referenceLabel=},...}}
+--  groups={{id=,label=,style=,conditions=,help=,silent=true,parent={label=},
+--      groups={<subgroup>,...}},...},
+--  fields={{id=,group=,label=,description=,type=,values=,default=,widget=,style=,silent=true,
+--      conditions=,action=true,link=,slot=,slotLabel=true,slotGroups=true,tabsWidth=,wrap=true,
+--      table={entries={{code=,text=},...},columns=}},...}}
 --
--- Groups also take help=, silent=true and parent={label=,level=}. Each property is one of
--- ModCoreSettings' presentation keys (see REFERENCE.md: silent is mcSilent, table mcTable and
--- mcColumns, cycle mcType=cycle, onOff mcType=onoff, and so on), checked here with the field's id.
+-- A field's type is what it holds (the model) and its widget how it shows (the view):
+--   type='enum'    values={{value=,label=,note=,module=,sound=},...}; default=<a value>
+--                  widget='picker' (default) | 'tabs' (up to 8) | 'cycler' | 'switch'
+--                  (values 0 and 1) | 'text' (a shown value) | 'table' (with table=)
+--   type='integer' values={min=,max=,step=,suffix=}; default=<number>; widget='slider'
+--   type='range'   values={min=,max=,step=,suffix=,delta=}; default={low,high}; widget='range'
+--                  min and max are an edge, or {low marker's, high marker's}; delta is the
+--                  smallest and largest high-low, {min,max}, or one number for both.
+-- type may be left out when values says it: a list is an enum, {min=,max=} an integer. A
+-- range is always declared. text and table rows are shown, never stored.
+--
+-- style sets how a row stands out; sizes otherwise follow its place on the page:
+--   fields: 'title' (an enum in the page title row, one per page), 'category' (the row
+--           stands in for its group's heading), 'notice' (small, muted text)
+--   groups: 'category' (default: headed by its label, else its id), 'none' (no heading)
 --
 -- conditions holds everything that changes with state while the menu is open:
 --   visible={field=,values={...},playerExists=}  shown while all of these hold
---   label={field=,values={[value]='text'}}       named after that picker's value
---   dim={value,...}                              (fields) faded while its own value is one
---   order={field=,values={[value]=rank}}         (groups) ordered by that picker's value
--- A label or order key may be a list of values sharing the entry ([{1,2}]='text').
+--   label={field=,values={[value]='text'}}       named after that enum's value
+--   dim={value,...}                              (enum fields) faded while its own value is one
+--   order={field=,values={[value]=rank}}         (groups) ordered by that enum's value
+-- A label or order key may be a list of values sharing the entry ([{1,2}]='text'). A rule's
+-- field is an enum on the page.
 --
--- Groups keep their declared order, and fields theirs within their group. A group's heading
--- is its label (its id when absent). A group's groups are its subgroups (one level): smaller
--- headings after its own rows, whose rows indent further (mcWithin). A rule's field is a
--- picker on the page. A choice's note is shown under it; module=<mod folder> notes that mod's name.
--- sound=<Wwise event path under /Game/> or 'none' plays on a change to that choice
--- (mcChoiceSounds); choices without one keep DMM's change sound.
--- heading=true puts a picker in the page title row (one per page); level 0 or 2-6 sets the
--- text size.
--- action rows are navigation and are never stored; link=<page id or provider:slot> opens
--- that page. A single choice makes a button or, read-only, a shown value. slot=<name> makes a
--- read-only field the page's slot <name>: other contributors' rows replace it (slotLabel=true:
--- the first takes its label; slotGroups=true: rows keep their own groups as headings). Errors
--- raise with the offending id.
+-- Groups keep their declared order, and fields theirs within their group. A group's groups
+-- are its subgroups (one level): smaller headings after its own rows, whose rows indent
+-- further (mcWithin). A choice's note is shown under it; module=<mod folder> notes that mod's
+-- name. sound=<Wwise event path under /Game/> or 'none' plays on a change to that choice
+-- (mcChoiceSounds). action rows are navigation and are never stored; link=<page id or
+-- provider:slot> opens that page. A single choice makes a button or, as text, a shown value.
+-- slot=<name> makes a text field the page's slot <name>: other contributors' rows replace it
+-- (slotLabel=true: the first takes its label; slotGroups=true: rows keep their own groups as
+-- headings). Errors raise with the offending id.
 local ChoiceSound=require('mcs_choice_sound')
 local Contributions=require('menu_contributions')
+local Range=require('range_editor')
 local M={version=1}
 
 local MAX_FIELDS,MAX_GROUPS,MAX_CHOICES,MAX_TABLE=256,256,64,256
@@ -56,10 +65,6 @@ local function number(value,where)
 end
 local function flag(value,where)
     assert(value==nil or type(value)=='boolean','invalid '..where)
-    return value
-end
-local function level(value,where,low)
-    assert(value==nil or math.type(value)=='integer' and value>=0 and value<=6 and (low or value~=1),'invalid '..where)
     return value
 end
 local function format(value)
@@ -93,19 +98,19 @@ function M.manifest(menu,options)
     -- A group's groups are its subgroups, one level deep; they follow its own rows.
     local groups,byGroup={},{}
     local function addGroup(group,where,within)
-        allowed(group,{id=true,label=true,heading=true,level=true,conditions=true,groups=not within,
+        allowed(group,{id=true,label=true,style=true,conditions=true,groups=not within,
             help=true,silent=true,parent=not within},where)
         text(group.id,where..' id',128)
         assert(not byGroup[group.id],'duplicate group '..group.id)
         if group.label~=nil then text(group.label,group.id..' label') end
-        assert(group.heading==nil or type(group.heading)=='boolean',group.id..': invalid heading')
+        assert(group.style==nil or group.style=='category' or group.style=='none',
+            group.id..': a group style is category or none')
         if group.help~=nil then text(group.help,group.id..' help') end
         flag(group.silent,group.id..' silent')
         if group.conditions~=nil then allowed(group.conditions,{visible=true,label=true,order=true},group.id..' conditions') end
         if group.parent~=nil then
-            allowed(group.parent,{label=true,level=true},group.id..' parent')
+            allowed(group.parent,{label=true},group.id..' parent')
             text(group.parent.label,group.id..' parent label')
-            level(group.parent.level,group.id..' parent level',true)
         end
         groups[#groups+1]=group
         byGroup[group.id]={used=false,rank=#groups,within=within}
@@ -117,13 +122,26 @@ function M.manifest(menu,options)
             addGroup(child,group.id..' group '..c,group.id)
         end
     end
+    local WIDGETS={enum={picker=true,tabs=true,cycler=true,switch=true,text=true,table=true},
+        integer={slider=true},range={range=true}}
+    local DEFAULT_WIDGET={enum='picker',integer='slider',range='range'}
+    -- A range's min, max or delta: one number for both, or a pair.
+    local function pair(value,where)
+        if type(value)=='number' then return value,value end
+        list(value,where,2)
+        assert(#value==2 or #value==1,'invalid '..where)
+        return value[1],value[2]
+    end
+    local function whole(value,where)
+        assert(number(value,where)%1==0,where..' must be whole')
+        return value
+    end
     local fields,byField,titles,slots={},{},0,{}
     for n,field in ipairs(list(menu.fields or {},'menu fields',MAX_FIELDS)) do
         local where='field '..n
-        allowed(field,{id=true,group=true,label=true,description=true,default=true,choices=true,range=true,
-            tabs=true,heading=true,level=true,conditions=true,action=true,link=true,readOnly=true,
-            slot=true,slotLabel=true,slotGroups=true,silent=true,category=true,cycle=true,onOff=true,
-            tabsWidth=true,wrap=true,table=true,referenceLabel=true},where)
+        allowed(field,{id=true,group=true,label=true,description=true,type=true,values=true,default=true,
+            widget=true,style=true,silent=true,conditions=true,action=true,link=true,slot=true,slotLabel=true,
+            slotGroups=true,tabsWidth=true,wrap=true,table=true},where)
         identifier(field.id,where..' id')
         assert(not byField[field.id],'duplicate field '..field.id)
         where=field.id
@@ -134,93 +152,113 @@ function M.manifest(menu,options)
             assert(type(field.description)=='string' and #field.description<=4096
                 and not field.description:find('%c'),where..': invalid description')
         end
-        assert((field.choices==nil)~=(field.range==nil),where..': needs choices or range')
+        assert(type(field.values)=='table',where..': needs values')
+        local kind=field.type
+        if kind==nil then
+            kind=field.values[1]~=nil and 'enum' or field.values.min~=nil and 'integer' or nil
+            assert(kind,where..': needs a type')
+        end
+        assert(WIDGETS[kind],where..': type is enum, integer or range')
+        local widget=field.widget or DEFAULT_WIDGET[kind]
+        assert(WIDGETS[kind][widget],where..': '..kind..' takes no '..tostring(widget)..' widget')
         if field.conditions~=nil then allowed(field.conditions,{visible=true,label=true,dim=true},where..' conditions') end
-        for _,name in ipairs({'tabs','action','readOnly','silent','category','cycle','onOff','wrap'}) do
+        for _,name in ipairs({'action','silent','wrap','slotLabel','slotGroups'}) do
             flag(field[name],where..' '..name)
         end
+        local shown=widget=='text' or widget=='table'
+        local record={field=field,kind=kind,widget=widget,shown=shown}
+        local values={}
+        if kind=='enum' then
+            local choices=list(field.values,where..' values',MAX_CHOICES)
+            assert(#choices>=1,where..': needs a value')
+            assert(widget~='tabs' or #choices<=8,where..': tabs take at most eight values')
+            for c,choice in ipairs(choices) do
+                allowed(choice,{value=true,label=true,note=true,module=true,sound=true},where..' value '..c)
+                number(choice.value,where..' value')
+                assert(not values[choice.value],where..': duplicate value')
+                text(choice.label,where..' value label')
+                assert(choice.note==nil or choice.module==nil,where..': a value has a note or a module')
+                if choice.note~=nil then text(choice.note,where..' value note',64) end
+                if choice.module~=nil then text(choice.module,where..' value module',255) end
+                if choice.sound~=nil then
+                    assert(type(choice.sound)=='string' and (choice.sound=='none' or ChoiceSound.path(choice.sound)),
+                        where..': invalid value sound')
+                end
+                values[choice.value]=true
+            end
+            assert(widget~='switch' or #choices==2 and choices[1].value==0 and choices[2].value==1,
+                where..': a switch takes the values 0 and 1')
+            number(field.default,where..' default')
+            assert(values[field.default],where..': default is not a value')
+        elseif kind=='integer' then
+            allowed(field.values,{min=true,max=true,step=true,suffix=true},where..' values')
+            local range=field.values
+            whole(range.min,where..' min');whole(range.max,where..' max')
+            if range.step~=nil then whole(range.step,where..' step') end
+            assert(range.min<range.max and (range.step==nil or range.step>=1 and range.step<=range.max-range.min),
+                where..': invalid integer values')
+            if range.suffix~=nil then text(range.suffix,where..' suffix',8) end
+            assert(whole(field.default,where..' default')>=range.min and field.default<=range.max,
+                where..': default outside the values')
+        else
+            allowed(field.values,{min=true,max=true,step=true,suffix=true,delta=true},where..' values')
+            local range=field.values
+            local lowMin,highMin=pair(range.min,where..' min')
+            local lowMax,highMax=pair(range.max,where..' max')
+            lowMin,highMax=whole(lowMin,where..' min'),whole(highMax,where..' max')
+            highMin,lowMax=whole(highMin or lowMin,where..' min'),whole(lowMax or highMax,where..' max')
+            assert(lowMin<=highMin and lowMax<=highMax and lowMin<=lowMax and highMin<=highMax,
+                where..': each marker needs min <= max, and the low marker\'s bounds <= the high marker\'s')
+            local deltaMin,deltaMax
+            if range.delta~=nil then
+                deltaMin,deltaMax=pair(range.delta,where..' delta')
+                whole(deltaMin,where..' delta')
+                if deltaMax~=nil then whole(deltaMax,where..' delta') end
+            end
+            if range.step~=nil then whole(range.step,where..' step') end
+            if range.suffix~=nil then text(range.suffix,where..' suffix',8) end
+            local function raw(value) return value~=nil and format(value) or nil end
+            local ok,setting=pcall(Range.declare,{Min=raw(lowMin),Max=raw(highMax),Step=raw(range.step),
+                LowMax=raw(lowMax),HighMin=raw(highMin),DeltaMin=raw(deltaMin),DeltaMax=raw(deltaMax),Suffix=range.suffix})
+            assert(ok,where..': invalid range: '..tostring(setting))
+            local d=field.default
+            local default=type(d)=='table' and type(d[1])=='number' and type(d[2])=='number' and next(d,2)==nil
+                and format(d[1])..'|'..format(d[2])
+            assert(default and Range.normalize(setting,default)==default,where..': default outside the range')
+            record.range={lowMin=lowMin,highMax=highMax,lowMax=lowMax~=highMax and lowMax or nil,
+                highMin=highMin~=lowMin and highMin or nil,deltaMin=deltaMin,deltaMax=deltaMax,default=default}
+        end
+        if field.style~=nil then
+            assert(field.style=='title' or field.style=='category' or field.style=='notice',
+                where..': a field style is title, category or notice')
+            assert(field.style~='title' or kind=='enum',where..': a title row is an enum')
+            if field.style=='title' then titles=titles+1 end
+        end
         if field.link~=nil then text(field.link,where..' link',256) end
+        assert(not (field.action or field.link) or kind=='enum' and not shown,
+            where..': action and link rows are enums that are not text or table')
         if field.slot~=nil then
             assert(type(field.slot)=='string' and #field.slot<=64 and field.slot:match('^[%w_]+$'),where..': invalid slot')
-            assert(field.readOnly==true and field.choices,where..': a slot is a read-only field with choices')
+            assert(widget=='text',where..': a slot is a text field')
             assert(not slots[field.slot],where..': duplicate slot '..field.slot)
             slots[field.slot]=true
         end
         assert(field.slotLabel==nil or field.slotLabel==true and field.slot~=nil,where..': slotLabel needs a slot')
         assert(field.slotGroups==nil or field.slotGroups==true and field.slot~=nil,where..': slotGroups needs a slot')
-        local values={}
-        if field.choices then
-            list(field.choices,where..' choices',MAX_CHOICES)
-            assert(#field.choices>=1,where..': needs a choice')
-            assert(not field.tabs or #field.choices<=8,where..': tabs take at most eight choices')
-            for c,choice in ipairs(field.choices) do
-                allowed(choice,{value=true,label=true,note=true,module=true,sound=true},where..' choice '..c)
-                number(choice.value,where..' choice value')
-                assert(not values[choice.value],where..': duplicate choice value')
-                text(choice.label,where..' choice label')
-                assert(choice.note==nil or choice.module==nil,where..': a choice has a note or a module')
-                if choice.note~=nil then text(choice.note,where..' choice note',64) end
-                if choice.module~=nil then text(choice.module,where..' choice module',255) end
-                if choice.sound~=nil then
-                    assert(type(choice.sound)=='string' and (choice.sound=='none' or ChoiceSound.path(choice.sound)),
-                        where..': invalid choice sound')
-                end
-                values[choice.value]=true
-            end
-            assert(not field.onOff or #field.choices==2 and field.choices[1].value==0 and field.choices[2].value==1,
-                where..': onOff takes the choices 0 and 1')
-        else
-            allowed(field.range,{min=true,max=true,step=true,suffix=true},where..' range')
-            local range=field.range
-            for _,key in ipairs({'min','max','step'}) do
-                if key~='step' or range.step~=nil then
-                    assert(number(range[key],where..' range '..key)%1==0,where..': range '..key..' must be whole')
-                end
-            end
-            assert(range.min<range.max and (range.step==nil or range.step>=1 and range.step<=range.max-range.min),
-                where..': invalid range')
-            if range.suffix~=nil then text(range.suffix,where..' suffix',16) end
-            assert(not field.tabs,where..': tabs need choices')
-        end
-        number(field.default,where..' default')
-        if field.choices then assert(values[field.default],where..': default is not a choice')
-        else assert(field.default>=field.range.min and field.default<=field.range.max
-            and field.default%1==0,where..': default outside range') end
-        if field.level~=nil then
-            assert(math.type(field.level)=='integer' and field.level>=0 and field.level<=6 and field.level~=1,
-                where..': invalid level')
-        end
-        if field.heading~=nil then
-            assert(field.heading==true,where..': invalid heading')
-            assert(field.choices,where..': a heading needs choices')
-            assert(field.level==nil,where..': a heading takes no level')
-            titles=titles+1
-        end
-        assert(not field.link or field.choices,where..': a link needs choices')
-        assert(not field.readOnly or field.choices and not field.action and not field.link,
-            where..': a read-only row needs choices and no action')
-        assert(not field.cycle or field.choices and not field.tabs,where..': cycle needs choices and no tabs')
         if field.tabsWidth~=nil then
-            assert(field.tabs and math.type(field.tabsWidth)=='integer' and field.tabsWidth>=160
+            assert(widget=='tabs' and math.type(field.tabsWidth)=='integer' and field.tabsWidth>=160
                 and field.tabsWidth<=440,where..': tabsWidth is 160 through 440 on tabs')
         end
-        assert(not field.category or field.level==nil and not field.heading,
-            where..': a category row takes no level or heading')
-        assert(not field.wrap or field.readOnly,where..': wrap needs a read-only row')
-        if field.referenceLabel~=nil then
-            assert(field.readOnly and field.tabs,where..': referenceLabel needs read-only tabs')
-            text(field.referenceLabel,where..' referenceLabel',64)
-        end
+        assert(not field.wrap or widget=='text',where..': wrap needs a text widget')
         local dim=field.conditions and field.conditions.dim
         if dim~=nil then
-            assert(field.choices,where..': dim needs choices')
+            assert(kind=='enum',where..': dim needs an enum')
             for _,value in ipairs(list(dim,where..' dim',MAX_CHOICES)) do
-                assert(values[value],where..': dim value outside the choices')
+                assert(values[value],where..': dim value outside the values')
             end
         end
+        assert((field.table~=nil)==(widget=='table'),where..': a table widget needs table=, and table= a table widget')
         if field.table~=nil then
-            assert(field.readOnly and not field.wrap and not field.tabs and not field.cycle,
-                where..': a table is a read-only row without wrap, tabs or cycle')
             allowed(field.table,{entries=true,columns=true},where..' table')
             local entries=list(field.table.entries,where..' table entries',MAX_TABLE)
             assert(#entries>0,where..': a table needs entries')
@@ -237,26 +275,21 @@ function M.manifest(menu,options)
             assert(columns==nil or math.type(columns)=='integer' and columns>=1 and columns<=6,
                 where..': table columns are 1 through 6')
         end
-        fields[n],byField[field.id]=field,values
+        fields[n],byField[field.id]=record,values
     end
-    assert(titles<=1,'only one heading field per page')
+    assert(titles<=1,'only one title field per page')
     -- A group's rows stay together, in their declared order, and groups keep theirs.
     for _,group in ipairs(groups) do
         local within=byGroup[group.id].within
         if byGroup[group.id].used and within then byGroup[within].shown=true end
     end
     local order={}
-    for n,field in ipairs(fields) do order[field]=n end
+    for n,record in ipairs(fields) do order[record]=n end
     table.sort(fields,function(a,b)
-        local ra,rb=byGroup[a.group].rank,byGroup[b.group].rank
+        local ra,rb=byGroup[a.field.group].rank,byGroup[b.field.group].rank
         if ra~=rb then return ra<rb end
         return order[a]<order[b]
     end)
-    for _,group in ipairs(groups) do
-        if group.level~=nil then
-            assert(math.type(group.level)=='integer' and group.level>=0 and group.level<=6,group.id..': invalid level')
-        end
-    end
     -- A rule's source is a picker on this page; its values must be that picker's choices.
     local function rule(value,where,map)
         allowed(value,{field=true,values=true},where)
@@ -337,27 +370,30 @@ function M.manifest(menu,options)
         end
         if entry.used then
             local outer=entry.within and byId[entry.within]
-            local outerLabel=outer and not byGroup[outer.id].used and outer.heading~=false and (outer.label or outer.id) or nil
+            local outerLabel=outer and not byGroup[outer.id].used and outer.style~='none' and (outer.label or outer.id) or nil
             local conditions=group.conditions or {}
             local when,values,player=visible(conditions.visible,group.id)
             local labelWhen,labels=relabel(conditions.label,group.id)
             local orderWhen,orders=ordering(conditions.order,group.id..' order')
             section('Category.'..group.id,{{'mcLabel',group.label~=nil and group.label~=group.id and group.label or nil},
-                {'mcHeading',group.heading==false and 0 or nil},{'mcLevel',group.level},
+                {'mcHeading',group.style=='none' and 0 or nil},
                 {'mcWithin',entry.within},{'mcWithinLabel',outerLabel},
                 {'VisibleWhen',when},{'VisibleValues',values},{'mcLabelWhen',labelWhen},{'mcLabels',labels},
                 {'mcHelp',group.help},{'mcSilent',group.silent and 1 or nil},{'mcPlayerExists',player},
-                {'mcParent',group.parent and group.parent.label},{'mcParentLevel',group.parent and group.parent.level},
+                {'mcParent',group.parent and group.parent.label},
                 {'mcOrderWhen',orderWhen},{'mcOrders',orders}})
         end
     end
-    for _,field in ipairs(fields) do
+    local MC_TYPES={tabs='tab',cycler='cycle',switch='onoff'}
+    local MC_STYLES={title={'mcHeading',1},category={'mcCategory',1},notice={'mcLevel',5}}
+    for _,record in ipairs(fields) do
+        local field,widget=record.field,record.widget
         local keys={{'Id',field.id},{'Label',field.label},{'Group',field.group},
             {'Description',field.description}}
         local function add(key,value) keys[#keys+1]={key,value} end
-        if field.choices then
+        if record.kind=='enum' then
             local values,labels,notes,sounds={},{},{},{}
-            for n,choice in ipairs(field.choices) do
+            for n,choice in ipairs(field.values) do
                 values[n],labels[n]=format(choice.value),choice.label
                 local note=choice.note
                 if choice.module then
@@ -368,16 +404,15 @@ function M.manifest(menu,options)
                 if note then notes[#notes+1]=values[n]..':'..note end
                 if choice.sound then sounds[#sounds+1]=values[n]..':'..choice.sound end
             end
-            -- DMM needs two choices; a single one (a button or read-only value) repeats.
+            -- DMM needs two choices; a single one (a button or shown value) repeats.
             if #values==1 then
-                values[2],labels[2]=format(field.choices[1].value+1),labels[1]
+                values[2],labels[2]=format(field.values[1].value+1),labels[1]
             end
             add('Type','picker');add('PresetValues',table.concat(values,'|'))
             add('PresetLabels',table.concat(labels,'|'))
             add('mcChoiceNotes',#notes>0 and table.concat(notes,';') or nil)
             add('mcChoiceSounds',#sounds>0 and table.concat(sounds,';') or nil)
-            add('mcType',field.tabs and 'tab' or field.cycle and 'cycle' or field.onOff and 'onoff' or nil)
-            add('mcTabsWidth',field.tabsWidth)
+            add('mcType',MC_TYPES[widget]);add('mcTabsWidth',field.tabsWidth)
             local dimmed=field.conditions and field.conditions.dim
             if dimmed then
                 local dim={}
@@ -389,13 +424,23 @@ function M.manifest(menu,options)
                 for n,entry in ipairs(field.table.entries) do entries[n]=entry.code..':'..entry.text end
                 add('mcTable',table.concat(entries,'|'));add('mcColumns',field.table.columns)
             end
-            add('mcWrap',field.wrap and 1 or nil);add('mcReferenceLabel',field.referenceLabel)
+            add('mcWrap',field.wrap and 1 or nil)
+            add('Default',format(field.default))
+        elseif record.kind=='integer' then
+            local range=field.values
+            add('Type','integer');add('Minimum',format(range.min));add('Maximum',format(range.max))
+            add('Step',range.step and format(range.step) or nil);add('Suffix',range.suffix)
+            add('Default',format(field.default))
         else
-            add('Type','integer');add('Minimum',format(field.range.min));add('Maximum',format(field.range.max))
-            add('Step',field.range.step and format(field.range.step) or nil);add('Suffix',field.range.suffix)
+            local range,bounds=field.values,record.range
+            local function opt(value) return value~=nil and format(value) or nil end
+            add('Type','range');add('Min',format(bounds.lowMin));add('Max',format(bounds.highMax))
+            add('Step',opt(range.step));add('LowMax',opt(bounds.lowMax));add('HighMin',opt(bounds.highMin))
+            add('DeltaMin',opt(bounds.deltaMin));add('DeltaMax',opt(bounds.deltaMax));add('Suffix',range.suffix)
+            add('Default',bounds.default)
         end
-        add('Default',format(field.default))
-        add('mcHeading',field.heading and 1 or nil);add('mcLevel',field.level)
+        local style=field.style and MC_STYLES[field.style]
+        if style then add(style[1],style[2]) end
         local conditions=field.conditions or {}
         local when,values,player=visible(conditions.visible,field.id)
         add('VisibleWhen',when);add('VisibleValues',values);add('mcPlayerExists',player)
@@ -403,12 +448,11 @@ function M.manifest(menu,options)
         add('mcLabelWhen',labelWhen);add('mcLabels',labels)
         if field.action or field.link then add('mcNavigation',1) end
         add('mcLinkPage',field.link)
-        add('mcReadOnly',field.readOnly and 1 or nil)
+        add('mcReadOnly',record.shown and 1 or nil)
         add('mcSlot',field.slot);add('mcSlotLabel',field.slotLabel and 1 or nil)
         add('mcSlotGroups',field.slotGroups and 1 or nil)
         add('mcSilent',field.silent and 1 or nil)
-        add('mcCategory',field.category and 1 or nil)
-        if storage and not (field.action or field.link or field.readOnly) then
+        if storage and not (field.action or field.link or record.shown) then
             add('ConfigFile',storage.file);add('ConfigSection',storage.section);add('ConfigKey',field.id)
         end
         section('Setting.'..field.id,keys)

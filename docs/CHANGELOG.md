@@ -1,5 +1,39 @@
 # Changelog
 
+## v1.5.0
+
+- `Type=range` settings pick a low and a high value on one track, stored as one text value
+  `<low>|<high>` (e.g. `70|90`), on pages with storage hooks. `Min`, `Max`, `Step` (1 to 40
+  steps), `DeltaMin` and `DeltaMax` (bounds on high-low) and `Suffix` declare it. The row
+  is drawn like a slider, in a picker's value column: the span (`70% - 90%`) above, 2 points
+  smaller; a thin line, lit and thicker across the span, dim until the row is selected or
+  hovered; a thin handle at each end. Left/Right highlight a handle, which gets a white
+  contour; Enter, or A on a controller, grabs it (raised; the other dims) so Left/Right move
+  it a step, and lets go again. Handles stop at the limits. The mouse moves the nearer
+  handle to the pressed step and drags it.
+- `Type=range` takes `LowMax` and `HighMin`: the highest the low marker goes and the lowest
+  the high one goes.
+- Menu data declares what a setting holds and how it shows, separately. A field's `type` is
+  `enum`, `integer` or `range` (inferred from `values` when left out; a range is always
+  declared), its `values` the domain, and its `widget` the view: `picker`, `tabs`, `cycler`,
+  `switch`, `text` or `table` for an enum, `slider` for an integer, `range` for a range.
+  `style` makes a row stand out: `title` (the page title row), `category` (stands in for its
+  group's heading) or `notice` (small, muted text); a group's `style` is `category` (the
+  default) or `none`. The keys `choices`, `range`, `tabs`, `cycle`, `onOff`, `readOnly`,
+  `heading`, `level`, `category` and `referenceLabel`, and a group's `heading`, `level` and
+  `parent.level`, are removed; sizes follow a row's place on the page.
+- A menu-data range takes `values={min=,max=,step=,suffix=,delta=}` with `default={low,high}`.
+  `min` and `max` are edges, or `{low marker's, high marker's}` bounds; `delta` is the
+  smallest and largest `high-low`.
+- A menu-data page with `storage` that holds a range or keybind row is loaded and saved by
+  ModCoreSettings, since DMM stores numbers only: every stored row under its section,
+  missing keys added on Apply, every other byte kept.
+- While a range row is selected, the footer shows the Enter glyph (A on a controller) with
+  `ADJUST`, or `DONE` while a handle is grabbed. The game has no action bound to both, so the
+  glyph is ConfirmReturn's on a keyboard and Confirm's on a controller.
+- Field-type editors can take a row's Left/Right, Enter and A (`navigation=true`), and
+  show a footer hint.
+
 ## v1.4.0
 
 - Each enabled module's `mod.json` `id` is shared at load as `MCS_ModuleId_v1.<folder>`,

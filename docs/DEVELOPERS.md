@@ -115,6 +115,51 @@ needs its own post-save notification from the storage hook to its gameplay state
 Escape cancels capture. Modifier chords, Escape bindings, wheel directions and
 gamepad capture are unsupported.
 
+## Add a range
+
+A range picks a low and a high value on one track, such as 70% to 90%. Like a
+keybind, its value is text, so DMM cannot store it. In [menu data](REFERENCE.md#menu-data)
+with `storage`, ModCoreSettings stores the page itself:
+
+```lua
+{id='Threshold',group='Combat',label='Threshold',type='range',default={70,100},
+    values={min=0,max=100,step=5,suffix='%',delta={20}}}
+```
+
+`min` and `max` may be pairs, `{low marker's, high marker's}`: `min={0,60},
+max={40,100}` keeps the low marker within 0–40 and the high one within 60–100. A
+manifest declares it on a [generated page with storage hooks](REFERENCE.md#page-hooks):
+
+```ini
+[Setting.Threshold]
+Id=Threshold
+Label=Threshold
+Type=range
+Min=0
+Max=100
+Step=5
+DeltaMin=20
+Suffix=%
+Default=70|100
+```
+
+The stored value is `<low>|<high>`: `70|90`. `Min` and `Max` are required. `Step`
+(default 1) must divide `Max-Min` into 1 to 40 steps. `DeltaMin` and `DeltaMax`
+(defaults 0 and `Max-Min`, multiples of `Step`) bound `high-low`: with `DeltaMin=20`,
+70-90 is allowed and 70-80 is not. `LowMax` (default `Max`) and `HighMin` (default
+`Min`), on steps, are the highest the low marker goes and the lowest the high one
+goes. `Suffix` (up to 8 characters) follows each number
+in the caption, `70% - 90%`. A saved value off a step, outside `Min`/`Max` or outside
+the delta limits falls back to the default.
+
+The row is drawn like a slider: the span above, 2 points smaller; a thin line, lit and
+thicker across the span; a thin handle at each end. Left/Right highlight the low or high
+handle (a white contour); Enter (A on a controller) grabs it, Left/Right then move it a step, and Enter lets go. Markers stop at `Min`,
+`Max`, `LowMax`, `HighMin`, `DeltaMin` and `DeltaMax`. Leaving the row lets go. While the row is selected,
+the footer shows `ADJUST`, or `DONE` while a marker is grabbed, beside the Enter or A
+glyph. The mouse moves the nearer marker to the step it is pressed on and drags it
+while held. As with keybinds, numeric Apply events omit range values.
+
 ## Add presentation only when needed
 
 | Need | Metadata | Example |

@@ -13,6 +13,12 @@
 -- Optional, for settings that declare conflictScope:
 --   conflictKey(setting,value) -> what two rows in one scope must not share, or nil
 --   instance:conflict(on) -> shows whether the row collides
+-- Optional, for editors that take the row's keys (navigation=true on the editor):
+--   instance:step(direction) -> new value or nil; Left/Right (-1/1) on the row
+--   instance:confirm() -> new value or nil; Enter (controller: A) on the selected row
+--   instance:focus(on) -> the row is selected or not
+--   instance:hint() -> the footer hint's label while the row is selected, or nil
+-- tick(pointer) gets pointer() -> whether the left mouse button is down.
 local M={version=1}
 local Manifest=require('mcs_manifest')
 local MAX_SETTINGS=256
@@ -54,7 +60,10 @@ function M.new(report)
         local s={id=id,kind='extension',editor=name,label=r.Label or id,description=r.Description or '',
             group=r.Group or r.Section or r.Category or 'Settings',
             -- DMM's toggle shell sizes its navigation from two values; they are never stored.
-            values={0,1},labels={'',''},file=r.ConfigFile,key=r.ConfigKey or id,section=r.ConfigSection,visibility={}}
+            -- A navigation editor's shell has three, and rests on the middle one: a move to
+            -- either side is a step that way.
+            values=editor.navigation and {0,1,2} or {0,1},labels=editor.navigation and {'','',''} or {'',''},
+            file=r.ConfigFile,key=r.ConfigKey or id,section=r.ConfigSection,visibility={}}
         for key,value in pairs(editor.declare(r) or {}) do
             assert(s[key]==nil,'setting type '..name..' cannot redefine '..key)
             s[key]=value
@@ -226,7 +235,7 @@ function M.new(report)
             local editor=editorOf(setting)
             if not editor then return index(setting,value) end
             local ok,valid=pcall(editor.valid,setting,value)
-            return ok and valid and 1 or nil
+            return ok and valid and (editor.navigation and 2 or 1) or nil
         end
         -- Canonical form of a stored value of this module's types; nil for DMM's own
         -- types and for values the editor rejects.
@@ -242,6 +251,15 @@ function M.new(report)
             local ok,text=pcall(editor.format,setting,value)
             return ok and text or ''
         end
+        -- Left/Right on a navigation editor's row are steps for the editor, kept until the
+        -- page's next tick: DMM's keys arrive as change(i,1|2), its shell's native moves as
+        -- set(i,0|2). Steps are kept by setting, as the panel's model may route rows.
+        local steps={}
+        registry.steps=steps
+        local function navigating(setting)
+            local editor=editorOf(setting)
+            return editor and editor.navigation
+        end
         choices.open=function(provider)
             local model=open(provider)
             if not model.error and not provider.testOnly then
@@ -251,6 +269,23 @@ function M.new(report)
                         break
                     end
                 end
+            end
+            local set,change=model.set,model.change
+            function model:set(i,value,...)
+                local setting=self.items and self.items[i]
+                if navigating(setting) and type(value)=='number' then
+                    if value~=1 and not self.error then steps[#steps+1]={setting=setting,direction=value<1 and -1 or 1} end
+                    return
+                end
+                return set(self,i,value,...)
+            end
+            function model:change(i,direction,...)
+                local setting=self.items and self.items[i]
+                if navigating(setting) then
+                    if direction and not self.error then steps[#steps+1]={setting=setting,direction=direction==1 and -1 or 1} end
+                    return
+                end
+                return change(self,i,direction,...)
             end
             return model
         end
@@ -303,7 +338,24 @@ function M.new(report)
                     end
                 end
             end
-            local prepare,show,refresh,tick=ui.prepare,ui.show,ui.refresh,ui.tick
+            -- The footer hint follows the selected row's editor; Enter and A reach it.
+            -- confirm.take(wants,api) -> whether Enter or A was pressed since the last call;
+            -- it reads the controller only when wants is true. pointer(api) -> whether the
+            -- left mouse button is down. hint.show(text or nil,api) shows or hides the hint.
+            local confirm,hint,pointer=modules.confirm,modules.hint,modules.pointer
+            local pointerDown=pointer and function() return pointer(uiApi)==true end
+            local shownHint
+            local function showHint(text)
+                if text==shownHint or not hint then return end
+                shownHint=text
+                local ok,err=pcall(hint.show,text,uiApi)
+                if not ok then report('FIELD_EDITOR_FAILED','hint: '..tostring(err)) end
+            end
+            local function selected()
+                local list=ui.active and instances[ui.active]
+                return list and ui.current and list[ui.current]
+            end
+            local prepare,show,refresh,tick,hide=ui.prepare,ui.show,ui.refresh,ui.tick,ui.hide
             function ui:prepare(index,...)
                 local results=table.pack(prepare(self,index,...))
                 attach(index)
@@ -312,8 +364,18 @@ function M.new(report)
             function ui:show(index,...)
                 local results=table.pack(show(self,index,...))
                 attach(index)
+                for n in pairs(steps) do steps[n]=nil end
+                -- Presses from before the page opened are dropped.
+                if confirm then pcall(confirm.take,false,uiApi) end
                 self:refresh()
                 return table.unpack(results,1,results.n)
+            end
+            if hide then
+                function ui:hide(...)
+                    each(function(_,instance) if instance.focus then instance:focus(false) end end)
+                    showHint(nil)
+                    return hide(self,...)
+                end
             end
             -- The setter: every refresh puts the model's value into the editor, and
             -- marks collisions; presentation colors the pickers in mcConflictPickers.
@@ -333,13 +395,55 @@ function M.new(report)
                 local results=table.pack(tick(self,...))
                 local changed=false
                 local model=self.model
-                each(function(i,instance)
-                    local value=instance:tick()
-                    if value~=nil and not model.error and value~=model.pending[i] then
+                local function edit(i,value)
+                    if value~=nil and model and not model.error and value~=model.pending[i] then
                         model:set(i,value)
                         changed=true
                     end
+                end
+                local list=self.active and instances[self.active]
+                local panel=self.active and self.panels[self.active]
+                -- Steps go to their rows' editors; a navigation shell returns to its middle.
+                local queued={}
+                for n,entry in ipairs(steps) do queued[n]=entry;steps[n]=nil end
+                if list and model and model.items then
+                    for _,entry in ipairs(queued) do
+                        for i,setting in ipairs(model.items) do
+                            local instance=list[i]
+                            if setting==entry.setting and instance and instance.step then
+                                local ok,value=pcall(instance.step,instance,entry.direction)
+                                if ok then edit(i,value) else report('FIELD_EDITOR_FAILED',setting.id..': '..tostring(value)) end
+                            end
+                        end
+                    end
+                    for i,setting in ipairs(model.items) do
+                        local row=panel and panel.rows[i]
+                        if navigating(setting) and row and row.visible~=false and row.nav then
+                            pcall(function()
+                                if row.nav:GetValue()~=1 then row.nav:SetValue(1);row.lastNavigation=row.nav:GetValue() end
+                            end)
+                        end
+                    end
+                end
+                each(function(i,instance)
+                    if instance.focus then instance:focus(self.current==i) end
+                    edit(i,instance:tick(pointerDown))
                 end,true)
+                local current=selected()
+                if confirm then
+                    local wants=current and current.confirm~=nil
+                    local ok,pressed=pcall(confirm.take,wants,uiApi)
+                    if ok and pressed and wants then
+                        local done,value=pcall(current.confirm,current)
+                        if done then edit(self.current,value) else report('FIELD_EDITOR_FAILED',tostring(value)) end
+                    end
+                end
+                local text
+                if current and current.hint then
+                    local ok,label=pcall(current.hint,current)
+                    text=ok and label or nil
+                end
+                showHint(text)
                 if changed then self:refresh() end
                 return table.unpack(results,1,results.n)
             end

@@ -57,6 +57,11 @@ loadfile=function(path)
             return 'sort button'
         end} end
         if name=='menu_contributions' then return {textTable='table decoder'} end
+        if name=='editor_input' then return {new=function() return {take=function() end,pointer='pointer'} end} end
+        if name=='editor_hint' then return {install=function(native)
+            assert(native==package.loaded.nativeactions)
+            return 'hint'
+        end} end
         if name=='dmm_lifecycle' then
             return {publisher=function() return {publish=function(_,event) installs[#installs+1]={name='publish',event=event} end} end}
         end
@@ -74,7 +79,7 @@ local events={on=function(_,name,callback) callbacks[name]=callback end}
 local settingsApi={}
 extension.install({version=1,choices=choices,controls=controls,pages=pages,events=events,settingsApi=settingsApi})
 local order={'mc_ini','mcs_manifest','safe_file','mcs_protocols','mcs_choice_sound','navigation','mapped_presets','menu_contributions','presentation','browser_groups','module_categories','mcs_taxonomy','mcs_module_json',
- 'init_config','dmm_lifecycle','menu_pages','page_links','menu_slots','page_hooks','field_types','keybind_editor','standard_keys','standard_controls',
+ 'init_config','dmm_lifecycle','menu_pages','page_links','menu_slots','page_hooks','field_types','keybind_editor','range_editor','editor_input','editor_hint','standard_keys','standard_controls',
  'sort_button','menu_data','index_refresh'}
 assert(#loaded==#order)
 for n,name in ipairs(order) do assert(loaded[n]:match(name..'%.lua$'),'load '..n) end
@@ -86,6 +91,8 @@ end
 assert(fieldTypes.order==0 and fieldTypes.registered.keybind and fieldTypes.modules.choices==choices
  and fieldTypes.modules.controls==controls and fieldTypes.modules.settingsApi==settingsApi
  and fieldTypes.modules.standardControls,'keybind registered and installed on DMM modules first')
+assert(fieldTypes.registered.range and fieldTypes.modules.confirm and fieldTypes.modules.pointer=='pointer'
+ and fieldTypes.modules.hint=='hint','range registered; editors get Enter/A, the mouse button and the footer hint')
 assert(installs[1].args[1]==choices)
 assert(installs[2].args[1]==choices and installs[2].args[2]==controls)
 assert(installs[3].args[1]==choices and installs[3].args[2]==controls and installs[3].args[3]==pages)

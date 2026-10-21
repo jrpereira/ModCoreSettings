@@ -1827,6 +1827,15 @@ function M.install(choices,controls,pages,options)
                             keyLane:GetChildAt(1):SetWidthOverride(ROW_WIDTH-indent-label)
                             row.mcKeyIndent=indent
                         end
+                        -- A range's track starts where a picker's value column does and
+                        -- runs, with its caption, to the row's end.
+                        local rangeLane=setting.kind=='extension' and setting.editor=='range'
+                            and row.widget:GetContent()
+                        if rangeLane and row.mcRangeIndent~=indent and rangeLane:GetChildrenCount()==2 then
+                            rangeLane:GetChildAt(0):SetWidthOverride(pickerValueLeft-indent)
+                            rangeLane:GetChildAt(1):SetWidthOverride(ROW_WIDTH-pickerValueLeft)
+                            row.mcRangeIndent=indent
+                        end
                         local wrapperSlot=row.wrapper.Slot
                         local wrapperPadding=wrapperSlot.Padding
                         -- An mcCategory row's rule hugs it, with no space between.
