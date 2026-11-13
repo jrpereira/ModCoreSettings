@@ -190,8 +190,21 @@ local pages={build=function(tree,providers,status,a)
         wrapper.Slot:SetPadding({Left=0,Top=0,Right=8,Bottom=0})
         allRows[#allRows+1]={widget=button,wrapper=wrapper,providerIndex=index}
     end
+    -- DMM's help column: the setting's title, then its description 12 pixels below.
+    local help=widget()
+    local detailTitle,detailCopy=a.caption(tree,''),a.caption(tree,'')
+    detailCopy.visible=4
+    help:AddChild(detailTitle);help:AddChild(detailCopy)
+    detailCopy.Slot:SetPadding({Left=0,Top=12,Right=0,Bottom=0})
+    local detailControls={model={items={{label='Span',description='Own text.',mcHelp='Keys.'},
+        {label='Plain',description='Plain text.'},{label='Bare',description='',mcHelp='Keys.'}}}}
+    function detailControls:description(index)
+        local setting=self.model.items[index]
+        a.setText(detailTitle,setting.label);a.setText(detailCopy,setting.description)
+    end
     local page={filterButton=filterButton,filterLabel=filterLabel,browserList=browserList,allRows=allRows,
-        controls={},modTitle=title,controlStatus=status,mcTestControlArea=parent,mcTestDivider=divider,mcTestApi=a}
+        controls=detailControls,modTitle=title,controlStatus=status,mcTestControlArea=parent,mcTestDivider=divider,mcTestApi=a,
+        detailTitle=detailTitle,detailCopy=detailCopy,mcTestHelp=help}
     function page:refresh(compatibleOnly)
         a.setText(self.filterLabel,compatibleOnly and 'Compatible Mods' or 'All Mods')
     end
@@ -309,6 +322,28 @@ assert(#page.controls.mcHeaderTabs.children==1 and page.controls.mcHeaderTabs.ch
     and statusBox.Slot.HorizontalAlignment==1 and statusBox.Slot.VerticalAlignment==1
     and statusBox.Slot.Padding.Top==4,
     'The page status must start the header row beneath the divider, keeping its padding')
+-- A control's help gets its own dim box between the setting's title and description;
+-- each shows only while it has text.
+do
+    local help,controlHelp=page.mcTestHelp,page.mcControlHelp
+    local band=controlHelp.band
+    assert(#help.children==3 and help.children[1]==page.detailTitle and help.children[2]==band
+        and help.children[3]==page.detailCopy and band.Slot.Padding.Top==12 and page.detailCopy.Slot.Padding.Top==12,
+        'the help box sits between the setting title and its description, 12 pixels apart')
+    assert(band:GetContent()==controlHelp.text and controlHelp.text.Font.Size==10 and controlHelp.text.AutoWrapText
+        and controlHelp.text.colorAndOpacity.SpecifiedColor.R==1 and controlHelp.text.colorAndOpacity.SpecifiedColor.A<1
+        and band.BrushColor.A<0.2 and band.visible==1,'the help box is smaller wrapped text on a dim band, hidden at first')
+    page.controls:description(1)
+    assert(band.visible==3 and controlHelp.text.text=='Keys.' and page.detailCopy.text=='Own text.'
+        and page.detailCopy.visible==4,'a control with help shows it above the description')
+    page.controls:description(2)
+    assert(band.visible==1 and page.detailCopy.text=='Plain text.' and page.detailCopy.visible==4,
+        'a control without help shows only the description')
+    page.controls:description(3)
+    assert(band.visible==3 and page.detailCopy.visible==1,'an empty description collapses, leaving the help alone')
+    page.mcTestApi.setText(page.detailCopy,'Select a setting to see its description.')
+    assert(band.visible==1 and page.detailCopy.visible==4,'any other description DMM writes hides the help')
+end
 -- Unapplied changes show as a * after the page title, not as status text; every other
 -- status stays text, and the * follows the model's dirty state.
 local dirty,failed=true,nil
@@ -789,9 +824,9 @@ assert(page.controls.mcHeaderTabs:GetParent().Slot.Padding.Bottom==12,
 for n,tab in ipairs(headerRow.mcTabs) do
     assert(tab.widget.WidgetStyle.NormalPadding.Left==3 and tab.widget.WidgetStyle.NormalPadding.Right==3
         and headerTabs.children[2*n].MinDesiredWidth==110,'header tabs pad their labels by 3 pixels')
-    assert(tab.widget.WidgetStyle.NormalPadding.Top==0 and tab.widget.WidgetStyle.NormalPadding.Bottom==2
-        and tab.widget.WidgetStyle.PressedPadding.Bottom==2 and headerTabs.children[2*n].HeightOverride==29,
-        'a header tab label sits 1 pixel above centre in a tab of unchanged height')
+    assert(tab.widget.WidgetStyle.NormalPadding.Top==0 and tab.widget.WidgetStyle.NormalPadding.Bottom==4
+        and tab.widget.WidgetStyle.PressedPadding.Bottom==4 and headerTabs.children[2*n].HeightOverride==29,
+        'a header tab label sits 2 pixels above centre in a tab of unchanged height')
 end
 local longLabels=items[1].labels
 items[1].labels={longLabels[1],'Developer Tools And More'}
@@ -811,9 +846,13 @@ for n,tab in ipairs(headerRow.mcTabs) do
     assert((tab.glow.BrushColor.A>0)==(n==2) and tab.widget:GetParent()==tab.glow,
         'Only the selected header tab may glow')
     assert(#tab.under==2,'a soft band and a brighter edge under each tab')
-    assert(tab.under[1].HeightOverride==4 and tab.under[1].Slot.Padding.Bottom==0
-        and tab.under[2].HeightOverride==1 and tab.under[2].Slot.Padding.Bottom==-1,
-        'the soft band is 4 tall, ending at the tab\'s bottom; the 1-pixel edge sits 1 below')
+    assert(tab.under[1].HeightOverride==3 and tab.under[1].Slot.Padding.Bottom==1
+        and tab.under[2].HeightOverride==1 and tab.under[2].Slot.Padding.Bottom==0,
+        'the soft band is 3 tall, ending a pixel above the tab\'s bottom; the 1-pixel edge takes the last row')
+    for _,band in ipairs(tab.under) do
+        assert(band.Slot.Padding.Left==0 and band.Slot.Padding.Right==0,
+            'the bands span the tab\'s width, between its separator bars')
+    end
     for _,band in ipairs(tab.under) do
         assert(band.visible==(n==2 and 3 or 1),'the glow under a tab shows only while it is selected, never hit-tested')
     end
@@ -877,6 +916,21 @@ for _,part in ipairs(fixed.panels[1].rows[1].parts) do assert(part.widget.visibl
 fixed.current=nil;fixed:select(1);assert(fixed.current==nil,'selecting it is refused')
 fixed.current=1;fixed:refresh();assert(fixed.current==fixed.visibleRows[1],'a selection on it moves to a selectable row')
 print('PASS a read-only row cannot be selected')
+
+-- The game puts the cursor on the keyboard-focused widget: a row selected with keys takes
+-- the focus, so the hidden cursor's hover matches the selection. The pointer does not.
+do
+    local focused={}
+    function fixed:focusSelected() focused[#focused+1]=self.current end
+    local row=fixed.visibleRows[1]
+    fixed:select(row,true)
+    assert(fixed.current==row and focused[1]==row,'a row selected with keys takes the keyboard focus')
+    fixed:select(row,false)
+    assert(#focused==1,'a row selected with the pointer leaves the focus alone')
+    fixed:select(nil,true)
+    assert(#focused==1,'clearing the selection focuses nothing')
+end
+print('PASS a row selected with keys takes the keyboard focus')
 
 -- mcTable shows static code and text pairs in columns filled top to bottom, every line
 -- the same height and every code the same width.
@@ -1118,17 +1172,17 @@ do
     compact.mcTestRowHeight=40
     compact:show(1)
     local plainRow,compactRow=compact.panels[1].rows[1],compact.panels[1].rows[2]
-    assert(plainRow.wrapper.HeightOverride==43 and compactRow.wrapper.HeightOverride==39,
+    assert(plainRow.wrapper.HeightOverride==40 and compactRow.wrapper.HeightOverride==36,
         'a subgroup row is 4 pixels shorter: '..tostring(compactRow.wrapper.HeightOverride))
     for _,w in ipairs({compactRow.widget,compactRow.parts[1].widget,compactRow.parts[2].widget}) do
-        assert(w:GetParent().HeightOverride==39,'and so is every box as tall as the row')
+        assert(w:GetParent().HeightOverride==36,'and so is every box as tall as the row')
     end
     assert(compactRow.mcPipBox.Slot.Padding.Bottom==plainRow.mcPipBox.Slot.Padding.Bottom,
         'its indicator keeps its place above the row\'s bottom')
     assert(compactRow.value.Slot.Padding.Bottom==plainRow.value.Slot.Padding.Bottom,'its value keeps its bottom padding')
     -- A subgroup without a heading reads as its parent's own rows: drawn as theirs.
     local headless=compact.panels[1].rows[3]
-    assert(headless.wrapper.HeightOverride==43 and headless.mcLabel.Font.Size==plainRow.mcLabel.Font.Size
+    assert(headless.wrapper.HeightOverride==40 and headless.mcLabel.Font.Size==plainRow.mcLabel.Font.Size
         and headless.mcLabel.Slot.Padding.Left==plainRow.mcLabel.Slot.Padding.Left,
         'a headless subgroup\'s rows are regular rows')
     for i=#items,1,-1 do items[i]=nil end
@@ -1384,17 +1438,18 @@ assert(noteRow.mcNote.Slot.HorizontalAlignment==2 and noteRow.mcNote.Slot.Vertic
     'the note is centered in that space')
 assert(noteRow.mcNote.Font.Size==10 and noteRow.mcNote.color=='muted','the note is small and muted')
 assert(#noteRow.parts==3 and noteRow.value.parent~=noteBox,'DMM\'s value keeps its place')
--- None has no note: one line, 2 pixels above where DMM puts it, a point smaller.
+-- None has no note: one line, 2 pixels above where DMM puts it, 2 points smaller as a
+-- slider's value is.
 local valueSize=noteRow.mcValueSize
 assert(noteBox.visible==1 and noteRow.value.Slot.Padding.Bottom==4 and valueSize
-    and noteRow.value.Font.Size==valueSize-1)
+    and noteRow.value.Font.Size==valueSize-2)
 noteUi.model.pending[1]=7;noteUi:refresh()
 assert(noteBox.visible==3 and noteRow.mcNote.text=='Fangdango' and noteRow.value.Slot.Padding.Bottom==10
     and noteBox.Slot.Padding.Bottom==8 and noteRow.mcPipBox.Slot.Padding.Bottom==-1
-    and noteRow.value.Font.Size==valueSize,
-    'a noted choice shows its note without taking clicks, and the value moves up at full size')
+    and noteRow.value.Font.Size==valueSize-2,
+    'a noted choice shows its note without taking clicks, and the value moves up at the same size')
 noteUi.model.pending[1]=0;noteUi:refresh()
-assert(noteBox.visible==1 and noteRow.value.Slot.Padding.Bottom==4 and noteRow.value.Font.Size==valueSize-1,'back to one line')
+assert(noteBox.visible==1 and noteRow.value.Slot.Padding.Bottom==4 and noteRow.value.Font.Size==valueSize-2,'back to one line')
 -- A picker with arrows shows one pip per choice under its value, the current one lit,
 -- in the row's bottom pixels below the note; half strength until its row is hovered.
 local pipBox=noteRow.mcPipBox
@@ -1448,20 +1503,33 @@ assert(pipBox.opacity==0.5 and heights()=='2,2,2','back to half and level when t
 noteUi.current=1;noteUi:tick({},function() return false,false,false end,false)
 assert(pipBox.opacity==1 and heights()=='2,2,3','the selected row counts as hovered, keyboard or controller')
 noteUi.current=nil;noteUi:tick({},function() return false,false,false end,false)
--- A click on the value's outer 40%, either side, steps like the arrow there: two clear
--- buttons over the text inside DMM's value button; the middle 20% is left to that button.
+-- Clear buttons over the value, inside DMM's value button: one per choice across the
+-- indicator, above its pip, choosing it; either side of the indicator, a zone stepping like
+-- the arrow on that side.
 do
     local zones=noteRow.mcZones
+    local values=noteUi.model.items[1].values
     local stack=noteRow.value:GetParent()
-    assert(zones and #zones==2 and stack:GetParent()==noteRow.parts[2].widget and stack.children[1]==noteRow.value
+    assert(zones and #zones==#values+2 and stack:GetParent()==noteRow.parts[2].widget and stack.children[1]==noteRow.value
         and noteRow.value.Slot.Padding.Left==4 and noteRow.value.Slot.VerticalAlignment==2
         and stack.Slot.HorizontalAlignment==0 and stack.Slot.VerticalAlignment==0 and stack.Slot.Padding.Left==0,
         'the value text keeps its place and padding under the zones')
-    local lane=zones[1].widget:GetParent()
-    assert(lane==zones[2].widget:GetParent() and #lane.children==3 and lane.children[1]==zones[1].widget
-        and lane.children[3]==zones[2].widget and zones[1].widget.Slot.Size.Value==0.4
-        and zones[2].widget.Slot.Size.Value==0.4 and math.abs(lane.children[2].Slot.Size.Value-0.2)<1e-9
-        and zones[1].widget.IsFocusable==false,'two 40% zones around a 20% middle, never focused')
+    local first,last=zones[1],zones[#zones]
+    local lane=first.widget:GetParent():GetParent()
+    local pipWidth=pipBox.WidthOverride
+    local valueWidth=noteRow.parts[2].widget:GetParent().WidthOverride or 190 -- the picker value column
+    assert(first.arrow==1 and last.arrow==3 and last.widget:GetParent()==lane and last.widget.Slot.Size.Value==1
+        and first.widget:GetParent().WidthOverride==(valueWidth-pipWidth)//2 and first.widget.IsFocusable==false,
+        'the left zone reaches the indicator; the right one fills the rest')
+    local covered=0
+    for n=2,#zones-1 do
+        assert(zones[n].choice==values[n-1] and zones[n].widget.IsFocusable==false,'a zone per choice, in order')
+        covered=covered+zones[n].widget:GetParent().WidthOverride
+    end
+    assert(covered==pipWidth,'the choice zones span the indicator exactly')
+    local inset=noteRow.parts[2].widget.WidgetStyle.NormalPadding
+    assert(lane.Slot.Padding.Left==-inset.Left and lane.Slot.Padding.Right==-inset.Right and inset.Left~=0,
+        'the zones reach back over the value button\'s inset, lining up with the pips')
     local change=noteUi.model.change
     function noteUi.model:change(i,direction)
         local values,at=self.items[i].values,1
@@ -1470,14 +1538,23 @@ do
     end
     local click=function(w) local clicked=w.clicked;w.clicked=false;return clicked,false,false end
     noteUi.model.pending[1]=0;noteUi:refresh()
-    zones[2].widget.clicked=true;noteUi:tick({},click,false)
+    last.widget.clicked=true;noteUi:tick({},click,false)
     assert(noteUi.model.pending[1]==7 and noteUi.current==1,'the right zone steps forward and selects the row')
-    zones[1].widget.clicked=true;noteUi:tick({},click,false)
+    first.widget.clicked=true;noteUi:tick({},click,false)
     assert(noteUi.model.pending[1]==0,'the left zone steps back')
     noteRow.parts[3].widget:SetIsEnabled(false)
-    zones[2].widget.clicked=true;noteUi:tick({},click,false)
+    last.widget.clicked=true;noteUi:tick({},click,false)
     assert(noteUi.model.pending[1]==0,'not while its arrow is disabled')
     noteRow.parts[3].widget:SetIsEnabled(true)
+    noteUi.current=nil
+    zones[#zones-1].widget.clicked=true;noteUi:tick({},click,false)
+    assert(noteUi.model.pending[1]==values[#values] and noteUi.current==1,'a click above a pip chooses it')
+    zones[2].widget.clicked=true;noteUi:tick({},click,false)
+    assert(noteUi.model.pending[1]==values[1],'any pip, not just the next one')
+    noteRow.parts[2].widget:SetIsEnabled(false)
+    zones[3].widget.clicked=true;noteUi:tick({},click,false)
+    assert(noteUi.model.pending[1]==values[1],'not while the value is disabled')
+    noteRow.parts[2].widget:SetIsEnabled(true)
     noteUi.model.change=change;noteUi.current,noteUi.hovered=nil,nil;noteUi:refresh()
     noteUi:tick({},function() return false,false,false end,false)
 end
@@ -1578,7 +1655,7 @@ do
     assert(noteRow.value.RenderTranslation.X==12,'sliding in from the right, the side clicked')
     settle(noteUi)
     noteRow.renderLeft,noteRow.renderRight=false,true;noteUi:refresh()
-    noteRow.mcZones[1].widget.clicked=true;noteUi:tick({},click,false)
+    noteRow.mcZones[1].widget.clicked=true;noteUi:tick({},click,false) -- the left zone
     assert(noteUi.model.pending[1]==9 and noteRow.value.RenderTranslation.X==-12,
         'before the first choice comes the last, from the left')
     settle(noteUi)

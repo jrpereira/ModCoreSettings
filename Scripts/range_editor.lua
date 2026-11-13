@@ -14,6 +14,8 @@
 -- Leaving the row lets go and clears the highlight. The mouse moves the nearer marker to
 -- the step it is pressed on, and drags it while held.
 local M={navigation=true}
+-- How to use the control, shown above the row's description: Enter to grab is not obvious.
+M.help='Press Left/Right to select an end, Enter (A) to grab it, Left/Right to move it, and Enter (A) to let go.'
 M.MAX_STEPS=40
 -- Values are compared in steps; a stored number may be this far off a step.
 local EPSILON=1e-6
@@ -150,7 +152,7 @@ end
 
 -- Drawn like ModCoreSettings' slider (presentation.lua): the value above, two points
 -- smaller; a thin line, its span lit and thicker; a thin handle at each end. A highlighted
--- handle gets a white contour; a grabbed one is raised and the other dims. The line is dim
+-- handle gets a white contour; a grabbed one is raised and the other hides. The line is dim
 -- until the row is selected or hovered.
 local colors={lit={R=0.95,G=0.63,B=0.08,A=0.9},dim={R=0.62,G=0.55,B=0.42,A=0.35},
     contour={R=1,G=1,B=1,A=1},none={R=1,G=1,B=1,A=0}}
@@ -161,7 +163,7 @@ local colors={lit={R=0.95,G=0.63,B=0.08,A=0.9},dim={R=0.62,G=0.55,B=0.42,A=0.35}
 -- value's (lift 3 above the centre, shrink 2 points). Opacities: idle line 0.5, the other
 -- handle while one is grabbed 0.35.
 M.layout={label=330,value=210,control=190,share=0.75,rest=2,span=4,handle=3,marker=10,grabbed=14,
-    above=2,contour=1,bottom=4,lift=3,shrink=2,idle=0.5,dimmed=0.35,row=40}
+    above=2,contour=1,bottom=4,lift=3,shrink=2,idle=0.5,row=40}
 
 function M.build(row,setting,context)
     local layout=M.layout
@@ -183,6 +185,13 @@ function M.build(row,setting,context)
 
     -- Make room on DMM's toggle row: label | control, the control as wide as a picker's value.
     local content=need(row.widget:GetContent(),'range row content')
+    -- The shell button pads its content above and below (1.5 each); taking that back gives
+    -- the control the row's full height, so the line sits where a slider's bar does.
+    pcall(function()
+        local inset,slot=row.widget.WidgetStyle.NormalPadding,content.Slot
+        local p=slot.Padding
+        slot:SetPadding({Left=p.Left,Top=-(inset.Top or 0),Right=p.Right,Bottom=-(inset.Bottom or 0)})
+    end)
     local labelBox,valueBox=content:GetChildAt(0),content:GetChildAt(1)
     need(labelBox,'range label box'):SetWidthOverride(layout.label)
     need(valueBox,'range value box'):SetWidthOverride(layout.value)
@@ -200,8 +209,8 @@ function M.build(row,setting,context)
         row.value:SetFont(row.value.Font)
     end)
 
-    -- The track: the line with a handle per end, and a hit target per step over the row's
-    -- height. A step's target is centred on it; the end ones reach a margin past the line.
+    -- The track: the line with a handle per end, a margin past each end, over the row's
+    -- height. A step's place is centred on it; the end ones reach into the margins.
     local span=math.floor(layout.control*layout.share/2)*2
     local count=setting.count
     local cell=span/count
@@ -231,7 +240,7 @@ function M.build(row,setting,context)
     local markers={}
     for n=1,2 do
         local mark=new('HorizontalBox')
-        for _,color in ipairs({colors.dim,colors.lit,colors.dim}) do need(mark:AddChild(line(color,1,nil)),'range handle line') end
+        for _,color in ipairs({colors.dim,colors.lit,colors.dim}) do need(mark:AddChild((line(color,1,nil))),'range handle line') end
         local contour=new('Border');contour:SetBrushColor(colors.none)
         contour:SetPadding({Left=layout.contour,Top=layout.contour,Right=layout.contour,Bottom=layout.contour})
         need(contour:SetContent(mark),'range handle contour')
@@ -240,20 +249,26 @@ function M.build(row,setting,context)
         slot:SetHorizontalAlignment(1);slot:SetVerticalAlignment(3)
         markers[n]={contour=contour,box=box,slot=slot}
     end
-    local hits={}
-    local hitLine=new('HorizontalBox')
-    local hitSlot=need(track:AddChildToOverlay(hitLine),'range hit targets')
-    hitSlot:SetHorizontalAlignment(1);hitSlot:SetVerticalAlignment(0)
-    for n=0,count do
-        -- A precise-click button takes the press without capturing the pointer, so the
-        -- next step still sees it hovering during a drag.
-        local target=new('Button');target.IsFocusable=false
-        pcall(function() target:SetClickMethod(3) end)
-        pcall(function() target:SetBackgroundColor({R=0,G=0,B=0,A=0}) end)
-        pcall(function() target:SetRenderOpacity(0) end)
-        local width=(n==0 or n==count) and margin+cell/2 or cell
-        need(hitLine:AddChild(sized(target,width,layout.row)),'range hit target')
-        hits[n+1]=target
+    -- The mouse goes to an invisible native slider over the whole track. The menu takes the
+    -- mouse button before the player controller sees it, so a press shows as the slider
+    -- capturing the pointer; it holds the capture, and follows the pointer, until let go.
+    -- Its value is the pointer's place along the track (0 to 1): no handle, so no inset.
+    local width=span+2*margin
+    local mouse=new('Slider');mouse.IsFocusable=false
+    pcall(function() mouse.RequiresControllerLock=false end)
+    mouse:SetMinValue(0);mouse:SetMaxValue(1);mouse:SetStepSize(1/(4*width))
+    pcall(function() mouse:SetSliderBarColor(colors.none) end)
+    pcall(function() mouse:SetSliderHandleColor(colors.none) end)
+    pcall(function()
+        local style=mouse.WidgetStyle
+        for _,name in ipairs({'NormalThumbImage','HoveredThumbImage','DisabledThumbImage'}) do style[name].ImageSize={X=0,Y=0} end
+    end)
+    pcall(function() mouse:SetIndentHandle(false) end)
+    local mouseSlot=need(track:AddChildToOverlay(sized(mouse,width,layout.row)),'range mouse slider')
+    mouseSlot:SetHorizontalAlignment(0);mouseSlot:SetVerticalAlignment(0)
+    -- The step under a place along the track, between 0 and count.
+    local function stepAt(place)
+        return math.max(0,math.min(count,math.floor((place*width-margin)/cell+0.5)))
     end
 
     local instance={setting=setting,value=nil,state=M.state(setting),focused=false}
@@ -263,17 +278,22 @@ function M.build(row,setting,context)
         parts[1]:SetWidthOverride(at(low));parts[2]:SetWidthOverride(at(high)-at(low))
         parts[3]:SetWidthOverride(span-at(high))
         local state=instance.state
+        -- A marker dragged with the mouse shows as highlighted and grabbed.
+        local dragged=instance.dragging
+        local highlighted,grabbed=dragged or state.highlighted,state.grabbed or dragged~=nil
+        -- Like a slider's mark, the handles show only while the row is hovered or selected;
+        -- while one is grabbed, the other hides.
+        local hot=instance.focused or grabbed or instance.hovered==true
         for n,step in ipairs({low,high}) do
             local marker=markers[n]
-            local mine=state.highlighted==n
-            local raised=state.grabbed and mine
+            local mine=highlighted==n
+            local raised=grabbed and mine
             local height=(raised and layout.grabbed or layout.marker)+2*layout.contour
             marker.contour:SetBrushColor(mine and colors.contour or colors.none)
             marker.box:SetHeightOverride(height)
-            marker.box:SetRenderOpacity(state.grabbed and not mine and layout.dimmed or 1)
+            marker.box:SetVisibility(hot and (mine or not grabbed) and 4 or 1)
             marker.slot:SetPadding({Left=at(step)-layout.handle/2-layout.contour,Top=0,Right=0,Bottom=0})
         end
-        local hot=instance.focused or state.grabbed or instance.hovered==true
         if hot~=instance.hot then instance.hot=hot;barBox:SetRenderOpacity(hot and 1 or layout.idle) end
     end
     instance.render=render
@@ -307,23 +327,24 @@ function M.build(row,setting,context)
         render()
     end
     function instance:hint() return self.state:hint() end
-    -- Getter: a press or drag on the track as the new value, or nil. pointer() tells
-    -- whether the left mouse button is down.
-    function instance:tick(pointer)
+    -- Getter: a press or drag on the track as the new value, or nil. A press takes the
+    -- nearer marker (see M.nearer) and holding drags it; letting go ends the drag.
+    function instance:tick()
         if self.value==nil then return nil end
         local hovered=track:IsHovered()==true
         if hovered~=self.hovered then self.hovered=hovered;render() end
-        if not self.dragging and not hovered then self.inside=false;return nil end
-        local over
-        for n=1,count+1 do if hits[n]:IsHovered()==true then over=n-1;break end end
-        local down=pointer and pointer()==true or false
-        -- A button already held when the pointer arrives is not a press on the track.
-        local pressed=down and self.inside and not self.down
-        self.inside,self.down=true,down
-        if not down then self.dragging=nil;return nil end
+        local ok,captured=pcall(function() return mouse:HasMouseCapture() end)
+        local down=ok and captured==true
+        local pressed=down and not self.down
+        self.down=down
+        if not down then
+            if self.dragging then self.dragging=nil;render() end
+            return nil
+        end
         local low,high=M.parts(setting,self.value)
-        if not low or over==nil then return nil end
-        if pressed then self.dragging=M.nearer(low,high,over,self.state.highlighted) end
+        if not low then return nil end
+        local over=stepAt(tonumber(mouse:GetValue()) or 0)
+        if pressed then self.dragging=M.nearer(low,high,over,self.state.highlighted);render() end
         if not self.dragging then return nil end
         low,high=M.place(setting,low,high,self.dragging,over)
         local value=M.value(setting,low,high)

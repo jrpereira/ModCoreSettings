@@ -90,14 +90,16 @@ local function widget(kind)
         local sl={}
         function sl:SetHorizontalAlignment(v) self.h=v end
         function sl:SetVerticalAlignment(v) self.v=v end
-        function sl:SetPadding(v) self.padding=v end
+        function sl:SetPadding(v) self.padding=v;self.Padding=v end
         function sl:SetSize() end
-        child.slot=sl
+        child.slot=sl;child.Slot=sl
         return sl
     end
-    function w:SetContent(child) self.content=child;child.parent=self;return slot(child) end
+    -- UE4SS rejects a UFunction call with extra arguments, e.g. a helper's second result.
+    local function one(name,...) assert(select('#',...)==1,name..' expected 1 parameter, received '..select('#',...)) end
+    function w:SetContent(...) one('SetContent',...);local child=...;self.content=child;child.parent=self;return slot(child) end
     function w:GetContent() return self.content end
-    function w:AddChild(child) self.children[#self.children+1]=child;child.parent=self;return slot(child) end
+    function w:AddChild(...) one('AddChild',...);local child=...;self.children[#self.children+1]=child;child.parent=self;return slot(child) end
     w.AddChildToOverlay=w.AddChild
     function w:GetChildAt(i) return self.children[i+1] end
     function w:SetWidthOverride(v) self.width=v end
@@ -105,17 +107,25 @@ local function widget(kind)
     function w:SetBrushColor(c) self.brush=c end
     function w:IsHovered() return self.hovered==true end
     function w:SetRenderOpacity(v) self.opacity=v end
+    function w:SetVisibility(v) self.visibility=v end
     function w:SetPadding(v) self.ownPadding=v end
-    for _,name in ipairs({'SetJustification','SetClickMethod','SetBackgroundColor'}) do
+    for _,name in ipairs({'SetJustification','SetClickMethod','SetBackgroundColor','SetStepSize',
+        'SetSliderBarColor','SetSliderHandleColor','SetIndentHandle'}) do
         w[name]=function() end
     end
+    -- A slider: its range, and the pointer's capture and place as the test sets them.
+    function w:SetMinValue(v) self.min=v end
+    function w:SetMaxValue(v) self.max=v end
+    function w:GetValue() return self.value or 0 end
+    function w:HasMouseCapture() return self.captured==true end
     return w
 end
 local api={construct=function(path) return widget(path:match('UMG%.(.+)$')) end,
     need=function(value,label) assert(value,label);return value end}
 local function toggleRow()
     local button,content=widget('Button'),widget('HorizontalBox')
-    button:SetContent(content)
+    button:SetContent(content).Padding={Left=56,Top=0,Right=0,Bottom=0}
+    button.WidgetStyle={NormalPadding={Left=0,Top=1.5,Right=12,Bottom=1.5}}
     local labelBox,valueBox,value=widget('SizeBox'),widget('SizeBox'),widget('TextBlock')
     content:AddChild(labelBox);content:AddChild(valueBox);valueBox:SetContent(value)
     return {widget=button,value=value}
@@ -126,21 +136,26 @@ local instance=Range.build(row,small,{api=api,tree={}})
 local L=Range.layout
 local content=row.widget:GetContent()
 assert(content:GetChildAt(0).width==L.label and content:GetChildAt(1).width==L.value)
+local p=content.slot.padding
+assert(p and p.Left==56 and p.Top==-1.5 and p.Right==0 and p.Bottom==-1.5,
+    'the control takes back the shell button\'s padding above and below, so its line sits where a slider\'s does')
 local hostBox=content:GetChildAt(1):GetContent()
 local host=hostBox.content
 assert(hostBox.width==L.control and host.children[1]==row.value,'DMM\'s caption sits in the control, above the line')
 assert(row.value.slot.padding.Bottom==2*L.lift)
 local track=host.children[2].content
-local barBox,hits=track.children[1],track.children[2]
+local barBox,mouseBox=track.children[1],track.children[2]
 local bar=barBox.content
 local strip=bar.children[1].content
 local low,high=bar.children[2],bar.children[3]
-assert(#hits.children==5,'a hit target per step')
+local mouse=mouseBox.content
+assert(mouse.kind=='Slider' and mouse.IsFocusable==false and mouse.min==0 and mouse.max==1,
+    'an invisible, unfocusable slider takes the mouse')
 local span=math.floor(L.control*L.share/2)*2
 local cell=span/4
-local widths=0
-for _,box in ipairs(hits.children) do widths=widths+box.width end
-assert(math.abs(widths-host.children[2].width)<1e-6,'the hit targets cover the track')
+local width=host.children[2].width
+local margin=(width-span)/2
+assert(mouseBox.width==width and mouseBox.height==L.row,'the mouse slider covers the track')
 instance:set('1|3')
 local function parts(a,b,c)
     local w={strip.children[1].width,strip.children[2].width,strip.children[3].width}
@@ -151,11 +166,12 @@ assert(strip.children[2].height==L.span and strip.children[1].height==L.rest,'th
 local function centre(marker) return marker.slot.padding.Left+L.handle/2+L.contour end
 assert(centre(low)==cell and centre(high)==3*cell,'handles sit on the span\'s ends')
 assert(low.content.brush.A==0 and high.content.brush.A==0 and barBox.opacity==L.idle,'no contour; the line is dim at rest')
+assert(low.visibility==1 and high.visibility==1,'no handles at rest, like a slider\'s mark')
 instance:focus(true)
-assert(barBox.opacity==1,'a selected row lights its line')
+assert(barBox.opacity==1 and low.visibility==4 and high.visibility==4,'a selected row lights its line and shows its handles')
 assert(instance:step(1)==nil and high.content.brush.A==1 and high.content.brush.R==1,'a highlighted handle gets a white contour')
 instance:confirm()
-assert(low.opacity==L.dimmed and high.height==L.grabbed+2*L.contour,'a grabbed handle is raised; the other dims')
+assert(low.visibility==1 and high.visibility==4 and high.height==L.grabbed+2*L.contour,'a grabbed handle is raised; the other hides')
 assert(instance:step(1)=='1|4')
 instance:set('1|4')
 assert(parts(cell,3*cell,0) and instance:step(1)==nil)
@@ -163,30 +179,35 @@ assert(instance.state.grabbed)
 instance:focus(false)
 assert(not instance.state.grabbed and instance.state.highlighted==nil and high.height==L.marker+2*L.contour
     and barBox.opacity==L.idle,'leaving the row lets go')
--- The mouse: a press takes the nearer marker; holding drags it.
-local down=false
-local function pointer() return down end
-local function hover(n)
-    for i,box in ipairs(hits.children) do box.content.hovered=i==n end
-    track.hovered=n~=nil
-end
-hover(1)
-assert(instance:tick(pointer)==nil,'hovering does nothing')
-down=true
-assert(instance:tick(pointer)=='0|4','a press on step 0 takes the low marker')
+-- The mouse: a press takes the nearer marker; holding drags it. The slider's value is the
+-- pointer's place along the track; a press is the slider capturing the pointer.
+local function at(step) mouse.value=(margin+step*cell)/width end
+track.hovered=true
+at(0)
+assert(instance:tick()==nil,'hovering does nothing')
+mouse.captured=true
+assert(instance:tick()=='0|4','a press on step 0 takes the low marker')
+assert(low.content.brush.A==1 and low.height==L.grabbed+2*L.contour and high.visibility==1 and low.visibility==4,
+    'the dragged handle shows as highlighted and grabbed')
 instance:set('0|4')
-hover(4)
-assert(instance:tick(pointer)=='3|4','holding drags it')
+at(3)
+assert(instance:tick()=='3|4','holding drags it')
 instance:set('3|4')
-hover(5)
-assert(instance:tick(pointer)==nil,'DeltaMin stops the drag')
-down=false
-assert(instance:tick(pointer)==nil and not instance.dragging)
-hover(nil)
-down=true
-assert(instance:tick(pointer)==nil)
-hover(2)
-assert(instance:tick(pointer)==nil,'a button held when the pointer arrives is not a press')
+at(4)
+assert(instance:tick()==nil,'DeltaMin stops the drag')
+mouse.captured=false
+assert(instance:tick()==nil and not instance.dragging,'letting go ends the drag')
+assert(low.content.brush.A==0 and low.height==L.marker+2*L.contour and high.visibility==4 and low.visibility==4,
+    'letting go drops the drag look')
+mouse.value=0;mouse.captured=true
+assert(instance:tick()=='0|4','a press in the left margin is step 0')
+instance:set('0|4');mouse.captured=false;instance:tick()
+mouse.value=(margin+2.4*cell)/width;mouse.captured=true
+assert(instance:tick()=='2|4','a press takes the nearest step')
+instance:set('2|4');mouse.captured=false;instance:tick()
+mouse.value=1;mouse.captured=true
+assert(instance:tick()==nil,'a press past the high marker at the end leaves it where it is')
+mouse.captured=false;instance:tick()
 print('PASS the range row draws its span and markers and follows keys and the mouse')
 
 -- field_types: Left/Right reach the editor as steps, Enter/A as confirm, and the footer
@@ -198,6 +219,11 @@ do
     for key,value in pairs(small) do setting[key]=value end
     assert(registry:merge('[Setting.R]\nId=R\nType=range\nMin=0\nMax=4\nDefault=1|3\n',{})[1].values[3]==2,
         'a navigation editor\'s shell has three positions')
+    local plain=registry:merge('[Setting.R]\nId=R\nType=range\nMin=0\nMax=4\nDefault=1|3\n',{})[1]
+    local own=registry:merge('[Setting.R]\nId=R\nType=range\nMin=0\nMax=4\nDefault=1|3\nDescription=Own\n',{})[1]
+    assert(plain.mcHelp==Range.help and Range.help:find('Enter %(A%) to grab it') and plain.description==''
+        and own.mcHelp==Range.help and own.description=='Own',
+        'a range row carries its key help apart from its own description')
     local choices
     choices={parse=function() return {} end,index=function() return 1 end,format=function() return '' end,
         open=function(provider)
@@ -230,10 +256,11 @@ do
     local instance=nil
     ui.current=1
     model:change(1,2)
-    ui:tick()
+    assert(not ui:tick(),'a tick without Enter leaves DMM\'s buttons alone')
     assert(hints[#hints]=='ADJUST','the hint shows while the row is selected')
     presses=1
-    ui:tick()
+    -- DMM's focused Back button also sees Enter: a true tick makes DMM drop that press.
+    assert(ui:tick()==true,'an Enter the editor takes is not also DMM\'s Back')
     assert(hints[#hints]=='DONE','Enter grabs')
     model:change(1,2)
     ui:tick()

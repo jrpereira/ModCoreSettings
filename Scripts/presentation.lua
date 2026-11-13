@@ -68,9 +68,15 @@ local headerGlowOff={R=0,G=0,B=0,A=0}
 local headerHover={R=0.95,G=0.63,B=0.08,A=0.06}
 -- The glow under the selected page tab: a soft band with a brighter edge at the bottom.
 local headerUnderSoft,headerUnderEdge={R=0.95,G=0.63,B=0.08,A=0.14},{R=0.95,G=0.63,B=0.08,A=0.6}
--- The soft band sits headerUnderSoftDrop below the tab's bottom; the edge is a 1-pixel line
--- drawn headerUnderEdgeDrop pixels below it.
-local headerUnderSoftHeight,headerUnderSoftDrop,headerUnderEdgeHeight,headerUnderEdgeDrop=4,0,1,1
+-- Each band's bottom sits its drop below the tab's bottom (negative: above). The soft band
+-- ends a pixel above it; the edge, a 1-pixel line, takes the tab's last pixel row. Both
+-- span the tab's width, between its separator bars.
+local headerUnderSoftHeight,headerUnderSoftDrop,headerUnderEdgeHeight,headerUnderEdgeDrop=3,-1,1,0
+-- A control's help above a setting's description: 10-point dim white text on a dim amber
+-- band, apart from the description's 14-point muted text.
+local controlHelpSize,controlHelpBand,controlHelpPadding=10,{R=0.95,G=0.63,B=0.08,A=0.08},
+    {Left=10,Top=6,Right=10,Bottom=6}
+local controlHelpText={SpecifiedColor={R=1,G=1,B=1,A=0.6},ColorUseRule=0}
 -- A picker's choice indicator under its value: one pip per choice up to pipLimit, else a
 -- track with a thumb. Its strip is pipActiveHeight tall and starts pipBottom from the row's
 -- bottom; the pips (pipHeight) sit a pixel below its top, on the row's last pixels, and the
@@ -78,8 +84,6 @@ local headerUnderSoftHeight,headerUnderSoftDrop,headerUnderEdgeHeight,headerUnde
 -- The indicator spans pipShare of the value's width, centred; the pips share it, pipGap
 -- apart, each as wide as its place allows (they differ by a pixel at most).
 local pipLimit,pipHeight,pipActiveHeight,pipBottom,pipGap,pipShare=16,2,4,-1,4,0.75
--- A click on the outer stepZone of a picker's value, either side, steps like the arrow there.
-local stepZone=0.4
 local pipOn,pipOff={R=0.95,G=0.63,B=0.08,A=0.9},{R=0.62,G=0.55,B=0.42,A=0.35}
 -- A slider is drawn like a picker's indicator: its value sliderValueShrink points smaller,
 -- centred on the control, over a bar sliderShare of the control's width: the filled part
@@ -97,7 +101,7 @@ local pickerValueLeft=pickerLabelWidth+pickerArrowWidth
 -- A one-line picker row's height (DMM's is 40), and with choice notes; row labels are drawn
 -- labelDrop pixels lower; a toggle-shell row's button starts toggleShift pixels left, so its
 -- selection background starts where headings do.
-local pickerRowHeight,notedPickerRowHeight,labelDrop,toggleShift=43,42,1,14
+local pickerRowHeight,notedPickerRowHeight,labelDrop,toggleShift=40,40,1,14
 -- A picker arrow at the first or last choice: shown faint, not hidden. A click on it wraps
 -- around to the other end, as does a click on that side of the value.
 local edgeArrowOpacity=0.5
@@ -105,8 +109,9 @@ local edgeArrowOpacity=0.5
 local noteSize,noteRaise=10,8
 -- DMM centres a picker's value, so bottom padding raises it by half: noteValueLift raises
 -- it 5 pixels over a note. An arrow picker showing no note raises its value 2 pixels
--- (plainValueLift), plainValueShrink points smaller, while its indicator sits plainPipLift higher.
-local noteValueLift,plainValueLift,plainValueShrink,plainPipLift=10,4,1,6
+-- (plainValueLift), while its indicator sits plainPipLift higher. Either way the value is
+-- pickerValueShrink points smaller, as a slider's is.
+local noteValueLift,plainValueLift,pickerValueShrink,plainPipLift=10,4,2,6
 -- The indicator's opacity while its row is not hovered: half of full.
 local pipIdleOpacity=0.5
 -- The current pip (or thumb) is pipHotHeight tall while its row is hovered or selected,
@@ -131,7 +136,7 @@ end
 -- A page tab's label when it is not the selected one.
 local headerTabDimmed=0.8
 -- A page tab's label sits headerTabRaise pixels above its tab's centre.
-local headerTabRaise=1
+local headerTabRaise=2
 -- Paints a page tab for its state: selected (glow behind and under, full label), hovered
 -- (background) or neither (dimmed label). Only state changes touch the widgets.
 local function paintHeaderTab(tab)
@@ -1191,9 +1196,10 @@ function M.install(choices,controls,pages,options)
                     -- Never in the way of the value button underneath.
                     box:SetVisibility(3);box:SetRenderOpacity(pipIdleOpacity)
                     row.mcPips,row.mcPipBoxes,row.mcPipBox,row.mcPipShown,row.mcPipHot=pips,pipBoxes,box,nil,false
-                    -- The value's outer parts step like its arrows: two clear buttons over the
-                    -- text, inside DMM's value button, so the row still reads as hovered over
-                    -- them. The middle passes clicks to the value button, as before.
+                    -- Clear buttons over the text, inside DMM's value button, so the row still
+                    -- reads as hovered over them: across the indicator, one per choice, each
+                    -- above its pip (or its share of the track), choosing it; either side of
+                    -- the indicator, the rest steps like the arrow on that side.
                     -- Wrappers are new on every lookup, so widgets compare by full name.
                     local valueButton=row.parts[2].widget
                     local holder=row.value:GetParent()
@@ -1209,21 +1215,42 @@ function M.install(choices,controls,pages,options)
                         textSlot:SetPadding({Left=padding.Left,Top=padding.Top,Right=padding.Right,Bottom=padding.Bottom})
                         local lane=new('HorizontalBox')
                         local laneSlot=add(stack,lane);laneSlot:SetHorizontalAlignment(0);laneSlot:SetVerticalAlignment(0)
+                        -- The button insets its content by its style's padding; the lane reaches
+                        -- back over it, so its zones line up with the pips drawn from the row.
+                        local inner={Left=0,Right=0}
+                        pcall(function()
+                            local normal=valueButton.WidgetStyle.NormalPadding
+                            inner.Left,inner.Right=tonumber(normal.Left) or 0,tonumber(normal.Right) or 0
+                        end)
+                        laneSlot:SetPadding({Left=-inner.Left,Top=0,Right=-inner.Right,Bottom=0})
                         row.mcZones={}
-                        for n,share in ipairs({stepZone,1-2*stepZone,stepZone}) do
-                            local part=n==2 and new('Spacer') or api.button(tree,'')
-                            if n~=2 then part.IsFocusable=false end
-                            add(lane,part):SetSize({SizeRule=1,Value=share})
-                            if n~=2 then
-                                row.mcZones[#row.mcZones+1]={widget=part,arrow=n,direction=n==1 and 1 or 2,
-                                    pressed=false,pointer=false}
+                        local function zone(entry,laneWidth)
+                            local part=api.button(tree,'');part.IsFocusable=false
+                            local partSlot
+                            if laneWidth then
+                                local partBox=new('SizeBox');partBox:SetWidthOverride(laneWidth)
+                                local inner=api.need(partBox:SetContent(part),'MCS picker zone')
+                                inner:SetHorizontalAlignment(0);inner:SetVerticalAlignment(0)
+                                partSlot=add(lane,partBox)
+                            else
+                                partSlot=add(lane,part);partSlot:SetSize({SizeRule=1,Value=1})
                             end
+                            entry.widget,entry.pressed,entry.pointer=part,false,false
+                            row.mcZones[#row.mcZones+1]=entry
                         end
+                        -- Choice n's place along the indicator: a pip and the gap before it, or
+                        -- its share of the track; edges rounded as the pips' are.
+                        local place=count<=pipLimit and (width+pipGap)/count or width/count
+                        local function edge(n) return n==count and width or math.floor(n*place+0.5) end
+                        local inset=(value-width)//2
+                        zone({arrow=1,direction=1},inset)
+                        for n=1,count do zone({choice=setting.values[n]},edge(n)-edge(n-1)) end
+                        zone({arrow=3,direction=2})
                     end
                 end
-                -- A one-line picker row is pickerRowHeight tall: its columns grow with it and
-                -- their content sits 1 pixel lower, so 1 pixel more above and 2 below. With
-                -- choice notes it is notedPickerRowHeight, its content centred: 1 more each way.
+                -- A one-line picker row is pickerRowHeight tall, as a slider's: its columns
+                -- follow it and their content sits 1 pixel lower. With choice notes it is
+                -- notedPickerRowHeight, its content centred.
                 if setting.kind=='picker' and row.parts and #row.parts==3
                     and tonumber(row.wrapper.HeightOverride)==40 then
                     local noted=setting.mcChoiceNotes~=nil
@@ -1464,9 +1491,15 @@ function M.install(choices,controls,pages,options)
             local setting=self.model and self.model.items and self.model.items[index]
             return setting~=nil and setting.mcReadOnly==true
         end
-        function ui:select(index,...)
+        -- The game puts the (hidden) cursor on whatever takes keyboard focus, and Up/Down move
+        -- that focus through the rows on their own. A row selected with keys therefore takes
+        -- the focus too, as DMM does for a controller: the cursor lands on it, so its hover
+        -- is the selected row and never another one.
+        function ui:select(index,keyboard,...)
             if index and readOnly(self,index) then return end
-            return select(self,index,...)
+            local results=table.pack(select(self,index,keyboard,...))
+            if index and keyboard and self.current==index and self.focusSelected then pcall(self.focusSelected,self) end
+            return table.unpack(results,1,results.n)
         end
         local function dynamic(rule,model,fallback)
             if not rule then return fallback end
@@ -1565,11 +1598,11 @@ function M.install(choices,controls,pages,options)
                     end
                 end
                 if row.mcPipBox then
-                    -- Showing no note, the value is smaller and it and the indicator sit a little higher.
+                    -- Showing no note, the value and the indicator sit a little higher.
                     local noted=row.mcNoteText~=nil
                     if row.mcPipNoted~=noted then
                         row.mcValueSize=row.mcValueSize or tonumber(row.value.Font and row.value.Font.Size) or 14
-                        api.Theme.font(row.value,api.theme,noted and row.mcValueSize or row.mcValueSize-plainValueShrink)
+                        api.Theme.font(row.value,api.theme,row.mcValueSize-pickerValueShrink)
                         row.value:SetFont(row.value.Font)
                         local padding=row.value.Slot.Padding
                         row.value.Slot:SetPadding({Left=padding.Left,Top=padding.Top,Right=padding.Right,
@@ -1977,8 +2010,17 @@ function M.install(choices,controls,pages,options)
                             local clicked
                             clicked,zone.pressed,zone.pointer=released(zone.widget,zone.pressed,zone.pointer,
                                 not controller and zone.widget:IsHovered()==true)
-                            if clicked and row.parts[zone.arrow].widget:GetIsEnabled() then
+                            if clicked and zone.arrow and row.parts[zone.arrow].widget:GetIsEnabled() then
                                 step(self,i,zone.direction)
+                                return tick(self,queued,released,controller)
+                            end
+                            -- A click above a pip chooses it.
+                            if clicked and zone.choice~=nil and row.parts[2].widget:GetIsEnabled() then
+                                self:select(i,false)
+                                if self.model.pending[i]~=zone.choice then
+                                    self.model:set(i,zone.choice);self:refresh()
+                                    if adapted.feedback then adapted.feedback('Change') end
+                                end
                                 return tick(self,queued,released,controller)
                             end
                         end
@@ -2037,6 +2079,60 @@ function M.install(choices,controls,pages,options)
         return ui
     end
     controls.mcPresentationVersion=M.version
+    -- A control's help (a setting's mcHelp, from its editor) shows in its own box between
+    -- DMM's setting title and description: smaller text on a dim band. The help and the
+    -- description each show only while they have text. DMM writes the description through
+    -- setText, which hands it to copy(); the help follows each setting DMM describes.
+    local function installControlHelp(page,tree,api)
+        local title,copy=page.detailTitle,page.detailCopy
+        if not (title and copy and page.controls and type(page.controls.description)=='function') then return end
+        local stack=assert(copy:GetParent(),'MCS description parent')
+        local children={}
+        for n=0,stack:GetChildrenCount()-1 do
+            local child=stack:GetChildAt(n)
+            local padding=child.Slot.Padding
+            children[#children+1]={widget=child,padding={
+                Left=padding.Left,Top=padding.Top,Right=padding.Right,Bottom=padding.Bottom}}
+        end
+        assert(#children==2 and children[1].widget:GetFullName()==title:GetFullName()
+            and children[2].widget:GetFullName()==copy:GetFullName(),'MCS description layout')
+        local text=api.caption(tree,'')
+        text:SetJustification(0);text:SetAutoWrapText(true)
+        api.Theme.font(text,api.theme,controlHelpSize)
+        text:SetColorAndOpacity(controlHelpText)
+        local band=api.construct('/Script/UMG.Border',tree)
+        band:SetBrushColor(controlHelpBand)
+        band:SetPadding(controlHelpPadding)
+        local textSlot=api.need(band:SetContent(text),'MCS control help text')
+        textSlot:SetHorizontalAlignment(0);textSlot:SetVerticalAlignment(0)
+        band:SetVisibility(1)
+        stack:ClearChildren()
+        api.need(stack:AddChild(children[1].widget),'MCS description title'):SetPadding(children[1].padding)
+        api.need(stack:AddChild(band),'MCS control help'):SetPadding(children[2].padding)
+        api.need(stack:AddChild(children[2].widget),'MCS description copy'):SetPadding(children[2].padding)
+        local shown=copy:GetVisibility()
+        local help={band=band,text=text}
+        -- Every description DMM writes clears the help; describing a setting brings it back.
+        function help.copy(value)
+            band:SetVisibility(1)
+            copy:SetVisibility((value or '')~='' and shown or 1)
+            return api.setText(copy,value)
+        end
+        function help.show(value)
+            if (value or '')=='' then band:SetVisibility(1);return end
+            api.setText(text,value)
+            band:SetVisibility(3)
+        end
+        local controlsUi=page.controls
+        local describe=controlsUi.description
+        function controlsUi:description(index)
+            local result=describe(self,index)
+            local setting=self.model and self.model.items and self.model.items[index]
+            help.show(setting and setting.mcHelp)
+            return result
+        end
+        page.mcControlHelp=help
+    end
     if pages then
         local buildPages=pages.build
         pages.build=function(tree,providers,status,api)
@@ -2054,6 +2150,7 @@ function M.install(choices,controls,pages,options)
             end
             adapted.setText=function(widget,text)
                 if page and widget==page.modTitle then titleText=text;return showTitle() end
+                if page and page.mcControlHelp and widget==page.detailCopy then return page.mcControlHelp.copy(text) end
                 if page and widget==page.controlStatus then
                     local T=api.t or function(copy) return copy end
                     if text==T('Unapplied changes') then text='' end
@@ -2457,6 +2554,7 @@ function M.install(choices,controls,pages,options)
             end
             styleBrowserRows(page.allRows)
             lineBrowserRows(page.allRows)
+            installControlHelp(page,tree,api)
             page.controls.mcHeaderHost=host
             page.controls.mcHeaderTitle=title
             page.controls.mcHeaderTabs=strip

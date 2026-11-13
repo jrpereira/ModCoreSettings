@@ -180,3 +180,18 @@ do
         'resolving the collision clears both rows and the picker')
 end
 print('PASS refresh marks colliding editors and separating pickers')
+
+-- An editor's help travels apart from the row's description; blank help is none.
+do
+    local typed=FieldTypes.new(function() end)
+    local function kind(help)
+        return {help=help,declare=function() return {} end,normalize=function(_,raw) return raw or 'x' end,
+            valid=function() return true end,format=function() return '' end,build=function() return {} end}
+    end
+    typed:register('helped',kind(' Keys. '));typed:register('blank',kind('  '));typed:register('plain',kind(nil))
+    local rows=typed:merge('[Setting.A]\nId=A\nType=helped\nDescription=Own\n[Setting.B]\nId=B\nType=blank\n'
+        ..'[Setting.C]\nId=C\nType=plain\nDescription=+50% size\n',{})
+    assert(rows[1].mcHelp=='Keys.' and rows[1].description=='Own' and rows[2].mcHelp==nil and rows[2].description==''
+        and rows[3].mcHelp==nil and rows[3].description=='+50% size','help is trimmed and descriptions stay as written')
+end
+print('PASS an editor\'s help travels apart from the row\'s description')

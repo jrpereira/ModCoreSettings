@@ -96,13 +96,14 @@ extension={
         -- Menu data checks span fields with the same editor.
         package.loaded.range_editor=module('range_editor')
         fieldTypes:register('range',package.loaded.range_editor)
-        -- Enter and A for editors that take the row's keys, and their footer hint.
+        -- Enter and A for editors that take the row's keys, and their footer hint. UE4SS's
+        -- FName is callable userdata, not a function.
         local editorInput=module('editor_input').new({register=RegisterKeyBind,keys=Key,
-            key=type(FName)=='function' and function(name) return {KeyName=FName(name)} end or nil})
+            key=FName~=nil and function(name) return {KeyName=FName(name)} end or nil})
         fieldTypes:install({choices=dmm.choices,controls=dmm.controls,settingsApi=dmm.settingsApi,
             confirm=editorInput,pointer=editorInput.pointer,
             hint=module('editor_hint').install(require('nativeactions'),dmm.pages,
-                type(FName)=='function' and FName or nil),
+                FName~=nil and FName or nil),
             standardControls=(function()
                 -- The shared key rule, vendored like menu_contributions; DMM's require
                 -- resolves in DMM's folder, so standard_controls finds it here.

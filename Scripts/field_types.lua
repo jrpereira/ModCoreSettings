@@ -19,6 +19,7 @@
 --   instance:focus(on) -> the row is selected or not
 --   instance:hint() -> the footer hint's label while the row is selected, or nil
 -- tick(pointer) gets pointer() -> whether the left mouse button is down.
+-- help (optional): how to use the control, shown above every such row's description.
 local M={version=1}
 local Manifest=require('mcs_manifest')
 local MAX_SETTINGS=256
@@ -57,7 +58,10 @@ function M.new(report)
 
     local function item(index,r,editor,name)
         local id=r.Id or ('setting_'..index)
+        -- The editor's help (optional) shows in its own box above the description.
+        local help=trim(editor.help)
         local s={id=id,kind='extension',editor=name,label=r.Label or id,description=r.Description or '',
+            mcHelp=help~='' and help or nil,
             group=r.Group or r.Section or r.Category or 'Settings',
             -- DMM's toggle shell sizes its navigation from two values; they are never stored.
             -- A navigation editor's shell has three, and rests on the middle one: a move to
@@ -436,6 +440,11 @@ function M.new(report)
                     if ok and pressed and wants then
                         local done,value=pcall(current.confirm,current)
                         if done then edit(self.current,value) else report('FIELD_EDITOR_FAILED',tostring(value)) end
+                        -- Slate also presses DMM's focused Back button with Enter, and DMM
+                        -- goes back when it is let go (or asks to apply, on a changed page).
+                        -- A true tick makes DMM wait for every button to be let go and
+                        -- then forget their presses, so the editor's Enter is its alone.
+                        results[1]=true;results.n=math.max(results.n,1)
                     end
                 end
                 local text
