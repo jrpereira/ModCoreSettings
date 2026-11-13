@@ -619,6 +619,22 @@ An id is a plain identifier: a letter, then letters, digits and underscores, at 
 declares has none; the last two are logged. Without the ready flag ModCore Settings did
 not load or its scan failed.
 
+## Module requirements
+
+A module whose `mod.json` lists `dependencies` is checked against the loaded modules: the
+enabled folders, matched by their `mod.json` `id`, else their folder name. UE4SS is
+always loaded. A dependency's `version` is a minimum with a trailing `+` (`1.6.0+`; a `?`
+part counts as 0, so `1.6.?+` is 1.6.0 or later) and an exact version without one;
+versions compare part by part as numbers. A loaded module's version is its `mod.json`
+`version`, else its `VERSION` file, else `dlls/main.json`, else a `local VERSION = "…"`
+line near the top of `Scripts/main.lua` (Dawnwalker Mod Menu's own main).
+
+In the mod list a module with any dependency not met carries a red `⚠` at its right,
+centred on the row. Hovering or selecting a module shows a Requirements section after
+Author, in the same form: each dependency, the version it needs and the one loaded;
+unmet ones first, marked `⚠` with why (missing, too old, too new or of unknown version),
+then met ones, marked `√`; each group alphabetical.
+
 ## Module categories
 
 The Settings page's Modules tab provides Sort by (Recently Added/Categories/Alphabetical/Load Order) and, with Categories, Collections valid with # modules (No/2/3) and Modules appear in a single category (Off/On), and, with Categories or Recently Added, Modules per row (1/2/3), all under a Listing heading. Apply saves [Modules] SortBy (2/1/0/3), PreferredCategoryMinimum (0/2/3), SingleCategory (0/1) and ModulesPerRow (1/2/3) in config.ini. Defaults are Categories, 2, Off and 2. Modules per row sets the columns of every group's grid; mod names are left-aligned in every layout. With a single category, a mod whose categories span several top categories is listed only under the one holding most of them; a tie goes to the one declared first, a preferred category counting as declared first. The mod list's title line carries settings and controls links, top right, opening ModCore Settings and ModCore Controls when they are listed. The mod list's footer button (DMM's Filter Mods, Backspace) is Sort by: each press moves to the next way, saves it the same way and re-sorts the list. Inside every group mods follow load order (in Recently added, newest first), those with settings first. Load Order lists mods in load order, each with its load-order number; mods without settings fold to the end as in every list, so the numbers shown skip them.

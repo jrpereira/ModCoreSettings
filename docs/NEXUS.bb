@@ -10,7 +10,7 @@ ModCore Settings (MCS) extends Dawnwalker Mod Menu (DMM) with richer controls an
 [*]Generated pages and shared menu slots, so related mods can present settings together while retaining their own storage.
 [*]Numeric Apply notifications after successful saves, without configuration polling.
 [*]Missing-default initialization that preserves existing choices and unrelated configuration.
-[*]A Modules page that lists every installed mod by category, by when it was added, alphabetically or in load order, with collections and 1 to 3 mods per row.
+[*]A Modules page that lists every installed mod by category, by when it was added, alphabetically or in load order, with collections and 1 to 3 mods per row. Modules whose declared requirements are missing or at the wrong version are marked, and their details list each requirement with the version loaded.
 [/list]
 
 [b]Requirements and installation[/b]

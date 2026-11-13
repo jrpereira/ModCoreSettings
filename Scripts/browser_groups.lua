@@ -2,6 +2,7 @@
 -- same rules: a valid collection (mod.json preferred shared by enough mods) lists it
 -- there only; otherwise it is listed under each top category its categories belong to.
 local M = {}
+local Requirements = require('mod_requirements')
 
 local GROUP_PREFIX = 'ModCore.browser.group.'
 local VARIOUS = 'Various Authors'
@@ -32,6 +33,11 @@ local LINK_SIZE, LINK_GAP, LINK_END = 12, 7, 5
 local LOAD_NUMBER_WIDTH, LOAD_NUMBER_SIZE, LOAD_NUMBER_OPACITY, LOAD_NUMBER_GAP = 16, 11, 0.7, 4
 -- How far left of that the number and the name are drawn, and how far down the number.
 local LOAD_NUMBER_SHIFT, LOAD_NAME_SHIFT, LOAD_NUMBER_DROP = 13, 10, 1
+-- The unmet-requirements mark, right of its row and centred on it: text size, its gap
+-- from the row's right edge, how far below the centre it sits, and its colour (red at
+-- 70% opacity).
+local MARK_SIZE, MARK_INSET, MARK_DROP = 12, 3, 1
+local MARK_UNMET = {R=1, G=0.2, B=0.2, A=0.7}
 -- A group heading: its icon, a small line naming the kind of group, and its title.
 local function heading(key, title, kind, icon, columns)
     return {id=GROUP_PREFIX .. key, name=title, author='', version='',
@@ -98,7 +104,9 @@ local function clean(value)
 end
 
 -- A reader for a mod folder's version under mods (the Mods folder, ending in a separator):
--- its VERSION file, else the version in a native mod's dlls/main.json. open defaults to io.open.
+-- its VERSION file, else the version in a native mod's dlls/main.json, else a
+-- `local VERSION = "..."` line near the top of its Scripts/main.lua (or main.dmm.lua, the
+-- name Dawnwalker Mod Menu's own main takes once MCS is installed). open defaults to io.open.
 function M.folderVersion(mods, open)
     if type(mods) ~= 'string' then return nil end
     open = open or io.open
@@ -114,14 +122,21 @@ function M.folderVersion(mods, open)
         local version = read(mods .. folder .. '/VERSION')
         if version then return version:match('^%s*(.-)%s*$') end
         local json = read(mods .. folder .. '/dlls/main.json')
-        return json and json:match('"version"%s*:%s*"([^"]+)"')
+        version = json and json:match('"version"%s*:%s*"([^"]+)"')
+        if version then return version end
+        for _, main in ipairs({'main.dmm.lua', 'main.lua'}) do
+            local script = read(mods .. folder .. '/Scripts/' .. main)
+            version = script and ('\n' .. script):match('\nlocal%s+VERSION%s*=%s*"([%w%.%-%+]+)"')
+            if version then return version end
+        end
     end
 end
 
 -- A reader for a mod folder's mod.json fields under mods (the Mods folder, ending in a
 -- separator): preferred, its collection; settings, false when the mod has none to show;
 -- name, author, version, icon, description and titleLink (the text of the mod's link on
--- the browser's title line); and requires, the set of dependency ids.
+-- the browser's title line); requires, the set of dependency ids; and dependencies, each
+-- {id=, version=} in declared order.
 -- mod.json is decoded as JSON, as the boot index decodes it; an unreadable one gives no
 -- fields. interface names how UE4SS starts the folder, from its files: 'Native'
 -- (dlls/main.dll), 'Lua' (Scripts/main.lua) or 'Native and Lua'; nil with neither. Each folder is read once: mod.json changes need a restart, like the index.
@@ -154,10 +169,14 @@ function M.folderManifest(mods, open)
         end
         local fields = {preferred=text('preferred', 120), name=text('name', 200), author=text('author', 120),
             version=text('version', 64), icon=text('icon', 16), description=text('description', 4096),
-            titleLink=text('title_link', 16), requires={}}
+            titleLink=text('title_link', 16), requires={}, dependencies={}}
         if manifest.settings == false then fields.settings = false end
         for _, dependency in ipairs(type(manifest.dependencies) == 'table' and manifest.dependencies or {}) do
-            if type(dependency) == 'table' and type(dependency.id) == 'string' then fields.requires[dependency.id] = true end
+            if type(dependency) == 'table' and type(dependency.id) == 'string' and dependency.id ~= '' then
+                fields.requires[dependency.id] = true
+                fields.dependencies[#fields.dependencies + 1] = {id=dependency.id,
+                    version=type(dependency.version) == 'string' and dependency.version or nil}
+            end
         end
         return fields
     end
@@ -225,6 +244,32 @@ end
 function M.arrange(providers, parse, report, options)
     options = options or {}
     local listed, tools, seen = {}, {}, {}
+    -- The loaded modules by id (their mod.json id, else their folder), built when a module
+    -- with dependencies first needs it: the active folders in the register.
+    local installed
+    local function loadedModule(id)
+        if not installed then
+            installed = {}
+            for folder, entry in pairs(options.categoryRegister or {}) do
+                local fields = {}
+                if options.folderManifest then
+                    local ok, value = pcall(options.folderManifest, folder)
+                    fields = ok and type(value) == 'table' and value or {}
+                end
+                local version = fields.version
+                if not version and options.folderVersion then
+                    local ok, value = pcall(options.folderVersion, folder)
+                    version = ok and trimmed(value) or nil
+                end
+                local key = type(entry) == 'table' and entry.id or folder
+                -- A folder named like another module's id never hides that module.
+                if not installed[key] or installed[key].byFolder then
+                    installed[key] = {name=fields.name or key, version=version, byFolder=key == folder or nil}
+                end
+            end
+        end
+        return installed[id]
+    end
     local host
     local parentOf = {}
     local lastParent
@@ -273,6 +318,15 @@ function M.arrange(providers, parse, report, options)
                     elseif fields.description then provider.description = fields.description end
                 elseif provider.detectedKind == 'package' and provider.noSettings then
                     provider.description = provider.name .. ' loaded as a game package; settings not available.'
+                end
+                -- A module's requirements: unmet ones mark its row, and the details card lists
+                -- them all. Without a register the loaded modules are unknown, so none is checked.
+                provider.mcRequirements = nil
+                if folder and #(fields.dependencies or {}) > 0 and not provider.mcBrowserChild
+                    and type(options.categoryRegister) == 'table' and next(options.categoryRegister) ~= nil then
+                    local ok, value = pcall(Requirements.evaluate, fields.dependencies, loadedModule)
+                    if ok and value then provider.mcRequirements = value
+                    elseif not ok and report then report('BROWSER_REQUIREMENTS_FAILED', tostring(value)) end
                 end
             end
             if id == HOST then host = provider end
@@ -668,6 +722,31 @@ function M.install(pages, report, parse, folderVersion, folderManifest, grouping
         -- own: a mod without settings, a group heading or an "and N more" entry.
         local card = type(page) == 'table' and page.browserCard
         if type(card) == 'table' and type(card.show) == 'function' and type(card.links) == 'table' then
+            -- A module's requirements follow Author in the same form: a heading, then the
+            -- list in a disabled button like the version's, so it is indented the same.
+            local requirements
+            if type(api) == 'table' and api.caption and api.button and api.setText and #card.links > 0 then
+                local ok, err = pcall(function()
+                    local block = assert(card.links[#card.links].widget:GetParent(), 'details card')
+                    local heading = api.caption(tree, api.t and api.t('Requirements') or 'Requirements')
+                    heading:SetJustification(0)
+                    assert(block:AddChild(heading), 'requirements heading')
+                    local button, label = api.button(tree, '')
+                    button.IsFocusable = false
+                    label:SetJustification(0)
+                    local content = assert(label.Slot, 'requirements text slot')
+                    content:SetHorizontalAlignment(0);content:SetVerticalAlignment(2)
+                    content:SetPadding({Left=0, Top=6, Right=0, Bottom=6})
+                    if api.Theme then api.Theme.textColor(label, 'muted') end
+                    local rowSlot = assert(block:AddChild(button), 'requirements list')
+                    rowSlot:SetPadding({Left=0, Top=4, Right=0, Bottom=0})
+                    button:SetIsEnabled(false)
+                    heading:SetVisibility(1);button:SetVisibility(1)
+                    requirements = {heading=heading, widget=button, label=label}
+                end)
+                if not ok then report('BROWSER_GROUPS_FAILED', err) end
+            end
+            card.mcRequirements = requirements
             local show = card.show
             function card:show(index, ...)
                 local result = show(self, index, ...)
@@ -677,7 +756,24 @@ function M.install(pages, report, parse, folderVersion, folderManifest, grouping
                         link.heading:SetVisibility(1);link.widget:SetVisibility(1)
                     end
                 end
+                if requirements then
+                    local checked = provider and provider.mcRequirements
+                    if checked then api.setText(requirements.label, Requirements.describe(checked)) end
+                    requirements.heading:SetVisibility(checked and 0 or 1)
+                    requirements.widget:SetVisibility(checked and 0 or 1)
+                end
                 return result
+            end
+        end
+        -- Without the card's list, the requirements end the module's description instead.
+        if not (type(card) == 'table' and card.mcRequirements) then
+            for _, provider in ipairs(providers) do
+                if provider.mcRequirements and not provider.mcRequirementsDescribed then
+                    provider.mcRequirementsDescribed = true
+                    local description = trimmed(provider.description)
+                    provider.description = (description and description .. '\n\n' or '') .. 'Requirements\n'
+                        .. Requirements.describe(provider.mcRequirements)
+                end
             end
         end
         if type(page)=='table' and type(page.setFilter)=='function' then
@@ -1006,6 +1102,39 @@ function M.install(pages, report, parse, folderVersion, folderManifest, grouping
                             labelSlot:SetVerticalAlignment(2);labelSlot:SetSize({SizeRule=1, Value=1})
                             labelSlot:SetPadding({Left=0, Top=padding.Top, Right=padding.Right, Bottom=padding.Bottom})
                             row.mcNumbered = true
+                        end)
+                        if not ok then report('BROWSER_GROUPS_FAILED', err) end
+                    end
+                end
+            end
+            -- A module whose requirements are not all met carries a small red mark at its
+            -- right, centred on the row. The row's content moves into an overlay with the
+            -- mark over it.
+            if type(api) == 'table' and api.construct and api.caption then
+                for _, row in ipairs(page.allRows or {}) do
+                    local provider = providers[row.providerIndex]
+                    local requirements = provider and provider.mcRequirements
+                    if requirements and not requirements.met and not row.mcRequirementMark then
+                        local ok, err = pcall(function()
+                            local content = assert(row.widget:GetContent(), 'mod-list row content')
+                            local padding = content.Slot.Padding
+                            padding = {Left=padding.Left, Top=padding.Top, Right=padding.Right, Bottom=padding.Bottom}
+                            local stack = api.construct('/Script/UMG.Overlay', tree)
+                            local stackSlot = assert(row.widget:SetContent(stack), 'requirement mark row')
+                            stackSlot:SetHorizontalAlignment(0);stackSlot:SetVerticalAlignment(0)
+                            stackSlot:SetPadding({Left=0, Top=0, Right=0, Bottom=0})
+                            local contentSlot = assert(stack:AddChild(content), 'requirement mark content')
+                            contentSlot:SetHorizontalAlignment(0);contentSlot:SetVerticalAlignment(0)
+                            contentSlot:SetPadding(padding)
+                            local mark = api.caption(tree, Requirements.UNMET)
+                            if api.Theme and api.theme then api.Theme.font(mark, api.theme, MARK_SIZE) end
+                            mark:SetColorAndOpacity({SpecifiedColor=MARK_UNMET,
+                                ColorUseRule=0})
+                            local markSlot = assert(stack:AddChild(mark), 'requirement mark')
+                            markSlot:SetHorizontalAlignment(3);markSlot:SetVerticalAlignment(2)
+                            -- Centred in the padded slot: a top padding of twice the drop lowers it by the drop.
+                            markSlot:SetPadding({Left=0, Top=2 * MARK_DROP, Right=MARK_INSET, Bottom=0})
+                            row.mcRequirementMark = mark
                         end)
                         if not ok then report('BROWSER_GROUPS_FAILED', err) end
                     end

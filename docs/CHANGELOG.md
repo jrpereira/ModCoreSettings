@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.7.0
+
+- The mod list marks each module whose `mod.json` dependencies are not all loaded at a
+  version they accept with a red `⚠` at its right. Its details show a Requirements section
+  after Author listing each dependency with the version it needs and the one loaded,
+  mismatches first.
+
 ## v1.6.0
 
 - A field-type editor can declare `help`: how to use its control, shown in its own box

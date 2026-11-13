@@ -71,6 +71,8 @@ extension={
         -- Menu data unfolds value lists with the contributors' own client.
         package.loaded.menu_contributions=contributions
         local presentation=module('presentation')
+        -- Whether each module's dependencies are loaded, for the browser's requirement marks.
+        package.loaded.mod_requirements=module('mod_requirements')
         local browserGroups=module('browser_groups')
         local moduleCategories=module('module_categories')
         local taxonomyModule=module('mcs_taxonomy')

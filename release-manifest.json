@@ -28,6 +28,7 @@
     "Scripts/main.lua": "Scripts/main.lua",
     "Scripts/mcs_page.lua": "Scripts/mcs_page.lua",
     "Scripts/mcs_folder_info.lua": "Scripts/mcs_folder_info.lua",
+    "Scripts/mod_requirements.lua": "Scripts/mod_requirements.lua",
     "Scripts/mcs_files.lua": "Scripts/mcs_files.lua",
     "Scripts/mcs_protocols.lua": "Scripts/mcs_protocols.lua",
     "Scripts/mcs_choice_sound.lua": "Scripts/mcs_choice_sound.lua",

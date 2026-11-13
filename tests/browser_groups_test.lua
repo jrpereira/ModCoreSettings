@@ -523,3 +523,133 @@ assert(items.MCS_Page and #items.MCS_Page.values==3 and items.MCS_Page.labels[2]
     and items.SortBy.file=='config.ini' and items.SortBy.section=='Modules',
     'the tabs parse through DMM beside the page\'s own settings')
 print('PASS the index tabs parse through DMM')
+
+-- A module with dependencies is checked against the loaded modules (the register's active
+-- folders, by mod.json id or folder name): its row carries a red mark unless all are met,
+-- and its description lists each with the version loaded, unmet ones first.
+do
+    local files={['Mods/Uses/mod.json']='{"id":"Uses","name":"Uses","dependencies":[{"id":"UE4SS"},'
+            ..'{"id":"Lib","version":"1.6.?+"},{"id":"DawnwalkerModMenu","version":"1.0.7.1+"}]}',
+        ['Mods/Old/mod.json']='{"id":"Old","name":"Old","dependencies":[{"id":"Lib","version":"2.?.?+"},{"id":"Gone"}]}',
+        ['Mods/1_Lib/mod.json']='{"id":"Lib","name":"The Lib"}',['Mods/1_Lib/VERSION']='1.6.3\n',
+        ['Mods/Plain/mod.json']='{"id":"Plain","name":"Plain"}',
+        ['Mods/DawnwalkerModMenu/Scripts/main.dmm.lua']='-- DMM\nlocal X = 1\nlocal VERSION = "1.0.7.1"\n'}
+    local function open(path)
+        local content=files[path]
+        return content and {read=function(_,n) return content:sub(1,n) end,close=function() end} or nil
+    end
+    local version=Groups.folderVersion('Mods/',open)
+    assert(version('1_Lib')=='1.6.3' and version('DawnwalkerModMenu')=='1.0.7.1' and version('Plain')==nil,
+        'a version comes from VERSION, dlls/main.json or the main script\'s VERSION line')
+    local manifest=Groups.folderManifest('Mods/',open)
+    assert(manifest('Old').dependencies[1].id=='Lib' and manifest('Old').dependencies[1].version=='2.?.?+'
+        and manifest('Old').dependencies[2].version==nil)
+    local register={}
+    for _,folder in ipairs({'Uses','Old','1_Lib','Plain','DawnwalkerModMenu'}) do
+        register[folder]=Tax:entry({categories={'tools'},tags={},id=files['Mods/'..folder..'/mod.json'] and
+            files['Mods/'..folder..'/mod.json']:match('"id":"(%w+)"') or nil})
+    end
+    local items={{id='Uses',name='Uses',mcFolder='Uses',description='Does things.',choices={{id='u'}}},
+        {id='Old',name='Old',mcFolder='Old',choices={{id='o'}}},
+        {id='Plain',name='Plain',mcFolder='Plain',choices={{id='p'}}}}
+    local function node(name)
+        local n={name=name,children={}}
+        function n:AddChild(child)
+            child.parent=self;self.children[#self.children+1]=child
+            child.Slot={Padding={Left=20,Top=1,Right=2,Bottom=1}}
+            function child.Slot:SetPadding(p) self.Padding=p end
+            function child.Slot:SetHorizontalAlignment(h) self.horizontal=h end
+            function child.Slot:SetVerticalAlignment(v) self.vertical=v end
+            return child.Slot
+        end
+        function n:SetContent(child) self.children={};return self:AddChild(child) end
+        function n:GetContent() return self.children[1] end
+        function n:SetColorAndOpacity(color) self.color=color.SpecifiedColor end
+        return n
+    end
+    -- DMM's rows are buttons holding their label.
+    local pages=browserPages()
+    local inner=pages.build
+    pages.build=function(...)
+        local built=inner(...)
+        for _,row in ipairs(built.allRows) do
+            for key,value in pairs(node('button')) do row.widget[key]=value end
+            row.widget:SetContent(node('label'))
+        end
+        return built
+    end
+    Groups.install(pages,nil,nil,version,manifest,function() return {categoryRegister=register} end)
+    local page=pages.build({},items,nil,{setText=function() end,construct=function(class) return node(class) end,
+        caption=function(_,text) local c=node('caption');c.text=text;return c end})
+    local byId={};for _,provider in ipairs(items) do byId[provider.id]=provider end
+    assert(byId.Uses.mcRequirements.met and not byId.Old.mcRequirements.met and byId.Plain.mcRequirements==nil)
+    -- Without the card's list (this page's card has no widgets to add to), the
+    -- requirements end the description, once.
+    local usesText='Requirements\n √    DawnwalkerModMenu 1.0.7.1+: 1.0.7.1\n √    The Lib 1.6.0+: 1.6.3\n √    UE4SS: loaded'
+    assert(byId.Uses.description=='Does things.\n\n'..usesText,byId.Uses.description)
+    assert(byId.Old.description=='Requirements\n⚠  Gone: not loaded\n⚠  The Lib 2.0.0+: 1.6.3 (too old)',
+        byId.Old.description)
+    pages.build({},items,nil,{})
+    assert(byId.Uses.description=='Does things.\n\n'..usesText,'described once')
+    local marks={}
+    for _,row in ipairs(page.allRows) do
+        local provider=items[row.providerIndex]
+        local stack=row.widget:GetContent()
+        if row.mcRequirementMark then
+            assert(stack.name=='/Script/UMG.Overlay' and stack.children[1].name=='label'
+                and stack.children[1].Slot.Padding.Left==20 and stack.children[2]==row.mcRequirementMark
+                and row.mcRequirementMark.Slot.horizontal==3 and row.mcRequirementMark.Slot.vertical==2,
+                'the row keeps its label and its padding, with the mark at the right, centred')
+            marks[provider.id]=row.mcRequirementMark
+        else assert(stack.name=='label','a module without requirements is unchanged') end
+    end
+    assert(not marks.Uses and marks.Old.text=='⚠' and marks.Old.color.R>marks.Old.color.G
+        and marks.Old.color.A==0.7 and not marks.Plain,'only unmet requirements are marked')
+    -- With DMM's details card, the requirements follow Author as a heading and an indented
+    -- list, the same form as Version and Author, shown only for a module that has them.
+    local cardItems={{id='Uses',name='Uses',mcFolder='Uses',description='Card.',choices={{id='u'}}},
+        {id='Plain',name='Plain',mcFolder='Plain',choices={{id='p'}}}}
+    local cardPages=browserPages()
+    local cardInner=cardPages.build
+    local block=node('block')
+    cardPages.build=function(...)
+        local built=cardInner(...)
+        for _,link in ipairs(built.browserCard.links) do block:AddChild(link.heading);block:AddChild(link.widget) end
+        for _,link in ipairs(built.browserCard.links) do
+            function link.widget:GetParent() return self.parent end
+        end
+        return built
+    end
+    Groups.install(cardPages,nil,nil,version,manifest,function() return {categoryRegister=register} end)
+    local function shown(w) return w.visibility end
+    local cardApi={setText=function(w,text) w.text=text end,construct=function(class) return node(class) end,
+        caption=function(_,text)
+            local c=node('caption');c.text=text
+            function c:SetJustification(j) self.justification=j end
+            function c:SetVisibility(v) self.visibility=v end
+            return c
+        end,
+        button=function(_,text)
+            local b=node('button');local l=node('label');l.text=text;b:SetContent(l)
+            function l:SetJustification(j) self.justification=j end
+            function b:SetIsEnabled(e) self.enabled=e end
+            function b:SetVisibility(v) self.visibility=v end
+            return b,l
+        end}
+    local cardPage=cardPages.build({},cardItems,nil,cardApi)
+    local heading,list=block.children[5],block.children[6]
+    assert(heading and heading.text=='Requirements' and heading.justification==0 and list.name=='button'
+        and list.enabled==false and list.IsFocusable==false and list.Slot.Padding.Top==4
+        and list.children[1].Slot.Padding.Top==6,'a heading and a disabled button follow Author')
+    local at={};for index,provider in ipairs(cardItems) do at[provider.id]=index end
+    cardPage.browserCard:show(at.Uses)
+    assert(shown(heading)==0 and shown(list)==0 and list.children[1].text==(usesText:gsub('^Requirements\n','')))
+    cardPage.browserCard:show(at.Plain)
+    assert(shown(heading)==1 and shown(list)==1,'hidden for a module without requirements')
+    assert(cardItems[at.Uses].description=='Card.','the description is left alone')
+    -- Without a register the loaded modules are unknown: nothing is marked.
+    local bare={{id='Uses',name='Uses',mcFolder='Uses',choices={{id='u'}}}}
+    Groups.arrange(bare,nil,nil,{folderManifest=manifest,folderVersion=version})
+    assert(bare[#bare].mcRequirements==nil and bare[#bare].description==nil)
+end
+print('PASS modules with requirements are marked and describe each dependency')

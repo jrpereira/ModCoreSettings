@@ -74,6 +74,10 @@ Settings page sets the rest:
 - **Alphabetical** and **Load Order** (numbered) list one mod per line.
 - **Modules per row** sets 1, 2 or 3 mods per row in Categories and Recently Added.
 
+A module whose `mod.json` dependencies are not all loaded at a version they accept
+carries a red ⚠ at the right of its row. Its details list each requirement after
+Author: the version it needs and the one loaded, unmet ones first.
+
 Mods without settings fold into a final "and N more" entry in each group. The
 **Templates** tab shows ModCore Templates' loaded templates by category, the active ones
 marked; **Developer Tools**
