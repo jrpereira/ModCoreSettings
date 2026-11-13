@@ -153,12 +153,14 @@ in the caption, `70% - 90%`. A saved value off a step, outside `Min`/`Max` or ou
 the delta limits falls back to the default.
 
 The row is drawn like a slider: the span above, 2 points smaller; a thin line, lit and
-thicker across the span; a thin handle at each end. Left/Right highlight the low or high
-handle (a white contour); Enter (A on a controller) grabs it, Left/Right then move it a step, and Enter lets go. Markers stop at `Min`,
-`Max`, `LowMax`, `HighMin`, `DeltaMin` and `DeltaMax`. Leaving the row lets go. While the row is selected,
-the footer shows `ADJUST`, or `DONE` while a marker is grabbed, beside the Enter or A
-glyph. The mouse moves the nearer marker to the step it is pressed on and drags it
-while held. As with keybinds, numeric Apply events omit range values.
+thicker across the span; a thin handle at each end, shown while the row is hovered or
+selected. Left/Right highlight the low or high handle (a white contour); Enter (A on a
+controller) grabs it, hiding the other, Left/Right then move it a step, and Enter lets go.
+Markers stop at `Min`, `Max`, `LowMax`, `HighMin`, `DeltaMin` and `DeltaMax`. Leaving the
+row lets go. While the row is selected, the footer shows `ADJUST`, or `DONE` while a marker
+is grabbed, beside the Enter or A glyph, and a help box above the description explains the
+keys. The mouse moves the nearer marker to the step it is pressed on and drags it until
+the button is let go. As with keybinds, numeric Apply events omit range values.
 
 ## Add presentation only when needed
 

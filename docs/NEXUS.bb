@@ -5,7 +5,7 @@ ModCore Settings (MCS) extends Dawnwalker Mod Menu (DMM) with richer controls an
 [b]Features and benefits[/b]
 [list]
 [*]Keyboard and mouse keybind editors with Tap/Hold choices, optional clearing and inherited game-key display.
-[*]Tabs, cycling pickers, conditional rows, shared headings and navigation that does not alter saved settings.
+[*]Tabs, cycling pickers, two-handle ranges, conditional rows, shared headings and navigation that does not alter saved settings.
 [*]Mapped presets that update several pending settings together and recognize custom edits.
 [*]Generated pages and shared menu slots, so related mods can present settings together while retaining their own storage.
 [*]Numeric Apply notifications after successful saves, without configuration polling.

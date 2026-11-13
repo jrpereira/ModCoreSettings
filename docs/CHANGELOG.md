@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.6.0
+
+- A field-type editor can declare `help`: how to use its control, shown in its own box
+  between a setting's title and description, in 10-point dim text on a dim amber band. The
+  range row uses it to explain Enter (A) to grab and let go of a handle.
+- Clicking above a pip (or its share of the track) on an arrow picker's indicator chooses
+  that value; clicking either side of the indicator still steps like the arrow there.
+- A range row's handles show only while the row is hovered or selected, and while one is
+  grabbed the other hides. The mouse now drags reliably: a press takes the nearer handle and
+  it follows the pointer until the button is let go, even off the track.
+- Pickers and sliders share one row height (40) and value size (2 points smaller); a range
+  row's line sits where a slider's bar does. The selected page tab's underline is redrawn
+  inside the tab, and its label sits a pixel higher.
+- A row selected with the keyboard takes the focus, so the game's hidden cursor no longer
+  leaves another row looking hovered.
+- Fixed: A on a controller did not reach field-type editors such as the range row, and the
+  footer hint did not show the Enter glyph on a keyboard.
+- Fixed: Enter on a field-type editor could also press DMM's Back button, leaving the page.
+
 ## v1.5.0
 
 - `Type=range` settings pick a low and a high value on one track, stored as one text value

@@ -11,8 +11,9 @@ edits and Apply; your mod applies the saved values to gameplay.
 - **Edit keyboard and mouse bindings:** capture keys, choose Tap/Hold triggers,
   clear optional bindings and display inherited game controls. Your mod supplies
   text storage and input behavior.
-- **Organize larger menus:** use tabs, cycling pickers, conditional rows, shared
-  headings and navigation that does not change saved settings.
+- **Organize larger menus:** use tabs, cycling pickers, two-handle ranges,
+  conditional rows, shared headings and navigation that does not change saved
+  settings.
 - **Offer coordinated presets:** one choice updates several settings in DMM's
   pending model; individual edits can return the selection to Custom.
 - **Share menu space:** contribute pages or insert settings into another mod's
