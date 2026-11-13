@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.7.1
+
+- The Modules page places 33 more mods in a category by their folder name, from reviews of
+  newly harvested Nexus mods, and Combat Disengage now appears under Movement as well as
+  Combat.
+
 ## v1.7.0
 
 - The mod list marks each module whose `mod.json` dependencies are not all loaded at a
