@@ -584,8 +584,12 @@ linked.mcHeaderHost=widget()
 linked:show(1)
 assert(#linked.panels[1].rows[1].mcTabs==1
     and linked.panels[1].rows[1].mcTabs[1].label.text=='Consumables'
-    and linked.panels[1].rows[1].mcTabs[1].box.MinDesiredWidth==160,
-    'page links must display one clickable tab')
+    and linked.panels[1].rows[1].mcTabs[1].box.MinDesiredWidth==190,
+    'page links must display one clickable tab, as wide as a picker value')
+-- A link is underlined text, not an outlined choice; it glows only while hovered.
+local linkTab=linked.panels[1].rows[1].mcTabs[1]
+assert(linkTab.outline==nil and linkTab.underline,'a link has an underline and no outline')
+assert(linkTab.underline.BrushColor.A<0.5 and linkTab.label.opacity<1,'an idle link is dimmed')
 -- A link row's label wraps in its column and the row grows from a 40-pixel minimum.
 local linkRow=linked.panels[1].rows[1]
 assert(linkRow.mcLabel.AutoWrapText==true,'link labels wrap')
@@ -593,7 +597,7 @@ for _,box in ipairs({linkRow.widget:GetParent(),linkRow.wrapper}) do
     assert(box.heightCleared and box.HeightOverride==nil and box.MinDesiredHeight==40,
         'link rows grow to fit their label, from a 40-pixel minimum')
 end
-assert(linkRow.widget:GetParent().WidthOverride==584-160-24,'the label column keeps its width')
+assert(linkRow.widget:GetParent().WidthOverride==330,'a link label takes a picker label column')
 assert(not row.mcLabel.AutoWrapText and not row.wrapper.heightCleared,
     'ordinary tab rows keep a fixed single-line label')
 local linkSet=linked.model.set
@@ -605,8 +609,8 @@ linked.panels[1].rows[1].mcTabs[1].widget.clicked=true
 linked:tick({},function(w) local clicked=w.clicked;w.clicked=false;return clicked,false,false end,false)
 assert(linked.model.linkActivated,'the single link tab must activate even at its default value')
 items[1].mcNavigation,items[1].mcLinkPage=nil,nil
--- A read-only status whose choices share one label lines up with link rows: one 160-pixel
--- button that cannot be pressed.
+-- A read-only status whose choices share one label lines up with link rows: one button
+-- in a picker's value column that cannot be pressed.
 local labels=items[1].labels
 items[1].mcReadOnly,items[1].labels=true,{}
 for n in ipairs(labels) do items[1].labels[n]='No settings' end
@@ -615,7 +619,7 @@ status.mcHeaderHost=widget()
 status:show(1)
 local statusRow=status.panels[1].rows[1]
 assert(#statusRow.mcTabs==1 and statusRow.mcTabs[1].label.text=='No settings'
-    and statusRow.mcTabs[1].box.MinDesiredWidth==160 and statusRow.widget:GetParent().WidthOverride==584-160-24
+    and statusRow.mcTabs[1].box.MinDesiredWidth==190 and statusRow.widget:GetParent().WidthOverride==330
     and statusRow.mcTabs[1].enabled==false,
     'a read-only one-label status shows one disabled button placed like a link')
 items[1].mcReadOnly,items[1].mcNavigation=nil,true
@@ -624,7 +628,7 @@ local action=controls.build(widget(),{{id='ModCoreTemplates.module.VisualExample
 action.mcHeaderHost=widget()
 action:show(1)
 local actionRow=action.panels[1].rows[1]
-assert(#actionRow.mcTabs==1 and actionRow.mcTabs[1].label.text=='Play' and actionRow.mcTabs[1].box.MinDesiredWidth==160
+assert(#actionRow.mcTabs==1 and actionRow.mcTabs[1].label.text=='Play' and actionRow.mcTabs[1].box.MinDesiredWidth==190
     and actionRow.mcTabs[1].enabled==true,'a one-label navigation action shows one button that can be pressed')
 local actionSets=0
 local actionSet=action.model.set
@@ -711,8 +715,8 @@ local tabSlot=row.mcTabs[1].box:GetParent().Slot
 assert(tabSlot.HorizontalAlignment==3 and tabSlot.Padding.Right==24,
     'Tab pickers must align right with a 24-pixel inset')
 local linkTab=linked.panels[1].rows[1].mcTabs[1]
-assert(#linkTab.outline==4 and linkTab.box:GetParent().Slot.Padding.Right==24,
-    'Provider-link pickers must use the same outlined inset')
+assert(linkTab.outline==nil and linkTab.box:GetParent().Slot.Padding.Right==32,
+    'Provider links sit in a picker value column, ending at its right arrow')
 assert(row.mcTabs[1].selected and not row.mcTabs[2].selected)
 assert(ui.panels[1].rows[2].mcLabel.text=='Slot 5')
 local scroll=ui.panels[1].scroll
@@ -1464,10 +1468,10 @@ local valueSize=noteRow.mcValueSize
 assert(noteBox.visible==1 and noteRow.value.Slot.Padding.Bottom==4 and valueSize
     and noteRow.value.Font.Size==valueSize-2)
 noteUi.model.pending[1]=7;noteUi:refresh()
-assert(noteBox.visible==3 and noteRow.mcNote.text=='Fangdango' and noteRow.value.Slot.Padding.Bottom==4
-    and noteBox.Slot.Padding.Bottom==5 and noteRow.mcPipBox.Slot.Padding.Bottom==-1
+assert(noteBox.visible==3 and noteRow.mcNote.text=='Fangdango' and noteRow.value.Slot.Padding.Bottom==8
+    and noteBox.Slot.Padding.Bottom==7 and noteRow.mcPipBox.Slot.Padding.Bottom==1
     and noteRow.value.Font.Size==valueSize-2,
-    'a noted choice shows its note without taking clicks, and the value moves up at the same size')
+    'a noted choice shows its note without taking clicks, and the value, note and indicator move up 2 pixels')
 noteUi.model.pending[1]=0;noteUi:refresh()
 assert(noteBox.visible==1 and noteRow.value.Slot.Padding.Bottom==4 and noteRow.value.Font.Size==valueSize-2,'back to one line')
 -- A picker with arrows shows one pip per choice under its value, the current one lit,
@@ -1623,7 +1627,7 @@ do
     assert(row.value.Font.Size==12 and row.value.Slot.HorizontalAlignment==0 and row.value.Justification==1
         and row.value.Slot.VerticalAlignment==2 and row.value.Slot.Padding.Bottom==6 and row.value.visible==3,
         'the value is 2 points smaller, its text centred across the control, 3 pixels up, never hit-tested')
-    assert(bar.span==142 and bar.bar.WidthOverride==142 and bar.bar.HeightOverride==10 and bar.bar.Slot.Padding.Bottom==4
+    assert(bar.span==142 and bar.bar.WidthOverride==142 and bar.bar.HeightOverride==10 and bar.bar.Slot.Padding.Bottom==2
         and row.slider.Slot.Padding.Left==24 and row.slider.Slot.Padding.Right==24 and row.slider.opacity==0,
         'the bar takes 75% of the control, centred, and the invisible native slider spans it')
     assert(bar.filled.WidthOverride==71 and bar.filled.HeightOverride==4,'the lit part is 4 tall, filled to the value')

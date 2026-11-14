@@ -48,6 +48,13 @@ local subheadingSize,subheadingShift,subheadingTop,nestedIndent,nestedShrink=15,
 local nestedRowShrink,nestedValueShrink,nestedValueLift=4,1,0
 -- A subgroup row: one in a subgroup (mcWithin) that shows its heading. A subgroup without
 -- a heading reads as its parent's own rows, so its rows are drawn as theirs.
+-- A row that opens another page. Its label lines up with the rows around it whatever its
+-- text style, and its button is drawn as underlined text, not a framed choice.
+local function linkRow(setting)
+    return (setting.mcNavigation and setting.mcLinkPage) and true or false
+end
+-- A link's text and underline at rest, and while hovered or selected (the glow).
+local linkIdleOpacity,linkLineIdle,linkLineGlow=0.7,{R=0.95,G=0.63,B=0.08,A=0.35},{R=0.95,G=0.63,B=0.08,A=1}
 local function subgroupRow(setting)
     return setting.mcGroup~=nil and setting.mcGroup.within~=nil and setting.mcGroup.heading~=false
 end
@@ -89,7 +96,7 @@ local pipOn,pipOff={R=0.95,G=0.63,B=0.08,A=0.9},{R=0.62,G=0.55,B=0.42,A=0.35}
 -- row is hovered or selected, a 3-pixel mark (lit between two dim lines) stands at the value,
 -- sliderMarkHeight tall from sliderMarkAbove above the bar. The bar sits sliderBottom above
 -- the row's bottom.
-local sliderValueShrink,sliderShare,sliderMarkHeight,sliderMarkAbove,sliderBottom=2,0.75,10,2,4
+local sliderValueShrink,sliderShare,sliderMarkHeight,sliderMarkAbove,sliderBottom=2,0.75,10,2,2
 -- The slider's value sits sliderValueLift pixels above the control's centre.
 local sliderValueLift=3
 -- A picker's value column in DMM's row: 330 of label and a 32-pixel arrow before it, 190
@@ -104,12 +111,13 @@ local pickerRowHeight,notedPickerRowHeight,labelDrop,toggleShift=40,40,1,14
 -- around to the other end, as does a click on that side of the value.
 local edgeArrowOpacity=0.5
 -- A choice note's size, and how far up the note sits while the current choice has one.
-local noteSize,noteRaise=10,5
+-- Over a note, the value and the indicator also sit notedLift pixels higher.
+local noteSize,noteRaise,notedLift=10,7,2
 -- DMM centres a picker's value, so bottom padding raises it by half: noteValueLift raises
--- it 2 pixels over a note. An arrow picker showing no note raises its value 2 pixels
+-- it 4 pixels over a note. An arrow picker showing no note raises its value 2 pixels
 -- (plainValueLift), while its indicator sits plainPipLift higher. Either way the value is
 -- pickerValueShrink points smaller, as a slider's is.
-local noteValueLift,plainValueLift,pickerValueShrink,plainPipLift=4,4,2,6
+local noteValueLift,plainValueLift,pickerValueShrink,plainPipLift=4+2*notedLift,4,2,6
 -- The indicator's opacity while its row is not hovered: half of full.
 local pipIdleOpacity=0.5
 -- The current pip (or thumb) is pipHotHeight tall while its row is hovered or selected,
@@ -665,7 +673,7 @@ function M.install(choices,controls,pages,options)
                     buttonSettingIndex=buttonSettingIndex+1
                     buttonsToSkip=nextSetting.kind=='picker' and 3 or 0
                     if nextSetting.mcCategory then pendingCategoryRule=button end
-                    if nextSetting.mcFont==nil and not nextSetting.mcHeader then
+                    if (nextSetting.mcFont==nil or linkRow(nextSetting)) and not nextSetting.mcHeader then
                         local style=button.WidgetStyle
                         local normal,pressed=style.NormalPadding,style.PressedPadding
                         rowButtonInset[button]=normal.Left
@@ -956,7 +964,10 @@ function M.install(choices,controls,pages,options)
                         for _,text in ipairs(setting.labels) do same=same and text==setting.labels[1] end
                         providerLink=providerLink or same
                     end
-                    local totalWidth=providerLink and 160 or
+                    -- A single button takes a picker's value column, so it lines up with the
+                    -- values of the rows around it.
+                    local link=linkRow(setting)
+                    local totalWidth=providerLink and pickerValueWidth or
                         (setting.mcReferenceLabel and 150 or (setting.mcTabsWidth or math.min(384,110*count)))
                     local choices={}
                     for n,value in ipairs(setting.values) do
@@ -977,17 +988,32 @@ function M.install(choices,controls,pages,options)
                         -- Stretch the text block across the button, then let centered
                         -- text justification position its contents.
                         label.Slot:SetHorizontalAlignment(0);label.Slot:SetVerticalAlignment(2)
-                        local frame,outline=outlined(button)
+                        local frame,outline,underline=button,nil,nil
+                        if link then
+                            -- Underlined text: the line sits under the text, as wide as it.
+                            local text=new('VerticalBox')
+                            local textSlot=api.need(button:SetContent(text),'MCS link text')
+                            textSlot:SetHorizontalAlignment(2);textSlot:SetVerticalAlignment(2)
+                            add(text,label):SetHorizontalAlignment(0)
+                            underline=new('Border');underline:SetBrushColor(linkLineIdle)
+                            local lineBox=new('SizeBox');lineBox:SetHeightOverride(1)
+                            api.need(lineBox:SetContent(underline),'MCS link underline')
+                            add(text,lineBox):SetPadding({Left=0,Top=1,Right=0,Bottom=0})
+                            label:SetRenderOpacity(linkIdleOpacity)
+                        else
+                            frame,outline=outlined(button)
+                        end
                         local box=tabSized(frame,choice.width,32)
                         local boxSlot=add(tabs,box)
                         boxSlot:SetVerticalAlignment(2)
                         if n>1 then boxSlot:SetPadding({Left=4,Top=0,Right=0,Bottom=0}) end
                         row.mcTabs[#row.mcTabs+1]={widget=button,label=label,value=choice.value,pressed=false,pointer=false,
-                            box=box,outline=outline}
+                            box=box,outline=outline,underline=underline,glow=false}
                     end
                     local overlay=row.background:GetParent()
                     local slot=add(overlay,tabs);slot:SetHorizontalAlignment(3);slot:SetVerticalAlignment(2)
-                    slot:SetPadding({Left=0,Top=0,Right=pickerRightMargin,Bottom=0})
+                    local rightMargin=providerLink and pickerArrowWidth or pickerRightMargin
+                    slot:SetPadding({Left=0,Top=0,Right=rightMargin,Bottom=0})
                     if setting.mcReadOnly and setting.mcReferenceLabel then
                         local reference,text=api.button(tree,setting.mcReferenceLabel)
                         reference.IsFocusable=false;reference:SetIsEnabled(false)
@@ -998,7 +1024,8 @@ function M.install(choices,controls,pages,options)
                         referenceSlot:SetHorizontalAlignment(3);referenceSlot:SetVerticalAlignment(2)
                         referenceSlot:SetPadding({Left=0,Top=0,Right=pickerRightMargin,Bottom=0})
                     end
-                    row.widget:GetParent():SetWidthOverride(PAGE_WIDTH-totalWidth-pickerRightMargin)
+                    row.widget:GetParent():SetWidthOverride(providerLink and pickerLabelWidth
+                        or PAGE_WIDTH-totalWidth-pickerRightMargin)
                     if providerLink then
                         -- A link row's label wraps within its column and the row grows to
                         -- fit; one line keeps DMM's 40-pixel row. The button stays centred.
@@ -1645,7 +1672,7 @@ function M.install(choices,controls,pages,options)
                         row.value.Slot:SetPadding({Left=padding.Left,Top=padding.Top,Right=padding.Right,
                             Bottom=(noted and noteValueLift or plainValueLift)+(row.mcValueLift or 0)})
                         row.mcPipBox.Slot:SetPadding({Left=row.mcPipLeft,Top=0,Right=0,
-                            Bottom=noted and pipBottom or pipBottom+plainPipLift})
+                            Bottom=noted and pipBottom+notedLift or pipBottom+plainPipLift})
                         row.mcPipNoted=noted
                     end
                     local current=1
@@ -1839,7 +1866,10 @@ function M.install(choices,controls,pages,options)
                 if heading.visible then categoryAdded=true end
                 for i=heading.first,heading.last do
                     local row,setting=panel.rows[i],self.model.items[i]
-                    if row.mcLabel and setting.mcFont==nil and not setting.mcHeader then
+                    -- A styled link row (a notice with a link) keeps its text style and
+                    -- spacing but lines up with the rows around it.
+                    local styled=setting.mcFont~=nil
+                    if row.mcLabel and not setting.mcHeader and (not styled or linkRow(setting)) then
                         -- An mcCategory row stands in for its group's heading: it takes
                         -- the heading's look, and the rows after it indent beneath it.
                         local beforeCategory=setting.mcCategory or not categoryAdded
@@ -1852,7 +1882,7 @@ function M.install(choices,controls,pages,options)
                         -- A subgroup's rows indent further, a little smaller.
                         local nested=not beforeCategory and subgroupRow(setting)
                         local style=beforeCategory and 'category' or nested and 'nested' or 'row'
-                        if row.mcCategoryStyle~=style then
+                        if not styled and row.mcCategoryStyle~=style then
                             -- The restyle starts from the base face; a dirty row keeps its
                             -- dirty face on the new style.
                             if row.mcDirty then dirtyFace(row,false) end
@@ -1910,7 +1940,7 @@ function M.install(choices,controls,pages,options)
                         -- An mcCategory row's rule hugs it, with no space between.
                         local top=beforeCategory and categoryTop or 0
                         local bottom=beforeCategory and not setting.mcCategory and 4 or 0
-                        if wrapperPadding.Top~=top or wrapperPadding.Bottom~=bottom then
+                        if not styled and (wrapperPadding.Top~=top or wrapperPadding.Bottom~=bottom) then
                             wrapperSlot:SetPadding({Left=wrapperPadding.Left,Top=top,
                                 Right=wrapperPadding.Right,Bottom=bottom})
                         end
@@ -2081,6 +2111,13 @@ function M.install(choices,controls,pages,options)
                         for _,tab in ipairs(row.mcTabs or {}) do
                             tab.hovered=not controller and tab.widget:IsHovered()==true
                             if tab.header then paintHeaderTab(tab) end
+                            -- A link glows while hovered, or while its row is selected.
+                            local glow=tab.underline and (tab.hovered or controller and self.current==i) or false
+                            if tab.underline and tab.glow~=glow then
+                                tab.underline:SetBrushColor(glow and linkLineGlow or linkLineIdle)
+                                tab.label:SetRenderOpacity(glow and 1 or linkIdleOpacity)
+                                tab.glow=glow
+                            end
                         end
                         for _,tab in ipairs(row.mcTabs or {}) do
                             local clicked

@@ -350,8 +350,9 @@ a value. It requires `mcNavigation=1` and works in any manifest. With unapplied
 changes the link is refused and the page shows a status message.
 `mcLinkPage=<provider>:<slot>` opens the page that hosts that slot, sets its
 navigation pickers so the slot shows, and selects the slot's first row. With
-`mcType=tab`, a link shows one button labelled with its first choice. `mcLevel=5`
-sets the row label in small (12pt) muted text, which suits a notice.
+`mcType=tab`, a link shows its first choice as underlined text in a picker's value
+column, dimmed until hovered or selected. Its label lines up with the rows around it.
+`mcLevel=5` sets the row label in small (12pt) muted text, which suits a notice.
 
 ## Apply notifications
 

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- A page link is drawn as underlined text in the value column, dimmed until hovered,
+  instead of a framed button; its label lines up with the rows around it.
+- Sliders sit 2 pixels lower, level with pickers' choice indicators.
+- A picker showing a choice note draws its value, note and indicator 2 pixels higher.
+- Key names longer than 10 characters are drawn 2pt smaller in the keybind editor.
 - Menu data enums can be keyed: each choice has a text `key` instead of a number `value`,
   and the setting is saved, loaded and notified as that key. Adding, removing or reordering
   choices keeps every saved key that is still offered, and a key that is not falls back to
