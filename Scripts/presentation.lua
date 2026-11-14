@@ -1276,8 +1276,9 @@ function M.install(choices,controls,pages,options)
                     row.widget:GetParent():SetWidthOverride(pickerValueLeft)
                     surfaceBox:SetWidthOverride(width)
                     valueBox:SetWidthOverride(0);valueBox:SetVisibility(1)
+                    -- Wrappers are new on every lookup, so widgets compare by full name.
                     local track=surface:GetChildAt(0)
-                    if track and track~=row.slider then track:SetVisibility(1) end
+                    if track and track:GetFullName()~=row.slider:GetFullName() then track:SetVisibility(1) end
                     row.slider.Slot:SetPadding({Left=margin,Top=0,Right=margin,Bottom=0})
                     -- DMM shows the native handle on a hovered or selected row; the mark
                     -- replaces it. Opacity leaves the slider's input as it was.
