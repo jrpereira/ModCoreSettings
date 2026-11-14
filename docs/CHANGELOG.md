@@ -18,6 +18,12 @@
   and Apply saves every row, instead of failing with "config changed externally" after the
   first.
 
+- The Modules page counts a mod enabled in `Mods/mods.txt` (`Name : 1`) as loaded, as
+  UE4SS does, instead of only folders holding `enabled.txt`; such mods and their settings
+  pages are no longer dropped, nor reported as missing requirements.
+- Load Order follows the order UE4SS starts Lua mods: `mods.txt` entries first, in file
+  order, then the remaining folders by upper-cased name, so `ModA` now precedes `Mod_X`.
+
 ## v1.7.1
 
 - The Modules page places 33 more mods in a category by their folder name, from reviews of

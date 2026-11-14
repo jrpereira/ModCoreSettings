@@ -101,6 +101,29 @@ for _,found in ipairs(R.folders({__absolute_path='/mods',SaveBackupManager=folde
     AuditTrail=folder(),['Old.bak']=folder()},'/mods')) do named[#named+1]=found.name end
 assert(table.concat(named,',')=='ArchiveOfLore,AuditTrail,SaveBackupManager','mod folder names are not filtered by word')
 
+-- mods.txt: a folder enabled there (`Name : 1`) is active without enabled.txt. Load order
+-- puts mods.txt entries first, in file order, then the rest by upper-cased name ('A' < '_').
+do
+    local function bare() return {Scripts={__files={{__name='main.lua'}}}} end
+    local snapshot={__absolute_path='/mods',__files={{__name='mods.txt'}},Zeta=bare(),ModA=scripts(),
+        Mod_X=scripts(),modB=scripts(),Off=bare(),Disabled0=bare()}
+    local text='; UE4SS mods\n  Zeta : 1 ; first\nDisabled0 : 0\nGhost : 1\n#Off : 1\n'
+    local order={}
+    for _,found in ipairs(R.folders(snapshot,'/mods',function(path) assert(path=='/mods/mods.txt');return text end)) do
+        order[#order+1]=found.name..'='..found.order
+    end
+    assert(table.concat(order,',')=='Zeta=1,ModA=2,modB=3,Mod_X=4',table.concat(order,','))
+    order={}
+    for _,found in ipairs(R.folders(snapshot,'/mods')) do order[#order+1]=found.name end
+    assert(table.concat(order,',')=='ModA,modB,Mod_X','without a reader only enabled.txt counts')
+    local seen=0
+    local index=R.boot('/mods/MCS','/mods',function() return snapshot end,{database=folderData,mkdir=function() end,
+        read=function(path) if path=='/mods/mods.txt' then seen=seen+1;return text end end,write=function() end})
+    assert(seen==1 and index.modules.Zeta.load_order==1 and index.modules.Mod_X.load_order==4,
+        'the index carries each folder\'s load order')
+    assert(table.concat(R.modsList('A:1\nB : 0\n  c :1 # x\n:1\n'),',')=='a,c')
+end
+
 -- An existing cache folder is found by its probe, without a shell; a missing one is made.
 local temp=(os.getenv('TMPDIR') or '/tmp')..'/mcs_mkdir_'..tostring(os.time())..'_'..math.random(1e6)
 local execute=os.execute

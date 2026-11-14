@@ -352,17 +352,23 @@ function M.arrange(providers, parse, report, options)
     end
     local order = {}
     for index, provider in ipairs(listed) do order[provider] = index end
-    -- Within a group mods follow load order: UE4SS starts mod folders by name, so
-    -- numbered folders (0_, 1_ ... 9_) keep their sequence. Pages without a folder keep
-    -- their place ahead of them.
+    -- Within a group mods follow load order: the register's load_order, which puts mods.txt
+    -- entries first in file order and the rest by upper-cased folder name, as UE4SS starts
+    -- Lua mods. A folder missing from the register follows by upper-cased name. Pages without
+    -- a folder keep their place ahead of them.
     local loaded = {}
     do
-        local byFolder = {}
+        local byFolder, orders = {}, options.categoryRegister or {}
         for index, provider in ipairs(listed) do
-            byFolder[index] = {provider=provider, index=index,
-                folder=tostring(folderOf(provider) or ''):lower()}
+            local folder = folderOf(provider)
+            local entry = folder and orders[folder]
+            byFolder[index] = {provider=provider, index=index, named=folder ~= nil,
+                order=type(entry) == 'table' and tonumber(entry.load_order) or math.huge,
+                folder=tostring(folder or ''):upper()}
         end
         table.sort(byFolder, function(a, b)
+            if a.named ~= b.named then return not a.named end
+            if a.order ~= b.order then return a.order < b.order end
             if a.folder ~= b.folder then return a.folder < b.folder end
             return a.index < b.index
         end)

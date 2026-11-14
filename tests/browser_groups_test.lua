@@ -74,6 +74,13 @@ Groups.arrange(folders,nil,nil,{groupModules=false,loadOrder=true})
 expect(folders,'ModCore.browser.group.plain,p,m1,m9','load order follows the folders')
 assert(folders[2].mcLoadIndex==nil and folders[3].mcLoadIndex==1 and folders[4].mcLoadIndex==2,
     'mods are numbered in load order; a page without a folder is not loaded, so not numbered')
+-- The register's load_order (mods.txt first) wins; folders it lacks follow by upper-cased
+-- name, so 'ModA' comes before 'Mod_X' ('A' < '_').
+local ordered={{id='x',name='X',mcFolder='Mod_X'},{id='a',name='A',mcFolder='ModA'},{id='z',name='Z',mcFolder='Zeta'},
+    {id='b',name='B',mcFolder='modB'}}
+Groups.arrange(ordered,nil,nil,{groupModules=false,loadOrder=true,categoryRegister={Zeta={load_order=1},modB={load_order=2}}})
+expect(ordered,'ModCore.browser.group.plain,z,b,a,x','load order follows the register, then upper-cased names')
+assert(ordered[2].mcLoadIndex==1 and ordered[5].mcLoadIndex==4)
 local quiet={{id='q',name='Quiet',mcFolder='1_Q',noSettings=true},{id='s',name='Set',mcFolder='2_S'}}
 Groups.arrange(quiet,nil,nil,{groupModules=false,loadOrder=true})
 expect(quiet,'ModCore.browser.group.plain,s,q,ModCore.browser.group.plain.more','in load order mods without settings still fold')

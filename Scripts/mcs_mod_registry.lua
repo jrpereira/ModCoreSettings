@@ -131,6 +131,7 @@ function M.update(options)
                 entry=Taxonomy:entry({categories={'other'},tags={},source='auto',
                     confidence='abstained',reason='insufficient_evidence'})
             end
+            entry.load_order=folder.order
             index.modules[folder.name]=entry
         end
     end
@@ -141,8 +142,31 @@ function M.update(options)
 end
 
 local function canonical(path) return path:gsub('\\','/'):gsub('/+$',''):lower() end
+local function fileNamed(node,wanted)
+    for _,file in pairs(node.__files or {}) do
+        if type(file)=='table' and type(file.__name)=='string' and file.__name:lower()==wanted then return true end
+    end
+    return false
+end
+-- Mods/mods.txt: the folders enabled there (`Name : 1`), lower-cased, in file order. UE4SS
+-- starts these first, then every other folder holding enabled.txt.
+function M.modsList(text)
+    local list={}
+    for line in ((text or '')..'\n'):gmatch('([^\n]*)\n') do
+        line=line:match('^%s*(.-)%s*$')
+        if not line:match('^[;#]') then
+            local name,flag=line:match('^(.-)%s*:%s*([01])%s*[;#]?.*$')
+            name=name and name:match('^%s*(.-)%s*$')
+            if name and name~='' and flag=='1' then list[#list+1]=name:lower() end
+        end
+    end
+    return list
+end
 -- UE4SS supplies a directory snapshot; entries are identified by their immediate folder name.
-function M.folders(snapshot,mods)
+-- read (optional) reads Mods/mods.txt when the snapshot lists it. Each folder's order is its
+-- place in UE4SS's start sequence: mods.txt entries in file order, then the rest by
+-- upper-cased name, the order NTFS lists them in.
+function M.folders(snapshot,mods,read)
     local wanted=canonical(mods);local found,visited=nil,0
     local function locate(node,depth)
         if type(node)~='table' or depth>64 then return end
@@ -157,17 +181,20 @@ function M.folders(snapshot,mods)
         end
     end
     locate(snapshot,0);assert(found,'active Mods directory missing from snapshot')
+    local listed={}
+    if read and fileNamed(found,'mods.txt') then
+        local ok,text=pcall(read,mods..'/mods.txt')
+        if ok and type(text)=='string' then listed=M.modsList(text) end
+    end
+    local first={}
+    for position,name in ipairs(listed) do first[name]=first[name] or position end
     local folders={}
     for name,node in pairs(found) do
         if type(name)=='string' and name:sub(1,2)~='__' and safe(name) and type(node)=='table' then
             local root=mods..'/'..name
-            -- Only active modules: UE4SS starts a folder that holds enabled.txt.
-            local enabled=false
-            for _,file in pairs(node.__files or {}) do
-                if type(file)=='table' and type(file.__name)=='string' and file.__name:lower()=='enabled.txt' then
-                    enabled=true
-                end
-            end
+            -- Only active modules: UE4SS starts a folder that holds enabled.txt or is
+            -- enabled in mods.txt.
+            local enabled=fileNamed(node,'enabled.txt') or first[name:lower()]~=nil
             local files={};local count=0
             local function collect(current,prefix,depth)
                 assert(depth<=64,'module directory depth limit')
@@ -196,8 +223,29 @@ function M.folders(snapshot,mods)
             end
         end
     end
-    table.sort(folders,function(a,b) return a.name<b.name end)
+    table.sort(folders,function(a,b)
+        local x,y=first[a.name:lower()],first[b.name:lower()]
+        if x or y then
+            if x and y and x~=y then return x<y end
+            if not (x and y) then return x~=nil end
+        end
+        local au,bu=a.name:upper(),b.name:upper()
+        if au~=bu then return au<bu end
+        return a.name<b.name
+    end)
+    for position,folder in ipairs(folders) do folder.order=position end
     return folders
+end
+
+-- Reads a file another mod or UE4SS owns: bounded, never written or recovered.
+function M.readForeign(path,limit)
+    limit=limit or 1048576
+    local file=io.open(path,'rb')
+    if not file then return nil end
+    local content=file:read(limit+1)
+    file:close()
+    assert(not content or #content<=limit,'file exceeds '..limit..' bytes: '..path)
+    return content
 end
 
 M.mkdir=Io.mkdir
@@ -233,8 +281,8 @@ function M.boot(root,mods,iterator,options)
     -- options.files (mcs_files, optional): the file bridge, for atomic writes and file dates.
     local files=options.files
     ;(options.mkdir or files and files.mkdir or Io.mkdir)(cache)
-    local folders=M.folders(iterator(),mods)
     local read,write=options.read or M.read,options.write or files and files.write or M.write
+    local folders=M.folders(iterator(),mods,options.read or M.readForeign)
     local index=M.update({path=cache..'/modules_register.json',folders=folders,read=read,write=write,
         database=options.database or M.loadFolderCategories(),report=options.report})
     -- Each folder's top level and when it was added, for the browser's Recently added list.

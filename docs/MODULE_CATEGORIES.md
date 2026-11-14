@@ -60,7 +60,8 @@ An absent tag is not a verified negative.
 
 ## Identification and classification
 
-For each active mod folder (one UE4SS starts: it holds `enabled.txt`) with
+For each active mod folder (one UE4SS starts: it holds `enabled.txt` or is
+enabled in `Mods/mods.txt` as `Name : 1`) with
 `Scripts/`, `dlls/` or a `mod.json`:
 
 1. **Module:** categories declared in `mod.json`. Invalid ones are first passed
@@ -104,8 +105,11 @@ their `mod.json` like any other mod.
   distinct folders; `preferred: author` uses the declared author. A module in a
   valid collection is listed only there. A `preferred` value naming a category
   counts as that category declared first and forms no collection.
-- **Within a group**, modules follow load order: UE4SS starts mod folders by name,
-  so numbered folders (`0_` … `9_`) keep their sequence. Child pages stay with their parent. Modules with settings come first; the
+- **Within a group**, modules follow load order, as UE4SS starts Lua mods: folders
+  enabled in `mods.txt` first, in that file's order, then the rest by upper-cased
+  folder name (the order Windows lists them in, so `ModA` comes before `Mod_X`).
+  Numbered folders (`0_` … `9_`) keep their sequence. Mods with a native DLL start
+  in an earlier phase, which the order does not show. Child pages stay with their parent. Modules with settings come first; the
   rest fold into a final "and X more with no settings" entry, which lists them
   when selected.
 - **Headers** show the group's icon in a box of its own, a small line naming the
