@@ -7,6 +7,11 @@ local Choices=dofile(choicesPath)
 local MenuData=require('menu_data')
 local Hooks=require('page_hooks')
 local Menu=require('menu_contributions')
+local Ini=require('mc_ini')
+local function template(content)
+    local entry=Ini.entries(Ini.parse(content),'Templates','MCT_Template')[1]
+    return entry and entry.value
+end
 local Slots=require('menu_slots')
 assert(require('navigation').install(Choices))
 local logs={}
@@ -103,7 +108,7 @@ assert(model.pending[1]==3 and model.committed[1]==3 and model.pending[2]==1,'th
 model:set(1,2)
 local ok,warning,event=model:apply()
 assert(ok and not warning,warning)
-assert(files['/mct/templates.ini']:find('MCT_Template=Fangdango_SingleUnderbar\n',1,true),files['/mct/templates.ini'])
+assert(template(files['/mct/templates.ini'])=='Fangdango_SingleUnderbar',files['/mct/templates.ini'])
 assert(event.values.MCT_Template=='Fangdango_SingleUnderbar' and event.values.MCT_Size==1)
 assert(event.changes.MCT_Template.old=='Preymonition_Ring' and event.changes.MCT_Template.new=='Fangdango_SingleUnderbar')
 -- Reordered, added and removed choices: a saved key that still exists keeps its choice.
@@ -120,7 +125,7 @@ for _,stored in ipairs({'Preymonition_Gone','2'}) do
 end
 -- Saving replaces it with the key.
 model:set(2,1);assert(model:apply())
-assert(files['/mct/templates.ini']:find('MCT_Template=Fangdango_SingleUnderbar\n',1,true))
+assert(template(files['/mct/templates.ini'])=='Fangdango_SingleUnderbar')
 -- Custom hooks see keys both ways; a saved key they do not offer keeps the value given.
 local seen
 local custom={id='Custom',name='Custom',choices=Choices.parse(manifest),settingsCount=2,testOnly=false,
@@ -177,6 +182,6 @@ model:change(1,2)
 assert(model.pending[1]==2 and model:dirty())
 ok,warning=model:apply()
 assert(ok,warning)
-assert(files['/mct/templates.ini']:find('MCT_Template=Fangdango_SingleUnderbar\n',1,true),files['/mct/templates.ini'])
+assert(template(files['/mct/templates.ini'])=='Fangdango_SingleUnderbar',files['/mct/templates.ini'])
 assert(#applied==1 and applied[1].id=='MCT4' and applied[1].event.values.MCT_Template=='Fangdango_SingleUnderbar')
 print('PASS keyed enums: slot rows store and publish their key through the source page')
