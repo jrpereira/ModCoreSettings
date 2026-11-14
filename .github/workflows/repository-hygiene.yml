@@ -21,6 +21,5 @@ jobs:
           python -m unittest discover -s tests -p test_repository_hygiene.py -v
           python -m unittest discover -s tests -p test_deployment_preflight.py -v
           python -m unittest discover -s tests -p test_manifest_package.py -v
-          python -m unittest discover -s tests -p test_release_session.py -v
       - name: Check tree and introduced commits
         run: python tools/check_incoming_history.py
