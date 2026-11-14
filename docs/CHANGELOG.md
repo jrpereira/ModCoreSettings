@@ -27,6 +27,9 @@
 - Saving a mod's settings no longer lists that mod under Recently Added: the `.old` and
   `.new` copies made while saving are not counted as an update.
 
+- Keybind capture ignores the mouse wheel, as documented: a wheel turn while capturing
+  leaves the binding unchanged, and wheel names in a config file are not accepted.
+
 ## v1.7.1
 
 - The Modules page places 33 more mods in a category by their folder name, from reviews of

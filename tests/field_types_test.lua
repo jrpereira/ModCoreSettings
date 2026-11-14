@@ -10,7 +10,8 @@ for raw,expected in pairs({['']='none',['0']='none',none='none',NONE='none',Left
     ['LeftAlt|hold']='LeftAlt|Hold',[' F | Tap ']='F|Tap',One='1|Hold',['1|Hold']='1|Hold',['zero|tap']='0|Tap'}) do
     assert(Keybind.normalize(s,raw)==expected,raw)
 end
-for _,raw in ipairs({'LeftAlt|Push','Escape','None|Tap','Gamepad_FaceButton_Bottom','Left Alt','|Tap'}) do
+for _,raw in ipairs({'LeftAlt|Push','Escape','None|Tap','Gamepad_FaceButton_Bottom','Left Alt','|Tap',
+    'MouseScrollUp','MouseScrollDown|Tap','MouseWheelAxis|Hold'}) do
     assert(Keybind.normalize(s,raw)==nil,raw)
 end
 assert(Keybind.valid(s,'LeftAlt|Hold') and not Keybind.valid(s,'LeftAlt') and not Keybind.valid(s,3))

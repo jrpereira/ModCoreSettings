@@ -34,11 +34,13 @@ local digits={}
 for digit,word in ipairs({'Zero','One','Two','Three','Four','Five','Six','Seven','Eight','Nine'}) do
     digits[word:lower()]=tostring(digit-1)
 end
+-- The mouse wheel is no key: a turn while capturing leaves the value unchanged.
+local WHEEL={MouseScrollUp=true,MouseScrollDown=true,MouseWheelAxis=true}
 local function keyName(name)
     if type(name)~='string' then return nil end
     if name:match('^%d$') then return name end
     if digits[name:lower()] then return digits[name:lower()] end
-    return name:match('^%a[%w_]*$') and name~='None' and name~='Escape'
+    return name:match('^%a[%w_]*$') and name~='None' and name~='Escape' and not WHEEL[name]
         and not name:find('^Gamepad_') and name or nil
 end
 
