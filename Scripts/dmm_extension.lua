@@ -112,6 +112,8 @@ extension={
                 package.loaded.standard_keys=module('vendor/standard_keys')
                 return module('standard_controls')
             end)()})
+        -- Outside field types' numbers-only filter: v2 subscribers also get text values.
+        module('settings_notify').install(dmm.settingsApi,report)
         navigation.install(dmm.choices)
         mapped.install(dmm.choices,dmm.controls)
         presentation.install(dmm.choices,dmm.controls,dmm.pages,{keyColumn=keybind.layout,

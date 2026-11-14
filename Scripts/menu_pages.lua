@@ -66,10 +66,10 @@ local function generated(contribution,page,parse,hooked,compile,stored)
     end
     if manifest then choices=parse(manifest) end
     -- DMM stores numbers only; a menu-data page that stores a setting of ModCoreSettings' own
-    -- types (a range or keybind) has its storage kept by ModCoreSettings instead.
+    -- types (a range or keybind) or a keyed picker has its storage kept by ModCoreSettings.
     if page.menu and page.menu.storage and stored then
         for _,choice in ipairs(choices) do
-            if choice.kind=='extension' then hooks,context=stored(page);break end
+            if choice.kind=='extension' or choice.mcKeys then hooks,context=stored(page);break end
         end
     end
     local provider={id=page.id,name=page.name,author=page.author or contribution.id,

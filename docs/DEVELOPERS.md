@@ -62,8 +62,9 @@ end)
 ```
 
 The callback runs after a successful save. It receives `providerId`, `revision`,
-`values`, and `changes` (`{old=...,new=...}` per changed ID). Events contain numeric
-settings only and do not replay startup values. Use one subscriber per provider;
+`values`, and `changes` (`{old=...,new=...}` per changed ID). Values are numbers, or
+text as the page stores it (a keyed enum's key, a range, a keybind). Events do not replay
+startup values. Use one subscriber per provider;
 a second subscription in the same client replaces its callback. See the
 [notification contract](REFERENCE.md#apply-notifications) for ownership details.
 

@@ -100,15 +100,15 @@ assert(not displayPlan.content:find('Reference',1,true),'references never receiv
 -- MCS's own page, compiled from its menu data as menu_pages compiles it.
 local visuals=require('menu_data').manifest(require('mcs_page'))
 local visualItems=Choices.parse(visuals)
-assert(#visualItems==8)
+assert(#visualItems==6)
 local byId={}
 for index,item in ipairs(visualItems) do
     byId[item.id]=index
     if item.id=='SortBy' or item.id=='PreferredCategoryMinimum' or item.id=='SingleCategory'
         or item.id=='ModulesPerRow' then
         assert(not item.mcNavigation and item.file=='config.ini' and item.section=='Modules')
-    elseif item.id=='MCS_Extensions' or item.id=='MCS_Verifications' or item.id=='MCS_Templates' then
-        -- Slots for UE4SS Lua Extensions and ModCore Templates: shown values that store nothing.
+    elseif item.id=='MCS_Templates' then
+        -- The slot ModCore Templates fills: a shown value that stores nothing.
         assert(not item.mcNavigation and not item.file)
     else assert(item.mcNavigation and not item.file) end
 end

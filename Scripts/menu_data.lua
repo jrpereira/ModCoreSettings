@@ -13,6 +13,12 @@
 --   type='enum'    values={{value=,label=,note=,module=,sound=},...}; default=<a value>
 --                  widget='picker' (default) | 'tabs' (up to 8) | 'cycler' | 'switch'
 --                  (values 0 and 1) | 'text' (a shown value) | 'table' (with table=)
+--                  A keyed enum gives every choice key=<text> instead of value= and its
+--                  default as a key; it is stored and notified as that key. DMM sees each
+--                  choice's position, for this build only (mcKeys). Rules that name a keyed
+--                  field use its keys. Keys are letters, digits and _ . -, at most 128 bytes,
+--                  not a number, unique per field. Keyed enums need storage and are pickers,
+--                  tabs or cyclers that are not action or link rows.
 --   type='integer' values={min=,max=,step=,suffix=}; default=<number>; widget='slider'
 --   type='range'   values={min=,max=,step=,suffix=,delta=}; default={low,high}; widget='range'
 --                  min and max are an edge, or {low marker's, high marker's}; delta is the
@@ -65,6 +71,12 @@ local function number(value,where)
 end
 local function flag(value,where)
     assert(value==nil or type(value)=='boolean','invalid '..where)
+    return value
+end
+-- A keyed enum's choice key: never a number, so a stored value reads back unambiguously.
+local function key(value,where)
+    assert(type(value)=='string' and #value>=1 and #value<=128 and value:match('^[%w_.-]+$')
+        and tonumber(value)==nil,'invalid '..where)
     return value
 end
 local function format(value)
@@ -167,15 +179,21 @@ function M.manifest(menu,options)
         end
         local shown=widget=='text' or widget=='table'
         local record={field=field,kind=kind,widget=widget,shown=shown}
+        -- Each choice's value or key -> the number DMM sees: the value itself, or for a keyed
+        -- enum the choice's position.
         local values={}
         if kind=='enum' then
             local choices=list(field.values,where..' values',MAX_CHOICES)
             assert(#choices>=1,where..': needs a value')
             assert(widget~='tabs' or #choices<=8,where..': tabs take at most eight values')
+            local keyed=type(choices[1])=='table' and choices[1].key~=nil
+            record.keyed=keyed
             for c,choice in ipairs(choices) do
-                allowed(choice,{value=true,label=true,note=true,module=true,sound=true},where..' value '..c)
-                number(choice.value,where..' value')
-                assert(not values[choice.value],where..': duplicate value')
+                allowed(choice,{value=not keyed,key=keyed,label=true,note=true,module=true,sound=true},where..' value '..c)
+                local id
+                if keyed then id=key(choice.key,where..' value key')
+                else id=number(choice.value,where..' value') end
+                assert(not values[id],where..': duplicate value')
                 text(choice.label,where..' value label')
                 assert(choice.note==nil or choice.module==nil,where..': a value has a note or a module')
                 if choice.note~=nil then text(choice.note,where..' value note',64) end
@@ -184,11 +202,17 @@ function M.manifest(menu,options)
                     assert(type(choice.sound)=='string' and (choice.sound=='none' or ChoiceSound.path(choice.sound)),
                         where..': invalid value sound')
                 end
-                values[choice.value]=true
+                values[id]=keyed and c or id
             end
-            assert(widget~='switch' or #choices==2 and choices[1].value==0 and choices[2].value==1,
+            assert(widget~='switch' or not keyed and #choices==2 and choices[1].value==0 and choices[2].value==1,
                 where..': a switch takes the values 0 and 1')
-            number(field.default,where..' default')
+            if keyed then
+                assert(storage~=nil and (widget=='picker' or widget=='tabs' or widget=='cycler')
+                    and not field.action and not field.link,
+                    where..': a keyed enum is a stored picker, tabs or cycler')
+                key(field.default,where..' default')
+                assert(#choices>=2,where..': a keyed enum needs two choices')
+            else number(field.default,where..' default') end
             assert(values[field.default],where..': default is not a value')
         elseif kind=='integer' then
             allowed(field.values,{min=true,max=true,step=true,suffix=true},where..' values')
@@ -299,14 +323,14 @@ function M.manifest(menu,options)
         if map then
             for choice,label in pairs(Contributions.unfold(value.values,where..' values')) do
                 assert(source[choice],where..': value outside the source choices')
-                out[#out+1]={choice,text(label,where..' text')}
+                out[#out+1]={source[choice],text(label,where..' text')}
             end
             table.sort(out,function(a,b) return a[1]<b[1] end)
             assert(#out>0,where..': needs a value')
         else
             for _,choice in ipairs(list(value.values,where..' values',MAX_CHOICES)) do
                 assert(source[choice],where..': value outside the source choices')
-                out[#out+1]=format(choice)
+                out[#out+1]=format(source[choice])
             end
             assert(#out>0,where..': needs a value')
         end
@@ -351,7 +375,7 @@ function M.manifest(menu,options)
             assert(source[choice],where..': value outside the source choices')
             number(rank,where..' rank')
             assert(math.abs(rank)<=1000000,where..': rank too large')
-            out[#out+1]={choice,rank}
+            out[#out+1]={source[choice],rank}
         end
         assert(#out>0,where..': needs a value')
         table.sort(out,function(a,b) return a[1]<b[1] end)
@@ -392,9 +416,11 @@ function M.manifest(menu,options)
             {'Description',field.description}}
         local function add(key,value) keys[#keys+1]={key,value} end
         if record.kind=='enum' then
-            local values,labels,notes,sounds={},{},{},{}
+            local own=byField[field.id]
+            local values,labels,notes,sounds,keys={},{},{},{},{}
             for n,choice in ipairs(field.values) do
-                values[n],labels[n]=format(choice.value),choice.label
+                values[n],labels[n]=format(own[choice.key or choice.value]),choice.label
+                keys[n]=choice.key
                 local note=choice.note
                 if choice.module then
                     note=options.moduleName and options.moduleName(choice.module) or choice.module
@@ -406,17 +432,18 @@ function M.manifest(menu,options)
             end
             -- DMM needs two choices; a single one (a button or shown value) repeats.
             if #values==1 then
-                values[2],labels[2]=format(field.values[1].value+1),labels[1]
+                values[2],labels[2]=format(own[field.values[1].key or field.values[1].value]+1),labels[1]
             end
             add('Type','picker');add('PresetValues',table.concat(values,'|'))
             add('PresetLabels',table.concat(labels,'|'))
             add('mcChoiceNotes',#notes>0 and table.concat(notes,';') or nil)
             add('mcChoiceSounds',#sounds>0 and table.concat(sounds,';') or nil)
             add('mcType',MC_TYPES[widget]);add('mcTabsWidth',field.tabsWidth)
+            add('mcKeys',record.keyed and table.concat(keys,'|') or nil)
             local dimmed=field.conditions and field.conditions.dim
             if dimmed then
                 local dim={}
-                for n,value in ipairs(dimmed) do dim[n]=format(value) end
+                for n,value in ipairs(dimmed) do dim[n]=format(own[value]) end
                 add('mcDimValues',table.concat(dim,'|'))
             end
             if field.table then
@@ -425,7 +452,7 @@ function M.manifest(menu,options)
                 add('mcTable',table.concat(entries,'|'));add('mcColumns',field.table.columns)
             end
             add('mcWrap',field.wrap and 1 or nil)
-            add('Default',format(field.default))
+            add('Default',format(own[field.default]))
         elseif record.kind=='integer' then
             local range=field.values
             add('Type','integer');add('Minimum',format(range.min));add('Maximum',format(range.max))

@@ -106,12 +106,12 @@ local pickerRowHeight,notedPickerRowHeight,labelDrop,toggleShift=40,40,1,14
 -- around to the other end, as does a click on that side of the value.
 local edgeArrowOpacity=0.5
 -- A choice note's size, and how far up the note sits while the current choice has one.
-local noteSize,noteRaise=10,8
+local noteSize,noteRaise=10,5
 -- DMM centres a picker's value, so bottom padding raises it by half: noteValueLift raises
--- it 5 pixels over a note. An arrow picker showing no note raises its value 2 pixels
+-- it 2 pixels over a note. An arrow picker showing no note raises its value 2 pixels
 -- (plainValueLift), while its indicator sits plainPipLift higher. Either way the value is
 -- pickerValueShrink points smaller, as a slider's is.
-local noteValueLift,plainValueLift,pickerValueShrink,plainPipLift=10,4,2,6
+local noteValueLift,plainValueLift,pickerValueShrink,plainPipLift=4,4,2,6
 -- The indicator's opacity while its row is not hovered: half of full.
 local pipIdleOpacity=0.5
 -- The current pip (or thumb) is pipHotHeight tall while its row is hovered or selected,

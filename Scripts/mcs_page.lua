@@ -8,10 +8,6 @@ return {
         {id='Pages',style='none'},
         -- The Modules tab's settings, under a Listing heading.
         {id='Listing',conditions={visible={field='MCS_Page',values={0}}}},
-        -- Then slots that UE4SS Lua Extensions fills from its own hidden pages: how many
-        -- extensions are installed, and, in a subgroup, each one's startup verification switch.
-        {id='Extensions',label='Lua Extensions',conditions={visible={field='MCS_Page',values={0}}},groups={
-            {id='Verifications',label='Verify Extensions on Startup',conditions={visible={field='MCS_Page',values={0}}}}}},
         -- The Templates tab: one slot that ModCore Templates fills with every loaded template.
         {id='Templates',style='none',conditions={visible={field='MCS_Page',values={1}}}},
     },
@@ -34,11 +30,6 @@ return {
         -- Grid columns of every group, shown in every sort; the ungrouped lists are one mod per line.
         {id='ModulesPerRow',group='Listing',label='Modules per row',default=2,
             values={{value=1,label='1'},{value=2,label='2'},{value=3,label='3'}}},
-        -- Shown as is until UE4SS Lua Extensions fills them (settings:extensions, :verifications).
-        {id='MCS_Extensions',group='Extensions',label='Installed extensions',widget='text',default=0,
-            values={{value=0,label='None'}},slot='extensions',slotLabel=true},
-        {id='MCS_Verifications',group='Verifications',label='Extensions',widget='text',default=0,
-            values={{value=0,label='Not installed'}},slot='verifications'},
         -- Shown as is until ModCore Templates fills it (settings:templates); its rows keep
         -- their own groups, one heading per template category.
         {id='MCS_Templates',group='Templates',label='Templates',widget='text',default=0,

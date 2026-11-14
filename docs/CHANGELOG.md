@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+- Menu data enums can be keyed: each choice has a text `key` instead of a number `value`,
+  and the setting is saved, loaded and notified as that key. Adding, removing or reordering
+  choices keeps every saved key that is still offered, and a key that is not falls back to
+  the default. Keyed pickers also work as slot rows on another page.
+- `settings_api` version 2 delivers every applied setting, text included: keyed enum keys,
+  ranges as `low|high` and keybinds. Consumers re-vendor `Scripts/vendor/settings_api.lua`;
+  a version 1 copy keeps receiving DMM's own numeric notifications until then.
+- `menu_contributions` version 8 accepts keys in value lists.
+- The Modules tab no longer reserves a Lua Extensions section. ModCore Lua Extensions lists
+  itself in the mod list instead, with the installed extensions' count and each extension's settings
+  on its own page.
+
 ## v1.7.1
 
 - The Modules page places 33 more mods in a category by their folder name, from reviews of

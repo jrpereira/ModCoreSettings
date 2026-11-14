@@ -18,7 +18,7 @@ edits and Apply; your mod applies the saved values to gameplay.
   pending model; individual edits can return the selection to Custom.
 - **Share menu space:** contribute pages or insert settings into another mod's
   declared slot while retaining ownership of storage and Apply.
-- **React to saved changes:** receive numeric Apply notifications after a
+- **React to saved changes:** receive Apply notifications, numbers and text, after a
   successful save, without watching or polling configuration files.
 - **Preserve configuration:** add missing numeric defaults while keeping existing
   choices and unrelated content.
@@ -55,7 +55,8 @@ next restart.
 - Numeric settings use ordinary DMM storage; keybind values are text such as
   `K|Tap` and need a page whose hooks save them.
 - Navigation and read-only rows are omitted from persistence and Apply events.
-- Apply notifications contain numeric values; consumers reload text bindings.
+- Apply notifications from a raw manifest page's DMM storage are numeric; menu-data and
+  hooks pages also deliver text values (keys, ranges, keybinds).
 - Key capture excludes modifier chords, Escape, wheel directions and gamepads.
 - MCS depends on DMM's widget layout; offline tests do not prove live UI compatibility.
 

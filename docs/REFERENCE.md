@@ -92,7 +92,7 @@ menu={
 
 - `storage`: values are saved under `section` in `file`, relative to the page's
   `configDirectory`. Without it, DMM's default storage applies. DMM stores numbers
-  only, so a page with `storage` that holds a range or keybind row is stored by
+  only, so a page with `storage` that holds a range, keybind or keyed enum row is stored by
   ModCoreSettings instead: every stored row under `section`, a missing or invalid
   value keeping its default, missing keys added on Apply, every other byte kept.
 - Groups keep their order, and fields theirs within their group; only groups with
@@ -111,9 +111,21 @@ menu={
 
   | `type` | `values` | `default` | `widget` (first is the default) |
   |---|---|---|---|
-  | `enum` | `{{value=,label=,note=,module=,sound=},...}`, up to 64 | a value | `picker`, `tabs` (up to 8), `cycler`, `switch` (values 0 and 1), `text`, `table` |
+  | `enum` | `{{value=,label=,note=,module=,sound=},...}`, up to 64; or `key=` in place of `value=` | a value (a key) | `picker`, `tabs` (up to 8), `cycler`, `switch` (values 0 and 1), `text`, `table` |
   | `integer` | `{min=,max=,step=,suffix=}`, whole numbers | a number | `slider` |
   | `range` | `{min=,max=,step=,suffix=,delta=}`, whole numbers | `{low,high}` | `range` |
+
+  A keyed enum gives every choice `key=` in place of `value=`, and its `default` as a
+  key: `values={{key='None',label='None'},{key='Fangdango_SingleUnderbar',label='Single Underbar'}},
+  default='None'`. It is saved, loaded and [notified](#apply-notifications) as that key, so
+  adding, removing or reordering choices keeps every saved key that is still offered; a
+  saved key that is not falls back to the default, and the next Apply saves a valid one.
+  Keys are letters, digits and `_ . -`, 1 to 128 bytes, never a number, unique per field.
+  A keyed enum needs `storage` and at least two choices, and is a `picker`, `tabs` or
+  `cycler` that is not an `action` or `link` row. Rules that name it (`visible`, `label`,
+  `order`, `dim`) list its keys. DMM sees each choice's position for the current build only
+  (`mcKeys`); no position is saved or notified. It can fill another page's
+  [slot](#slot-rows) and is still stored by its own page.
 
   A `text` or `table` row is a shown value, never stored; one value with `action`
   or `link` makes a button. A range is ModCoreSettings' [range row](DEVELOPERS.md#add-a-range):
@@ -354,19 +366,17 @@ local unsubscribe=Settings.subscribe('ExampleMod',function(event)
 end)
 ```
 
-DMM publishes only after a successful, durable Apply. Delivery is event-driven;
+This is version 2. ModCoreSettings publishes its notifications beside DMM's own numeric ones
+(which version 1 read), after every successful, durable Apply. Delivery is event-driven;
 there is no file watcher or polling. Revisions are delivered at most once in a
 Lua state. There is one active callback per provider ID; subscribing again through
 the same client replaces it. Another Lua state cannot claim that provider ID.
 Existing revisions are not replayed at subscription time: load startup values
 from your config. Unsubscribing stops delivery but does not release the native
-handler/claim; fully restart after script reloads. `values` contains the applied numeric settings (text keybinds are omitted), and
-`changes` contains `{old=...,new=...}` only for changed IDs. Treat the event and
-its nested tables as read-only. Reload your config to read text bindings; the
-event is not their value transport. A page with no numeric stored values emits
-no Apply notification through this API; its storage hook needs a separate
-post-save notification for gameplay consumers.
-Callback failure cannot turn a completed save
+handler/claim; fully restart after script reloads. `values` contains every applied
+stored setting: numbers as numbers, and text as the page stores it: a keyed enum's key,
+a range's `'low|high'`, a keybind. `changes` contains `{old=...,new=...}` only for
+changed IDs. Treat the event and its nested tables as read-only. Callback failure cannot turn a completed save
 into an Apply failure. Calling the returned function stops delivery to that
 callback.
 

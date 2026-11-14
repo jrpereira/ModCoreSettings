@@ -1444,8 +1444,8 @@ local valueSize=noteRow.mcValueSize
 assert(noteBox.visible==1 and noteRow.value.Slot.Padding.Bottom==4 and valueSize
     and noteRow.value.Font.Size==valueSize-2)
 noteUi.model.pending[1]=7;noteUi:refresh()
-assert(noteBox.visible==3 and noteRow.mcNote.text=='Fangdango' and noteRow.value.Slot.Padding.Bottom==10
-    and noteBox.Slot.Padding.Bottom==8 and noteRow.mcPipBox.Slot.Padding.Bottom==-1
+assert(noteBox.visible==3 and noteRow.mcNote.text=='Fangdango' and noteRow.value.Slot.Padding.Bottom==4
+    and noteBox.Slot.Padding.Bottom==5 and noteRow.mcPipBox.Slot.Padding.Bottom==-1
     and noteRow.value.Font.Size==valueSize-2,
     'a noted choice shows its note without taking clicks, and the value moves up at the same size')
 noteUi.model.pending[1]=0;noteUi:refresh()

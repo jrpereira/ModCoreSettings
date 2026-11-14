@@ -76,8 +76,9 @@ end
 
 -- Storage hooks for a menu-data page whose storage DMM cannot keep: every stored field's
 -- value under menu.storage.section in menu.storage.file, relative to the page's
--- configDirectory. A range's value is its text; every other value is a number. A missing
--- file or key keeps the default; Apply adds missing keys and keeps every other byte.
+-- configDirectory. A range's value and a keyed picker's key are text; every other value is a
+-- number. A missing file or key keeps the default; Apply adds missing keys and keeps every
+-- other byte.
 -- files (optional) is {read=,write=}, safe_file's by default.
 function M.stored(menu,files)
     local Ini=require('mc_ini')
@@ -123,6 +124,44 @@ function M.stored(menu,files)
         end}
 end
 
+-- A keyed picker (mcKeys=<key>|<key>|..., one per choice in order) keeps the choice's
+-- position in DMM's model, for this session only, and its key everywhere else: hooks load and
+-- apply keys, and Apply events carry them. Its values must be the positions 1 to n.
+function M.parseKeys(content,items)
+    local byId={}
+    for _,item in ipairs(items) do byId[item.id]=item end
+    for _,section in ipairs(require('mcs_manifest').settings(content)) do
+        local text=section.fields.mcKeys
+        if text~=nil then
+            local item=assert(byId[section.id],'mcKeys setting unavailable')
+            assert(item.kind=='picker' and not item.targets and not item.mcReadOnly and not item.mcNavigation,
+                'mcKeys requires an editable picker without preset targets')
+            local keys,index={},{}
+            for key in (text..'|'):gmatch('(.-)|') do
+                assert(#key>=1 and #key<=128 and key:match('^[%w_.-]+$') and tonumber(key)==nil and not index[key],
+                    'invalid mcKeys key '..key)
+                keys[#keys+1]=key;index[key]=#keys
+            end
+            assert(#keys==#item.values,'mcKeys needs one key per choice')
+            for n,value in ipairs(item.values) do assert(value==n,'a keyed picker\'s values are 1 to n') end
+            item.mcKeys,item.mcKeyIndex=keys,index
+        end
+    end
+    return items
+end
+
+-- A value as hooks and Apply events see it: a keyed picker's key, else the value.
+local function outward(item,value)
+    if item.mcKeys and type(value)=='number' then return item.mcKeys[value] end
+    return value
+end
+-- A loaded or saved value as DMM's model holds it: a keyed picker's position, which only a
+-- known key gives; else the value.
+local function inward(item,value)
+    if item.mcKeys then return type(value)=='string' and item.mcKeyIndex[value] or nil end
+    return value
+end
+
 -- A loaded value the setting accepts, in canonical form; nil when it accepts none.
 local function accepted(choices,item,value)
     local ok,index=pcall(choices.index,item,value)
@@ -139,7 +178,14 @@ end
 function M.install(choices,report)
     if choices.mcHooksVersion then return false end
     report=report or function() end
-    local open=choices.open
+    local open,parse=choices.open,choices.parse
+    choices.parse=function(content) return M.parseKeys(content,parse(content)) end
+    -- A keyed picker is stored only by hooks; DMM would save its position.
+    local function keyed(model)
+        for _,item in ipairs(model.items or {}) do
+            if item.mcKeys then return item end
+        end
+    end
     -- Setting a navigation row runs the page's action hook.
     local function actions(model,hooks,context)
         if not hooks.action or model.error then return model end
@@ -149,7 +195,7 @@ function M.install(choices,report)
             local item=self.items[i]
             if item and item.mcNavigation and not item.mcLinkPage then
                 local values={}
-                for n,other in ipairs(self.items) do values[other.id]=self.pending[n] end
+                for n,other in ipairs(self.items) do values[other.id]=outward(other,self.pending[n]) end
                 local ok,why=pcall(hooks.action,{page=context.page,directory=context.directory},
                     item.id,self.pending[i],values)
                 if not ok then report('HOOK_ACTION_FAILED',context.page..' '..item.id..': '..tostring(why)) end
@@ -160,8 +206,14 @@ function M.install(choices,report)
     end
     choices.open=function(provider)
         local hooks=provider.mcHooks
-        if not hooks then return open(provider) end
-        if not hooks.apply then return actions(open(provider),hooks,provider.mcHookContext) end
+        if not hooks or not hooks.apply then
+            local model=open(provider)
+            -- DMM may already have failed on a stored key; the cause is the missing storage.
+            local item=keyed(model)
+            if item then model.error='"'..item.label..'" needs a page that stores its own settings' end
+            if not hooks then return model end
+            return actions(model,hooks,provider.mcHookContext)
+        end
         local context=provider.mcHookContext
         local copy={}
         for key,value in pairs(provider) do copy[key]=value end
@@ -178,7 +230,8 @@ function M.install(choices,report)
                 for i,item in ipairs(model.items) do
                     local value=values[item.id]
                     if value~=nil then
-                        local usable=accepted(choices,item,value)
+                        local usable=inward(item,value)
+                        usable=usable~=nil and accepted(choices,item,usable) or nil
                         if usable~=nil then model.pending[i],model.committed[i]=usable,usable
                         else skipped[#skipped+1]=item.id..'='..tostring(value) end
                     end
@@ -196,9 +249,9 @@ function M.install(choices,report)
             local values,changes={},{}
             for i,item in ipairs(self.items) do
                 if stored(item) then
-                    values[item.id]=self.pending[i]
+                    values[item.id]=outward(item,self.pending[i])
                     if self.pending[i]~=self.committed[i] then
-                        changes[item.id]={old=self.committed[i],new=self.pending[i]}
+                        changes[item.id]={old=outward(item,self.committed[i]),new=values[item.id]}
                     end
                 end
             end
@@ -209,8 +262,10 @@ function M.install(choices,report)
             for i,item in ipairs(self.items) do
                 if stored(item) then
                     local value=saved[item.id]
+                    -- A key the picker does not offer keeps the value it was given.
+                    if value~=nil then value=inward(item,value) end
                     if value~=nil then self.pending[i]=value end
-                    event.values[item.id]=self.pending[i]
+                    event.values[item.id]=outward(item,self.pending[i])
                 end
                 self.committed[i]=self.pending[i]
             end

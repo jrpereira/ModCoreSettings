@@ -80,7 +80,7 @@ local settingsApi={}
 extension.install({version=1,choices=choices,controls=controls,pages=pages,events=events,settingsApi=settingsApi})
 local order={'mc_ini','mcs_manifest','safe_file','mcs_protocols','mcs_choice_sound','navigation','mapped_presets','menu_contributions','presentation','mod_requirements','browser_groups','module_categories','mcs_taxonomy','mcs_module_json',
  'init_config','dmm_lifecycle','menu_pages','page_links','menu_slots','page_hooks','field_types','keybind_editor','range_editor','editor_input','editor_hint','standard_keys','standard_controls',
- 'sort_button','menu_data','index_refresh'}
+ 'settings_notify','sort_button','menu_data','index_refresh'}
 assert(#loaded==#order)
 for n,name in ipairs(order) do assert(loaded[n]:match(name..'%.lua$'),'load '..n) end
 -- Copied files load from Scripts/vendor; the extension's own modules from Scripts.
@@ -93,6 +93,9 @@ assert(fieldTypes.order==0 and fieldTypes.registered.keybind and fieldTypes.modu
  and fieldTypes.modules.standardControls,'keybind registered and installed on DMM modules first')
 assert(fieldTypes.registered.range and fieldTypes.modules.confirm and fieldTypes.modules.pointer=='pointer'
  and fieldTypes.modules.hint=='hint','range registered; editors get Enter/A, the mouse button and the footer hint')
+assert(installs[1].name=='settings_notify' and installs[1].args[1]==settingsApi and type(installs[1].args[2])=='function',
+    'v2 notifications wrap DMM\'s publish, outside field types')
+table.remove(installs,1)
 assert(installs[1].args[1]==choices)
 assert(installs[2].args[1]==choices and installs[2].args[2]==controls)
 assert(installs[3].args[1]==choices and installs[3].args[2]==controls and installs[3].args[3]==pages)

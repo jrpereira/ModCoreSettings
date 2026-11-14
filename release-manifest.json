@@ -47,6 +47,7 @@
     "Scripts/page_links.lua": "Scripts/page_links.lua",
     "Scripts/row_error.lua": "Scripts/row_error.lua",
     "Scripts/vendor/settings_api.lua": "Scripts/vendor/settings_api.lua",
+    "Scripts/settings_notify.lua": "Scripts/settings_notify.lua",
     "Scripts/standard_controls.lua": "Scripts/standard_controls.lua",
     "Scripts/widget_discovery.lua": "Scripts/widget_discovery.lua",
     "README.md": "docs/README.md",

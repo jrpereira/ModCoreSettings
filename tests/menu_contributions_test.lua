@@ -221,10 +221,14 @@ do
     local again=Menu.unfold(map,'labels')
     assert(again[1]=='A' and again[3]=='B','unfolding twice changes nothing')
     for _,bad in ipairs({{{[1]='A',[{1}]='B'},'appears twice'},{{[{}]='A'},'empty value list'},
-            {{[{x=1}]='A'},'must be a list'},{{['a']='A'},'invalid value'}}) do
+            {{[{x=1}]='A'},'must be a list'},{{['a b']='A'},'invalid value'},
+            {{['12']='A'},'invalid value'},{{[{'K',1.5e10}]='A'},'invalid value'}}) do
         local ok,err=pcall(Menu.unfold,bad[1],'labels')
         assert(not ok and tostring(err):find(bad[2],1,true),bad[2]..': '..tostring(err))
     end
+    -- A keyed enum's choice keys unfold like values.
+    local keyed=Menu.unfold({[{'Mod_A','Mod.B'}]='A',['Mod-C']='C'},'labels')
+    assert(keyed.Mod_A=='A' and keyed['Mod.B']=='A' and keyed['Mod-C']=='C','keys unfold')
     local ok,err=pcall(Menu.serialize,{values={[{1,2}]='A'}})
     assert(not ok and tostring(err):find('unfold value lists',1,true),'folded keys never travel')
 end
