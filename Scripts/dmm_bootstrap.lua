@@ -76,6 +76,34 @@ local function launcher(dmmScripts,mcsScripts)
     return table.concat(lines,'\n')
 end
 
+-- The game-side environment: bounded file access, this mod's Scripts folder (from this
+-- file's own path), the shared variables and the game thread. Tests pass their own.
+local function runtime()
+    local function read(path)
+        local handle,err=io.open(path,'rb');if not handle then return nil,err end
+        local content,why=handle:read(MAX_FILE+1)
+        local closed,closeError=handle:close()
+        if not content or not closed then return nil,why or closeError or 'read failed' end
+        if #content>MAX_FILE then return nil,'file exceeds 256 KiB' end
+        return content
+    end
+    local function write(path,content)
+        local handle,err=io.open(path,'wb');if not handle then return nil,err end
+        local written,why=handle:write(content)
+        local closed,closeError=handle:close()
+        if not written or not closed then return nil,why or closeError or 'write failed' end
+        return true
+    end
+    local source=debug.getinfo(1,'S').source:gsub('^@','')
+    return {
+        read=read,write=write,remove=os.remove,rename=os.rename,
+        scripts=source:match('^(.*[/\\])[^/\\]+$'),
+        get=function(key) return ModRef and ModRef:GetSharedVariable(key) end,
+        set=function(key,value) assert(ModRef,'ModRef unavailable');ModRef:SetSharedVariable(key,value) end,
+        defer=ExecuteInGameThread,
+    }
+end
+
 -- DMM's Scripts folder sits beside this mod's under Mods: derived from this mod's own
 -- Scripts path, so no directory snapshot is needed. Present when its main.lua, or its own
 -- main kept aside by an interrupted install, can be read.

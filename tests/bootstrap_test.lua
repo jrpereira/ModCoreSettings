@@ -143,3 +143,12 @@ local text=test.launcher(DMM,MCS)
 assert(text:find('Shoutout to DMM',1,true)==4 and text:find(test.mark,1,true)<512 and not text:find('C:/Mods',1,true))
 assert(test.launcher('C:/Mods/DawnwalkerModMenu/Scripts/','D:/Other/1_ModCore_Settings/Scripts/'):find('"D:/Other/1_ModCore_Settings/enabled.txt"',1,true))
 print('PASS the launcher hooks in only while enabled and always runs DMM main')
+
+-- Without overrides the bootstrap builds the game environment itself; here, outside a
+-- Mods folder, it reports that DMM cannot be found instead of raising.
+do
+    local events,log=recorder()
+    assert(Bootstrap.run(log,function() return true end)==false,'no Mods folder, no launcher')
+    assert(has(events,'DMM_REQUIRED'),'the default environment locates DMM')
+end
+print('PASS the bootstrap builds its own environment without overrides')
