@@ -4,6 +4,14 @@
 local M={version=1}
 local function trim(s) return (s or ''):match('^%s*(.-)%s*$') end
 M.trim=trim
+-- The group a setting section belongs to, as DMM reads it.
+function M.groupOf(fields) return fields.Group or fields.Section or fields.Category or 'Settings' end
+-- A number as manifest and config text: whole numbers without a decimal point, the rest
+-- with every digit needed to read back the same value.
+function M.number(value)
+    return math.type(value)=='integer' and tostring(value)
+        or value%1==0 and string.format('%d',value) or string.format('%.17g',value)
+end
 
 -- Returns every [section] in order, and the manifest's lines (a final empty line
 -- dropped). Each section has:

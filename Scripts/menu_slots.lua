@@ -4,6 +4,7 @@
 -- inserted rows to their source page's own model: storage, Apply events and config stay theirs.
 local M={version=1}
 local Manifest=require('mcs_manifest')
+local groupOf=Manifest.groupOf
 -- Inserted rows render as plain DMM controls; source presentation keys are not copied,
 -- except a label rule naming an earlier inserted row and a picker's choice notes and sounds.
 local COPIED={'Id','Type','Label','Description','PresetValues','PresetLabels','Presets','Default',
@@ -87,7 +88,7 @@ local function insertion(source,id,slot,number,earlier,first,grouping)
         out[#out+1]='mcLabelWhen='..found.mcLabelWhen
         out[#out+1]='mcLabels='..found.mcLabels
     end
-    out[#out+1]='Group='..(grouping and grouping(found) or fields.Group or fields.Section or fields.Category or 'Settings')
+    out[#out+1]='Group='..(grouping and grouping(found) or groupOf(fields))
     local rule=fields
     if found.VisibleWhen or found.VisibleValues then
         assert(found.VisibleWhen and earlier[found.VisibleWhen],
@@ -106,7 +107,6 @@ end
 -- a rule of its own is rejected, as its rows would be. A subgroup's mcWithin follows its
 -- category's host name.
 local GROUP_COPIED={'mcLabel','mcHeading','mcLevel','mcHelp','mcSilent','mcWithinLabel'}
-local function groupOf(fields) return fields.Group or fields.Section or fields.Category or 'Settings' end
 
 local function categories(content)
     local byName={}

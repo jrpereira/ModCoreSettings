@@ -95,8 +95,7 @@ function M.stored(menu,files)
     end
     local function text(value)
         if type(value)=='string' then return value end
-        return math.type(value)=='integer' and tostring(value)
-            or value%1==0 and string.format('%d',value) or string.format('%.17g',value)
+        return require('mcs_manifest').number(value)
     end
     return {contract=M.contract,
         load=function(context)

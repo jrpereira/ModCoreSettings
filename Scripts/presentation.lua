@@ -5,6 +5,22 @@ local ChoiceSound=require('mcs_choice_sound')
 local function trim(s) return (s or ''):match('^%s*(.-)%s*$') end
 -- The player of choice sounds (mcChoiceSounds); report(event,detail) receives failures.
 function M.choiceSoundPlayer(report) return ChoiceSound.player(nil,report) end
+-- A slot's padding as a plain table, safe to keep after the slot changes.
+local function copyPadding(p) return {Left=p.Left,Top=p.Top,Right=p.Right,Bottom=p.Bottom} end
+-- A panel's children in order, each with a copy of its slot padding.
+local function childrenOf(panel)
+    local list={}
+    for n=0,panel:GetChildrenCount()-1 do
+        local child=panel:GetChildAt(n)
+        list[#list+1]={widget=child,padding=copyPadding(child.Slot.Padding)}
+    end
+    return list
+end
+-- The width of the size box holding widget, or fallback.
+local function boxWidth(widget,fallback)
+    local ok,width=pcall(function() return widget:GetParent().WidthOverride end)
+    return ok and tonumber(width) or fallback
+end
 -- DMM's settings page widths in its 1920-wide design: rows and the header strip are ROW_WIDTH
 -- wide; PAGE_WIDTH is the width of the page itself.
 local ROW_WIDTH,PAGE_WIDTH=572,584
@@ -843,12 +859,9 @@ function M.install(choices,controls,pages,options)
                     assert(not panel.mcHeader,'only one level-one setting per provider')
                     local placeholder=new('SizeBox')
                     placeholder:SetVisibility(1)
-                    local children={}
-                    for n=0,panel.scroll:GetChildrenCount()-1 do
-                        local child=panel.scroll:GetChildAt(n)
-                        local padding=child.Slot.Padding
-                        children[#children+1]={widget=child:GetFullName()==row.wrapper:GetFullName() and placeholder or child,
-                            padding={Left=padding.Left,Top=padding.Top,Right=padding.Right,Bottom=padding.Bottom}}
+                    local children=childrenOf(panel.scroll)
+                    for _,child in ipairs(children) do
+                        if child.widget:GetFullName()==row.wrapper:GetFullName() then child.widget=placeholder end
                     end
                     panel.scroll:ClearChildren()
                     for _,child in ipairs(children) do add(panel.scroll,child.widget):SetPadding(child.padding) end
@@ -1030,10 +1043,6 @@ function M.install(choices,controls,pages,options)
                     -- column. One clear button across the column, row-high, takes the pointer
                     -- and flips it; DMM's arrows and value stay alive, hidden, for keys and
                     -- controller.
-                    local function boxWidth(widget,fallback)
-                        local ok,width=pcall(function() return widget:GetParent().WidthOverride end)
-                        return ok and tonumber(width) or fallback
-                    end
                     local left=boxWidth(row.widget,pickerLabelWidth)+boxWidth(row.parts[1].widget,pickerArrowWidth)
                     local width=boxWidth(row.parts[2].widget,pickerValueWidth)
                     local glow=new('Border');glow:SetBrushColor(headerGlowOff)
@@ -1156,10 +1165,6 @@ function M.install(choices,controls,pages,options)
                     -- the row so DMM's value button keeps its structure, taking the
                     -- value's width and place from DMM's own size boxes: after the
                     -- label column and left arrow. The text is centered in that width.
-                    local function boxWidth(widget,fallback)
-                        local ok,width=pcall(function() return widget:GetParent().WidthOverride end)
-                        return ok and tonumber(width) or fallback
-                    end
                     local left=boxWidth(row.widget,pickerLabelWidth)+boxWidth(row.parts[1].widget,pickerArrowWidth)
                     local note=api.caption(tree,'')
                     api.Theme.font(note,api.theme,noteSize);note:SetFont(note.Font)
@@ -1184,10 +1189,6 @@ function M.install(choices,controls,pages,options)
                     and not setting.mcOnOff
                     and not setting.mcTable and not setting.mcWrap
                     and not setting.mcReadOnly and #(setting.values or {})>=2 then
-                    local function boxWidth(widget,fallback)
-                        local ok,width=pcall(function() return widget:GetParent().WidthOverride end)
-                        return ok and tonumber(width) or fallback
-                    end
                     local value=boxWidth(row.parts[2].widget,pickerValueWidth)
                     local width=math.floor(value*pipShare/2)*2
                     local left=boxWidth(row.widget,pickerLabelWidth)+boxWidth(row.parts[1].widget,pickerArrowWidth)+(value-width)//2
@@ -1248,7 +1249,7 @@ function M.install(choices,controls,pages,options)
                         stackSlot:SetPadding({Left=0,Top=0,Right=0,Bottom=0})
                         local textSlot=add(stack,row.value)
                         textSlot:SetHorizontalAlignment(0);textSlot:SetVerticalAlignment(2)
-                        textSlot:SetPadding({Left=padding.Left,Top=padding.Top,Right=padding.Right,Bottom=padding.Bottom})
+                        textSlot:SetPadding(copyPadding(padding))
                         local lane=new('HorizontalBox')
                         local laneSlot=add(stack,lane);laneSlot:SetHorizontalAlignment(0);laneSlot:SetVerticalAlignment(0)
                         -- The button insets its content by its style's padding; the lane reaches
@@ -1465,7 +1466,7 @@ function M.install(choices,controls,pages,options)
                 local known={}
                 local function capture(block,child)
                     local p=child.Slot.Padding
-                    block.children[#block.children+1]={widget=child,padding={Left=p.Left,Top=p.Top,Right=p.Right,Bottom=p.Bottom}}
+                    block.children[#block.children+1]={widget=child,padding=copyPadding(p)}
                     known[child:GetFullName()]=true
                 end
                 for _,heading in ipairs(panel.headings) do
@@ -2129,13 +2130,7 @@ function M.install(choices,controls,pages,options)
         local title,copy=page.detailTitle,page.detailCopy
         if not (title and copy and page.controls and type(page.controls.description)=='function') then return end
         local stack=assert(copy:GetParent(),'MCS description parent')
-        local children={}
-        for n=0,stack:GetChildrenCount()-1 do
-            local child=stack:GetChildAt(n)
-            local padding=child.Slot.Padding
-            children[#children+1]={widget=child,padding={
-                Left=padding.Left,Top=padding.Top,Right=padding.Right,Bottom=padding.Bottom}}
-        end
+        local children=childrenOf(stack)
         assert(#children==2 and children[1].widget:GetFullName()==title:GetFullName()
             and children[2].widget:GetFullName()==copy:GetFullName(),'MCS description layout')
         local text=api.caption(tree,'')
@@ -2206,13 +2201,7 @@ function M.install(choices,controls,pages,options)
             local title=assert(page.modTitle,'MCS page title')
             local parent=assert(title:GetParent(),'MCS page header parent')
             local host=api.construct('/Script/UMG.Overlay',tree)
-            local children={}
-            for n=0,parent:GetChildrenCount()-1 do
-                local child=parent:GetChildAt(n)
-                local padding=child.Slot.Padding
-                children[#children+1]={widget=child,padding={
-                    Left=padding.Left,Top=padding.Top,Right=padding.Right,Bottom=padding.Bottom}}
-            end
+            local children=childrenOf(parent)
             assert(#children>=2 and children[1].widget:GetFullName()==title:GetFullName(),
                 'MCS page header layout')
             local pageStatus=assert(page.controlStatus,'MCS page status')
@@ -2262,13 +2251,7 @@ function M.install(choices,controls,pages,options)
             header:SetWidthOverride(ROW_WIDTH);header:ClearHeightOverride()
             local list=assert(header:GetParent(),'MCS mod-browser page')
             local headerName=header:GetFullName()
-            local children={}
-            for n=0,list:GetChildrenCount()-1 do
-                local child=list:GetChildAt(n)
-                local padding=child.Slot.Padding
-                children[#children+1]={widget=child,padding={
-                    Left=padding.Left,Top=padding.Top,Right=padding.Right,Bottom=padding.Bottom}}
-            end
+            local children=childrenOf(list)
             list:ClearChildren()
             local inserted=false
             for _,child in ipairs(children) do
@@ -2494,13 +2477,7 @@ function M.install(choices,controls,pages,options)
                 -- Read and clear the list before any row moves into a group.
                 local first=groups[1] and groups[1].head or looseRows[1]
                 local scroll=assert(first.wrapper:GetParent(),'MCS mod-list rows')
-                local children={}
-                for n=0,scroll:GetChildrenCount()-1 do
-                    local child=scroll:GetChildAt(n)
-                    local padding=child.Slot.Padding
-                    children[#children+1]={widget=child,padding={
-                        Left=padding.Left,Top=padding.Top,Right=padding.Right,Bottom=padding.Bottom}}
-                end
+                local children=childrenOf(scroll)
                 scroll:ClearChildren()
                 local heads,moved={},{}
                 for _,group in ipairs(groups) do

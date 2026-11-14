@@ -62,7 +62,7 @@ function M.new(report)
         local help=trim(editor.help)
         local s={id=id,kind='extension',editor=name,label=r.Label or id,description=r.Description or '',
             mcHelp=help~='' and help or nil,
-            group=r.Group or r.Section or r.Category or 'Settings',
+            group=Manifest.groupOf(r),
             -- DMM's toggle shell sizes its navigation from two values; they are never stored.
             -- A navigation editor's shell has three, and rests on the middle one: a move to
             -- either side is a step that way.
@@ -82,7 +82,7 @@ function M.new(report)
         local raw,categories=sections(content)
         local used,typed={},false
         for _,r in ipairs(raw) do
-            local group=r.Group or r.Section or r.Category or 'Settings'
+            local group=Manifest.groupOf(r)
             if self.editors[trim(r.Type):lower()] then typed=true else used[group]=true end
         end
         if not typed then return content end

@@ -79,10 +79,7 @@ local function key(value,where)
         and tonumber(value)==nil,'invalid '..where)
     return value
 end
-local function format(value)
-    return math.type(value)=='integer' and tostring(value)
-        or value%1==0 and string.format('%d',value) or string.format('%.17g',value)
-end
+local format=require('mcs_manifest').number
 local function allowed(value,keys,where)
     assert(type(value)=='table','invalid '..where)
     for key in pairs(value) do assert(keys[key],where..': unknown field '..tostring(key)) end
