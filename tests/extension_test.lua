@@ -5,7 +5,7 @@ local shared={}
 ModRef={SetSharedVariable=function(_,key,value) shared[key]=value end,
     GetSharedVariable=function(_,key) return shared[key] end}
 local originalLoadfile=loadfile
-local missing,constructed,attached=nil,0,nil
+local missing,constructed,attached,guarded=nil,0,nil,nil
 debug.getinfo=function() return {source='@C:/Mods/1_ModCore_Settings/Scripts/dmm_extension.lua'} end
 loadfile=function(path)
     local name=assert(path:match('([^/\\]+)%.lua$'))
@@ -58,6 +58,13 @@ loadfile=function(path)
                 attached={modules=modules,bus=bus,before=constructed}
             end}
         end
+        if name=='build_guard' then
+            return {new=function(pagesModule,controlsModule,report)
+                assert(type(report)=='function')
+                guarded={pages=pagesModule,controls=controlsModule,before=constructed,attachedBefore=attached==nil}
+                return {install=function() guarded.installedAt=#installs end}
+            end}
+        end
         if name=='mcs_module_json' then return {decode=function() return {} end} end
         if name=='sort_button' then return {install=function(native,path)
             constructed=constructed+1
@@ -87,7 +94,7 @@ assert(attached and attached.modules.controls==controls and attached.modules.nat
     'the menu-closing event is attached on DMM\'s modules before any other wrapper')
 local order={'dmm_events','mc_ini','mcs_manifest','safe_file','mcs_choice_sound','navigation','mapped_presets','menu_contributions','presentation','mod_requirements','browser_groups','module_categories','mcs_taxonomy','mcs_module_json',
  'init_config','menu_pages','page_links','menu_slots','page_hooks','field_types','keybind_editor','range_editor','editor_input','editor_hint','standard_keys','standard_controls',
- 'settings_notify','sort_button','menu_data','index_refresh'}
+ 'settings_notify','sort_button','menu_data','build_guard','index_refresh'}
 assert(#loaded==#order)
 for n,name in ipairs(order) do assert(loaded[n]:match(name..'%.lua$'),'load '..n) end
 -- Copied files load from Scripts/vendor; the extension's own modules from Scripts.
@@ -141,6 +148,10 @@ local hooks,manifest,context=installs[8].args[7]({id='MCC',hooks='/m/hooks.lua'}
 assert(hooks=='hooks' and manifest=='manifest for MCC' and context.page=='MCC',
  'menu pages receive a hooks resolver for hooks pages')
 assert(installs[9].name=='page_links' and installs[9].args[1]==pages)
+assert(guarded and guarded.pages==pages and guarded.controls==controls and guarded.before==0 and guarded.attachedBefore,
+    'the build guard keeps DMM\'s own builds before any other wrapper')
+-- Counted before settings_notify left the list: page_links was the tenth install.
+assert(guarded.installedAt==10,'the build guard wraps every page wrapper but the index refresh')
 assert(installs[10].name=='index_refresh' and installs[10].args[1]==pages
  and type(installs[10].args[2])=='function','the index refresh wraps outermost')
 assert(shared['MC_DMM_Extension_v1.ready']=='1')
@@ -148,12 +159,12 @@ assert(not pcall(extension.install,choices,controls,nil,native,settingsApi),'pag
 assert(not pcall(extension.install,choices,controls,pages,{},settingsApi),'native actions are required')
 -- A module that fails to load, even the last one, leaves DMM's modules untouched: every load
 -- and check runs before the first wrapper.
-for _,name in ipairs({'index_refresh','menu_data','sort_button','standard_controls'}) do
-    installs,constructed,shared,missing,attached={},0,{},name,nil
+for _,name in ipairs({'index_refresh','build_guard','menu_data','sort_button','standard_controls'}) do
+    installs,constructed,shared,missing,attached,guarded={},0,{},name,nil,nil
     local fresh=assert(originalLoadfile('Scripts/dmm_extension.lua'))()
     local ok,err=pcall(fresh.install,choices,controls,pages,native,settingsApi)
     assert(not ok and tostring(err):find('cannot open',1,true),tostring(err))
-    assert(#installs==0 and constructed==0 and attached==nil and shared['MC_DMM_Extension_v1.ready']==nil,name..' failing wraps nothing')
+    assert(#installs==0 and constructed==0 and attached==nil and guarded==nil and shared['MC_DMM_Extension_v1.ready']==nil,name..' failing wraps nothing')
 end
 missing=nil
 -- Without shared variables nothing is wrapped either.

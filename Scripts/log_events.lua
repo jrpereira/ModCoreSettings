@@ -9,6 +9,8 @@ local levels={
     DMM_RESTART_REQUIRED='warn',DMM_DUPLICATE_INIT='warn',DMM_HANDSHAKE_FAILED='warn',
     DMM_LAUNCHER_INSTALLED='info',
     LIFECYCLE_PARTIAL='warn',
+    -- A wrapper failed while a page was built or used: DMM shows its own page until restart.
+    MCS_BUILD_FAILED='error',
     -- A page's action hook failed: what was clicked did nothing.
     HOOK_ACTION_FAILED='error',
 }

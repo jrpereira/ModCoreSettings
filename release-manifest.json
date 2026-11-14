@@ -14,6 +14,7 @@
     "Scripts/presentation.lua": "Scripts/presentation.lua",
     "Scripts/browser_groups.lua": "Scripts/browser_groups.lua",
     "Scripts/index_refresh.lua": "Scripts/index_refresh.lua",
+    "Scripts/build_guard.lua": "Scripts/build_guard.lua",
     "Scripts/sort_button.lua": "Scripts/sort_button.lua",
     "Scripts/dmm_bootstrap.lua": "Scripts/dmm_bootstrap.lua",
     "Scripts/dmm_events.lua": "Scripts/dmm_events.lua",

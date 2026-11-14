@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- An error in ModCoreSettings while the menu builds a page, or in a settings page's controls,
+  no longer stops Dawnwalker Mod Menu for the session. It is logged once as
+  `MCS_BUILD_FAILED` (ERROR) with its cause, and from then on, until the game restarts,
+  Dawnwalker Mod Menu builds its own page from its own mod list, without ModCoreSettings'
+  grouping, index tabs or contributed pages; after a failure in the controls, its own controls
+  too. Settings are not changed.
+- A failure while grouping the mod list keeps the list as it was instead of stopping the
+  menu; it is logged as `BROWSER_GROUPS_FAILED`.
+
 ## v1.8.0
 
 - A page link is drawn as underlined text in the value column, dimmed until hovered,

@@ -96,11 +96,14 @@ extension={
         local settingsNotify=module('settings_notify')
         local sortButtonModule=module('sort_button')
         local menuData=module('menu_data')
+        local buildGuard=module('build_guard')
         local indexRefresh=module('index_refresh')
         assert(type(mapped.install)=='function','mapped preset installer unavailable')
         assert(type(presentation.install)=='function','presentation installer unavailable')
         assert(type(config.install)=='function','configuration installer unavailable')
 
+        -- Before every other wrapper: keeps DMM's own page build and settings panel methods.
+        local guard=buildGuard.new(pages,controls,report)
         local bus=events.bus(report)
         events.attach({controls=controls,nativeactions=native},bus,report)
         -- Innermost: every other wrapper sees this module's settings among DMM's own.
@@ -161,6 +164,9 @@ extension={
         menuPages.install(pages,function(content) return choices.parse(content) end,
             menuPages.reader(contributions,ModRef,read,report),report,slots,read,hooked,compile,stored)
         pageLinks.install(pages,slots)
+        -- Around every wrapper but the index refresh, so a rebuild after Apply is guarded too:
+        -- the first error makes DMM build its own page for the rest of the session.
+        guard:install()
         -- Outermost: a rebuild after Apply runs every wrapper above with DMM's arguments.
         indexRefresh.install(pages,report)
         ModRef:SetSharedVariable('MC_DMM_Extension_v1.ready','1')

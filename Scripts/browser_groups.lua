@@ -721,7 +721,15 @@ function M.install(pages, report, parse, folderVersion, folderManifest, grouping
         end
         local listed,why=pcall(M.modules,providers,options.categoryRegister)
         if not listed then report('BROWSER_GROUPS_FAILED',why) end
-        M.arrange(providers, parse, report,options)
+        -- A failed arrangement leaves the list as it was; arrange only rewrites it at its end.
+        local kept = {}
+        for index, provider in ipairs(providers) do kept[index] = provider end
+        local arranged, err = pcall(M.arrange, providers, parse, report, options)
+        if not arranged then
+            for index = #providers, 1, -1 do providers[index] = nil end
+            for index, provider in ipairs(kept) do providers[index] = provider end
+            report('BROWSER_GROUPS_FAILED', err)
+        end
         local page = build(tree, providers, status, api)
         -- The details card names no version or author for an entry without settings of its
         -- own: a mod without settings, a group heading or an "and N more" entry.
