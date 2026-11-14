@@ -22,6 +22,35 @@ local function setup(dirty)
     return built,model,calls,texts,providers
 end
 
+-- Resetting a link row opens nothing: navigation rows have nothing to reset.
+do
+    local Navigation=require('navigation')
+    local function open(provider)
+        local m={items=provider.choices,pending={},committed={}}
+        for i,choice in ipairs(provider.choices) do m.pending[i],m.committed[i]=choice.default,choice.default end
+        function m:set(i,value) self.pending[i]=value end
+        function m:reset(i) self:set(i,self.items[i].default) end
+        function m:dirty() return false end
+        return m
+    end
+    local providers={{id='Source',choices={{id='Link',mcNavigation=true,mcLinkPage='Target',default=0},
+        {id='Plain',default=0}}},{id='Target',choices={{id='X'}}}}
+    local calls={}
+    local page={rows={{providerIndex=1},{providerIndex=2}},controlStatus={}}
+    page.controls={show=function(self) self.model=Navigation.open(providers[1],open) end,tick=function() return false end}
+    function page:showBrowser() calls[#calls+1]='browser' end
+    function page:showDetail(row) calls[#calls+1]='detail '..row end
+    local pages={build=function() return page end}
+    Links.install(pages)
+    local built=pages.build({},providers,nil,{})
+    built.controls:show(1)
+    local model=built.controls.model
+    model:reset(1)
+    assert(built.controls:tick()==false and #calls==0,'a reset link row opens nothing')
+    model:set(2,1);model:reset(2)
+    assert(model.pending[2]==0,'other rows still reset')
+end
+
 local page,model,calls,texts=setup(false)
 page.controls:show(1)
 model:set(2,1)

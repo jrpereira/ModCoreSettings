@@ -260,6 +260,8 @@ for _,hooks in ipairs({
     assert(model.items[4].id=='MCC_Link')
     model:set(3,1);model:set(1,2);model:set(4,0)
     assert(#acted==2 and acted[2].value==1,'stored rows and page links run no action')
+    model:reset(3);model:reset(4)
+    assert(#acted==2 and model.pending[3]==1,'resetting a navigation row runs no action and keeps its view')
 end
 logs={}
 model=Choices.open(actionPage({contract=1,manifest=mccHooks.manifest,action=function() error('no sound') end}))

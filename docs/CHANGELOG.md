@@ -30,6 +30,9 @@
 - Keybind capture ignores the mouse wheel, as documented: a wheel turn while capturing
   leaves the binding unchanged, and wheel names in a config file are not accepted.
 
+- Resetting a selected action or link row (Delete or the footer's Reset) no longer runs the
+  action or opens the link; such rows have nothing to reset.
+
 ## v1.7.1
 
 - The Modules page places 33 more mods in a category by their folder name, from reviews of

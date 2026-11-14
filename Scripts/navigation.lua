@@ -79,6 +79,9 @@ function M.open(provider,open)
         if transient[i] then self.committed[i]=self.pending[i] end
     end
     function model:reset(i)
+        -- A navigation or read-only row has nothing to reset; resetting it through set would
+        -- run its action or open its link.
+        if i and transient[i] then return end
         local views={}
         for n in pairs(transient) do views[n]=self.pending[n] end
         reset(self,i)
