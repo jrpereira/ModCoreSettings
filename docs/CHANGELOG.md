@@ -14,6 +14,10 @@
   itself in the mod list instead, with the installed extensions' count and each extension's settings
   on its own page.
 
+- Slot rows split from one hidden page share one source: its groups appear once in the slot
+  and Apply saves every row, instead of failing with "config changed externally" after the
+  first.
+
 ## v1.7.1
 
 - The Modules page places 33 more mods in a category by their folder name, from reviews of

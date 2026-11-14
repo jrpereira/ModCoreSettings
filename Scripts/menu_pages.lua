@@ -203,13 +203,16 @@ function M.apply(providers,contributions,parse,state,report,slots,hooked,compile
                     ids[page.id]=true
                 end
             end
-            -- A row's source page may be hidden; its model still needs a provider.
+            -- A row's source page may be hidden; its model still needs a provider. Every row of
+            -- one page shares that provider: slots key groups and models by the source object.
+            local sources={}
             for _,row in ipairs(address and contribution.rows or {}) do
                 local source
                 for _,page in ipairs(contribution.pages) do
                     if page.id==row.page then
-                        source=built[page.id] and built[page.id].provider
+                        source=built[page.id] and built[page.id].provider or sources[page.id]
                             or generated(contribution,page,parse,hooked,compile,stored)
+                        sources[page.id]=source
                     end
                 end
                 local target,slot=address(row.slot)

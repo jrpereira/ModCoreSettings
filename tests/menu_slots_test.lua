@@ -526,4 +526,31 @@ mcReadOnly=1
     assert(page.choices[1].group=='mcSlot.listed.1',text)
     assert(text:find('[Category.mcSlot.listed.1]\nmcLabel=Module\nmcWithinLabel=Category\nmcWithin=mcSlot.listed.2\n',1,true),text)
 end
+-- One hidden page split over several rows (as ModCoreTemplates chunks a slot page) gives one
+-- source: one source group in the slot and one source model, so Apply saves both rows.
+do
+    local Pages=require('menu_pages')
+    local hidden={id='ModCoreTemplates',pages={{id='ModCoreTemplates.slot',name='Slot',visible=false,
+        manifest=source,configDirectory='/mct'}},
+        rows={{page='ModCoreTemplates.slot',slot='controls:visuals',settings={'MCT_Template'}},
+            {page='ModCoreTemplates.slot',slot='controls:visuals',settings={'MCT_Other'}}}}
+    local state={}
+    local host=provider('ModCoreControls','/mcc/mod_settings.ini',host)
+    local list={host}
+    Pages.apply(list,{hidden},Choices.parse,state,report,{address=Menu.address,provider=Menu.provider,
+        declares=function(_,page,slot) return Slots.declares(page,slot,read) end})
+    assert(#list==1,'the source page stays hidden')
+    local rows=state.inserts.controls.visuals
+    assert(#rows==2 and rows[1].source==rows[2].source,'one source object for every row of a page')
+    files['/mct/templates.ini']='[Templates]\nMCT_Template=5\nMCT_Other=0\n'
+    controller.inserts=state.inserts
+    assert(controller:load(host,read))
+    assert(ids(host.choices)=='MCC_Page,MCT_Template,MCT_Other,Speed',ids(host.choices))
+    local model=Choices.open(host)
+    assert(not model.error,model.error)
+    model:set(2,7);model:set(3,1)
+    local ok,err=model:apply()
+    assert(ok,tostring(err))
+    assert(files['/mct/templates.ini']=='[Templates]\nMCT_Template=7\nMCT_Other=1\n',files['/mct/templates.ini'])
+end
 print('PASS menu slots splice contributed rows and route them to their source model')
