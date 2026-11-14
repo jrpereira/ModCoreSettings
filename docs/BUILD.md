@@ -10,17 +10,14 @@ repository's root. Live integration requires the dependencies in the [README](RE
 Run every Lua suite from Bash:
 
 ```sh
-for test in tests/*_test.lua; do
-    lua5.4 "$test" || exit 1
-done
-```
-
-Parser integration tests skip when `DMM_CHOICES_PATH` is unset. To include them,
-set this variable before running the same loop:
-
-```sh
 export DMM_CHOICES_PATH="/path/to/DawnwalkerModMenu/Scripts/choices.lua"
+bash tools/run_lua_tests.sh
 ```
+
+Parser integration suites, and the parser halves of others, need DMM's own parser and
+print `SKIP` without `DMM_CHOICES_PATH`. The runner fails on a skip unless
+`MCS_ALLOW_SKIP=1` is set. CI sets it, because DMM's parser is not redistributable, and
+lists every skipped suite as a warning; run the full set locally before publishing.
 
 Focused checks include `lua5.4 tests/settings_api_test.lua` for notifications
 and `lua5.4 tests/page_hooks_test.lua` for custom storage.

@@ -19,10 +19,15 @@ jobs:
           python-version: '3.12'
       - name: Install Lua 5.4
         run: sudo apt-get update && sudo apt-get install -y lua5.4
-      - name: Compile Lua and run mock tests
+      - name: Compile Lua and run every suite
+        # DMM's parser (choices.lua) is third-party and not redistributable, so the suites
+        # and halves that need it skip here; each skip is listed as a warning. A failing
+        # suite, or a skip without this flag, fails the job.
+        env:
+          MCS_ALLOW_SKIP: '1'
         run: |
           find Scripts tests -name '*.lua' -print0 | xargs -0 -n1 luac5.4 -p
-          for test in tests/*_test.lua; do lua5.4 "$test"; done
+          bash tools/run_lua_tests.sh
   package:
     runs-on: ubuntu-latest
     steps:

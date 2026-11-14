@@ -299,5 +299,7 @@ if choicesPath then
     assert(not pcall(Choices.parse,'[Setting.Link]\nId=Link\nLabel=x\nType=picker\nPresetValues=0|1\n'
         ..'PresetLabels=Open|Open\nDefault=0\nConfigFile=c.ini\nmcLinkPage=ModCoreControls\n'),
         'mcLinkPage requires a navigation picker')
+else
+    print('SKIP DMM parse: DMM_CHOICES_PATH is not set')
 end
 print('PASS menu pages read contributions, place them, and survive rebuilds and failures')
