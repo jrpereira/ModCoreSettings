@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v1.8.0
 
 - A page link is drawn as underlined text in the value column, dimmed until hovered,
   instead of a framed button; its label lines up with the rows around it.
@@ -18,33 +18,28 @@
 - The Modules tab no longer reserves a Lua Extensions section. ModCore Lua Extensions lists
   itself in the mod list instead, with the installed extensions' count and each extension's settings
   on its own page.
-
 - Slot rows split from one hidden page share one source: its groups appear once in the slot
   and Apply saves every row, instead of failing with "config changed externally" after the
   first.
-
 - The Modules page counts a mod enabled in `Mods/mods.txt` (`Name : 1`) as loaded, as
   UE4SS does, instead of only folders holding `enabled.txt`; such mods and their settings
   pages are no longer dropped, nor reported as missing requirements.
 - Load Order follows the order UE4SS starts Lua mods: `mods.txt` entries first, in file
   order, then the remaining folders by upper-cased name, so `ModA` now precedes `Mod_X`.
-
 - Saving a mod's settings no longer lists that mod under Recently Added: the `.old` and
   `.new` copies made while saving are not counted as an update.
-
 - Keybind capture ignores the mouse wheel, as documented: a wheel turn while capturing
   leaves the binding unchanged, and wheel names in a config file are not accepted.
-
 - Resetting a selected action or link row (Delete or the footer's Reset) no longer runs the
   action or opens the link; such rows have nothing to reset.
-
 - Startup takes one game-directory snapshot instead of two: DawnwalkerModMenu's folder is
   found beside this mod's own.
-
 - A changed setting's star and italic label now update on the same frame as the edit,
   drawn in DawnwalkerModMenu's own Lua state. ModCoreSettings no longer polls open pages
   from its second state (every 50 to 250 ms), and rows carry no hidden identity or signal
   captions; the "Error: no identity" row states are gone with them.
+- Config files saved with a UTF-8 byte order mark (as Notepad can) keep their first section:
+  `mc_ini` version 2 no longer reads that section's keys as global ones.
 
 ## v1.7.1
 
