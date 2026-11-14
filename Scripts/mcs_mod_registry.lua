@@ -47,7 +47,22 @@ local function safe(path)
 end
 M.safePath=safe
 
-M.read,M.write=Io.read,Io.write
+-- Reads a file another mod or UE4SS owns: bounded, nil when missing, and never written or
+-- recovered (safe_file's recovery would act on the other mod's .new and .old files).
+function M.readForeign(path,limit)
+    limit=limit or Io.LIMIT or 1048576
+    local file,err,code=io.open(path,'rb')
+    if not file then
+        if code==2 then return nil end
+        error(err or ('cannot read '..path),0)
+    end
+    local content=file:read(limit+1) or ''
+    file:close()
+    assert(#content<=limit,'file exceeds '..limit..' bytes: '..path)
+    return content
+end
+-- M.read reads other mods' files; this module's own cache goes through safe_file.
+M.read,M.write=M.readForeign,Io.write
 
 function M.encode(index)
     return Json.encode(Taxonomy:index(index))..'\n'
@@ -120,6 +135,7 @@ end
 -- Rebuilds the index on every boot and rewrites the browser handoff only when it changed.
 function M.update(options)
     local read,write=options.read or M.read,options.write or M.write
+    local own=options.read or Io.read
     local database=assert(options.database,'folder-category data is required')
     local report=options.report or function() end
     local index={schema_version=2,taxonomy_version=Taxonomy.data.version,modules={}}
@@ -136,7 +152,7 @@ function M.update(options)
         end
     end
     local encoded=M.encode(index)
-    local ok,previous=pcall(read,options.path)
+    local ok,previous=pcall(own,options.path)
     if not ok or previous~=encoded then write(options.path,encoded) end
     return index
 end
@@ -237,16 +253,6 @@ function M.folders(snapshot,mods,read)
     return folders
 end
 
--- Reads a file another mod or UE4SS owns: bounded, never written or recovered.
-function M.readForeign(path,limit)
-    limit=limit or 1048576
-    local file=io.open(path,'rb')
-    if not file then return nil end
-    local content=file:read(limit+1)
-    file:close()
-    assert(not content or #content<=limit,'file exceeds '..limit..' bytes: '..path)
-    return content
-end
 
 M.mkdir=Io.mkdir
 -- Module ids are shared with other Lua states as SetSharedVariable(MODULE_ID..folder, id),
@@ -282,13 +288,13 @@ function M.boot(root,mods,iterator,options)
     local files=options.files
     ;(options.mkdir or files and files.mkdir or Io.mkdir)(cache)
     local read,write=options.read or M.read,options.write or files and files.write or M.write
-    local folders=M.folders(iterator(),mods,options.read or M.readForeign)
+    local folders=M.folders(iterator(),mods,read)
     local index=M.update({path=cache..'/modules_register.json',folders=folders,read=read,write=write,
         database=options.database or M.loadFolderCategories(),report=options.report})
     -- Each folder's top level and when it was added, for the browser's Recently added list.
     -- Never blocks the index.
     local seen,why=pcall(require('mcs_folder_info').update,{path=cache..'/folder_info.json',
-        folders=folders,now=options.now or os.time(),read=files and files.read or read,write=write,
+        folders=folders,now=options.now or os.time(),read=files and files.read or options.read or Io.read,write=write,
         size=options.size or files and files.size,stat=files and files.stat,list=files and files.list,
         report=options.report})
     if not seen and options.report then options.report('folder_info.json',tostring(why)) end

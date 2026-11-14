@@ -124,6 +124,21 @@ do
     assert(table.concat(R.modsList('A:1\nB : 0\n  c :1 # x\n:1\n'),',')=='a,c')
 end
 
+-- Other mods' files are read plainly: a foreign mod.json.new is neither removed nor renamed.
+do
+    local dir=(os.getenv('TMPDIR') or '/tmp')..'/mcs_foreign_'..tostring(os.time())..'_'..math.random(1e6)
+    assert(os.execute('mkdir -p "'..dir..'"'))
+    local function put(path,text) local f=assert(io.open(path,'wb'));f:write(text);f:close() end
+    put(dir..'/mod.json','{}');put(dir..'/mod.json.new','{"x":1}')
+    assert(R.read==R.readForeign and R.read(dir..'/mod.json')=='{}')
+    assert(io.open(dir..'/mod.json.new','rb'),'the other mod\'s .new file stays')
+    assert(R.read(dir..'/missing.json')==nil,'a missing file reads as nil')
+    os.remove(dir..'/mod.json');os.remove(dir..'/mod.json.new')
+    put(dir..'/big','12345')
+    assert(not pcall(R.readForeign,dir..'/big',4),'reads are bounded')
+    os.remove(dir..'/big');os.remove(dir)
+end
+
 -- An existing cache folder is found by its probe, without a shell; a missing one is made.
 local temp=(os.getenv('TMPDIR') or '/tmp')..'/mcs_mkdir_'..tostring(os.time())..'_'..math.random(1e6)
 local execute=os.execute
