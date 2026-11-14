@@ -51,9 +51,16 @@ extension={
             pages=require('pages'),events=bus,settingsApi=require('dmm_api')})
     end,
     install=function(dmm)
+        -- First load every module and check every precondition; DMM's modules are only
+        -- wrapped once all of them hold, so a broken install wraps nothing.
         assert(type(dmm)=='table' and dmm.version==1,'unsupported DMM extension API')
         assert(type(dmm.choices)=='table' and type(dmm.controls)=='table' and type(dmm.pages)=='table',
             'DMM extension modules unavailable')
+        assert(type(dmm.events)=='table' and type(dmm.events.on)=='function','DMM lifecycle events unavailable')
+        assert(ModRef and type(ModRef.GetSharedVariable)=='function','DMM shared variables unavailable')
+        assert(type(ModRef.SetSharedVariable)=='function','DMM extension handshake unavailable')
+        local native=require('nativeactions')
+        assert(type(native)=='table' and type(native.new)=='function','DMM native actions unavailable')
         -- The manifest reader the modules below share; DMM's require resolves in DMM's
         -- folder, so it is placed in package.loaded under a name only this mod uses.
         package.loaded.mc_ini=module('vendor/mc_ini')
@@ -86,34 +93,39 @@ extension={
         local pageLinks=module('page_links')
         local menuSlots=module('menu_slots')
         local pageHooks=module('page_hooks')
+        local fieldTypesModule=module('field_types')
+        local keybind=module('keybind_editor')
+        -- Menu data checks span fields with the same editor.
+        package.loaded.range_editor=module('range_editor')
+        local editorInputModule=module('editor_input')
+        local editorHint=module('editor_hint')
+        -- The shared key rule, vendored like menu_contributions; DMM's require resolves in
+        -- DMM's folder, so standard_controls finds it here.
+        package.loaded.standard_keys=module('vendor/standard_keys')
+        local standardControls=module('standard_controls')
+        local settingsNotify=module('settings_notify')
+        local sortButtonModule=module('sort_button')
+        local menuData=module('menu_data')
+        local indexRefresh=module('index_refresh')
         assert(type(mapped.install)=='function','mapped preset installer unavailable')
         assert(type(presentation.install)=='function','presentation installer unavailable')
         assert(type(config.install)=='function','configuration installer unavailable')
-        assert(type(dmm.events)=='table' and type(dmm.events.on)=='function','DMM lifecycle events unavailable')
         assert(type(lifecycle.publisher)=='function','lifecycle publisher unavailable')
+
         -- Innermost: every other wrapper sees this module's settings among DMM's own.
-        local fieldTypes=module('field_types').new(report)
-        local keybind=module('keybind_editor')
+        local fieldTypes=fieldTypesModule.new(report)
         fieldTypes:register('keybind',keybind)
-        -- Menu data checks span fields with the same editor.
-        package.loaded.range_editor=module('range_editor')
         fieldTypes:register('range',package.loaded.range_editor)
         -- Enter and A for editors that take the row's keys, and their footer hint. UE4SS's
         -- FName is callable userdata, not a function.
-        local editorInput=module('editor_input').new({register=RegisterKeyBind,keys=Key,
+        local editorInput=editorInputModule.new({register=RegisterKeyBind,keys=Key,
             key=FName~=nil and function(name) return {KeyName=FName(name)} end or nil})
         fieldTypes:install({choices=dmm.choices,controls=dmm.controls,settingsApi=dmm.settingsApi,
             confirm=editorInput,pointer=editorInput.pointer,
-            hint=module('editor_hint').install(require('nativeactions'),dmm.pages,
-                FName~=nil and FName or nil),
-            standardControls=(function()
-                -- The shared key rule, vendored like menu_contributions; DMM's require
-                -- resolves in DMM's folder, so standard_controls finds it here.
-                package.loaded.standard_keys=module('vendor/standard_keys')
-                return module('standard_controls')
-            end)()})
+            hint=editorHint.install(native,dmm.pages,FName~=nil and FName or nil),
+            standardControls=standardControls})
         -- Outside field types' numbers-only filter: v2 subscribers also get text values.
-        module('settings_notify').install(dmm.settingsApi,report)
+        settingsNotify.install(dmm.settingsApi,report)
         navigation.install(dmm.choices)
         mapped.install(dmm.choices,dmm.controls)
         presentation.install(dmm.choices,dmm.controls,dmm.pages,{keyColumn=keybind.layout,
@@ -121,7 +133,7 @@ extension={
         local mods=directory:match('^(.*[/\\])[^/\\]+[/\\]Scripts[/\\]$')
         local folderManifest=browserGroups.folderManifest(mods)
         -- DMM's mod-list filter button becomes Sort by, saved in this mod's config.ini.
-        local sortButton=module('sort_button').install(require('nativeactions'),directory..'../config.ini',
+        local sortButton=sortButtonModule.install(native,directory..'../config.ini',
             io_.read,io_.write,report)
         local function read(path)
             return assert(io_.read(path),'unreadable '..path)
@@ -132,7 +144,6 @@ extension={
                 {taxonomy=taxonomy,json=indexJson,report=report,
                     seenPath=directory..'../cache/folder_info.json'}),read,sortButton)
         config.install(dmm.choices)
-        assert(ModRef and type(ModRef.GetSharedVariable)=='function','DMM shared variables unavailable')
         -- Hooks storage sits inside the slot model, which must stay outermost.
         pageHooks.install(dmm.choices,report)
         local loadHooks=pageHooks.loader()
@@ -141,7 +152,6 @@ extension={
             local ok,fields=pcall(folderManifest or error,folder)
             return ok and type(fields)=='table' and fields.name or folder
         end
-        local menuData=module('menu_data')
         local function compile(menu)
             return menuData.manifest(menu,{moduleName=moduleName})
         end
@@ -161,12 +171,11 @@ extension={
             menuPages.reader(contributions,ModRef,read,report),report,slots,read,hooked,compile,stored)
         pageLinks.install(dmm.pages,slots)
         -- Outermost: a rebuild after Apply runs every wrapper above with DMM's arguments.
-        module('index_refresh').install(dmm.pages,report)
+        indexRefresh.install(dmm.pages,report)
         local publisher=lifecycle.publisher(report)
         for _,name in ipairs({'providerPrepared','providerRefreshed','hostClosing'}) do
             dmm.events:on(name,function(context) publisher:publish(name,context) end)
         end
-        assert(ModRef and type(ModRef.SetSharedVariable)=='function','DMM extension handshake unavailable')
         ModRef:SetSharedVariable('MC_DMM_Extension_v1.ready','1')
     end,
 }

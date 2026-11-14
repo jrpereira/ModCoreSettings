@@ -5,11 +5,13 @@ local shared={}
 ModRef={SetSharedVariable=function(_,key,value) shared[key]=value end,
     GetSharedVariable=function(_,key) return shared[key] end}
 local originalLoadfile=loadfile
+local missing,constructed=nil,0
 debug.getinfo=function() return {source='@C:/Mods/1_ModCore_Settings/Scripts/dmm_extension.lua'} end
 loadfile=function(path)
     local name=assert(path:match('([^/\\]+)%.lua$'))
     -- Logging is real: it is loaded from the extension's folder before any module.
     if name=='mc_log' or name=='log_events' then return originalLoadfile(assert(path:match('Scripts/.+$'))) end
+    if name==missing then return nil,'cannot open '..path end
     loaded[#loaded+1]=path
     return function()
         if name=='menu_pages' then
@@ -32,7 +34,7 @@ loadfile=function(path)
         if name=='field_types' then
             return {new=function()
                 return {register=function(_,typeName,editor) fieldTypes.registered[typeName]=editor end,
-                    install=function(_,modules) fieldTypes.modules=modules;fieldTypes.order=#installs end}
+                    install=function(_,modules) constructed=constructed+1;fieldTypes.modules=modules;fieldTypes.order=#installs end}
             end}
         end
         if name=='browser_groups' then
@@ -53,12 +55,14 @@ loadfile=function(path)
         end} end
         if name=='mcs_module_json' then return {decode=function() return {} end} end
         if name=='sort_button' then return {install=function(native,path)
+            constructed=constructed+1
             assert(native==package.loaded.nativeactions and path=='C:/Mods/1_ModCore_Settings/Scripts/../config.ini')
             return 'sort button'
         end} end
         if name=='menu_contributions' then return {textTable='table decoder'} end
         if name=='editor_input' then return {new=function() return {take=function() end,pointer='pointer'} end} end
         if name=='editor_hint' then return {install=function(native)
+            constructed=constructed+1
             assert(native==package.loaded.nativeactions)
             return 'hint'
         end} end
@@ -142,4 +146,20 @@ end
 assert(shared['MC_DMM_Extension_v1.ready']=='1')
 assert(not pcall(extension.install,{version=2,choices=choices,controls=controls,pages=pages,events=events}))
 assert(not pcall(extension.install,{version=1,choices=choices,controls=controls,events=events}))
+-- A module that fails to load, even the last one, leaves DMM's modules untouched: every load
+-- and check runs before the first wrapper.
+for _,name in ipairs({'index_refresh','menu_data','sort_button','standard_controls'}) do
+    installs,constructed,shared,missing={},0,{},name
+    local fresh=assert(originalLoadfile('Scripts/dmm_extension.lua'))()
+    local ok,err=pcall(fresh.install,{version=1,choices=choices,controls=controls,pages=pages,events=events,settingsApi=settingsApi})
+    assert(not ok and tostring(err):find('cannot open',1,true),tostring(err))
+    assert(#installs==0 and constructed==0 and shared['MC_DMM_Extension_v1.ready']==nil,name..' failing wraps nothing')
+end
+missing=nil
+-- Without shared variables nothing is wrapped either.
+installs,constructed={},0
+local saved=ModRef;ModRef=nil
+assert(not pcall(extension.install,{version=1,choices=choices,controls=controls,pages=pages,events=events,settingsApi=settingsApi}))
+ModRef=saved
+assert(#installs==0 and constructed==0,'a missing ModRef wraps nothing')
 print('PASS pure-Lua DMM extension loads owned modules in order and rejects incompatible APIs')
