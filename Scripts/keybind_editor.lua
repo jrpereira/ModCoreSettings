@@ -182,6 +182,11 @@ function M.build(row,setting,context)
     local gap=new('SizeBox');gap:SetWidthOverride(layout.gap);need(line:AddChild(gap),'keybind gap')
     local key=control(layout.key,'')
     -- Keys are 16pt before the box's 0.84 scale; the "optional" placeholder is 14pt.
+    -- A key name longer than longKey characters is drawn longKeyShrink points smaller.
+    local longKey,longKeyShrink=10,2
+    local function fitted(copy,size)
+        return (utf8.len(copy) or #copy)>longKey and size-longKeyShrink or size
+    end
     local keySize
     local function sizeKey(size)
         if keySize==size then return end
@@ -194,7 +199,7 @@ function M.build(row,setting,context)
     -- An inherited key shows inside the key box: a small "default" at the top and
     -- the key flush with the bottom. They may overlap.
     local defaultLabel=text('default',nil,9)
-    local inheritedKey=text('',nil,11)
+    local inheritedKey,inheritedSize=text('',nil,11),11
     pcall(function() defaultLabel:SetColorAndOpacity({SpecifiedColor=placeholder.defaultCaption,ColorUseRule=0}) end)
     pcall(function() inheritedKey:SetColorAndOpacity({SpecifiedColor=placeholder.defaultKey,ColorUseRule=0}) end)
     local keyLayers=key.box:GetContent()
@@ -265,15 +270,24 @@ function M.build(row,setting,context)
     local function render()
         local bound,mode=M.parts(instance.value)
         local defaults=not bound and not instance.selecting and defaultKeys()
-        if instance.selecting then api.setText(key.text,'...');style(key.text,'key')
-        elseif bound then api.setText(key.text,displayName(bound));style(key.text,'active')
+        local shown
+        if instance.selecting then shown='...';style(key.text,'key')
+        elseif bound then shown=displayName(bound);style(key.text,'active')
         elseif setting.optional then
-            api.setText(key.text,'optional');style(key.text,setting.defaultControl and 'inherited' or 'optional')
-        else api.setText(key.text,'Unbound');style(key.text,'none') end
-        sizeKey((not bound and not instance.selecting and not defaults and setting.optional) and 14 or 16)
+            shown='optional';style(key.text,setting.defaultControl and 'inherited' or 'optional')
+        else shown='Unbound';style(key.text,'none') end
+        api.setText(key.text,shown)
+        sizeKey(fitted(shown,(not bound and not instance.selecting and not defaults and setting.optional) and 14 or 16))
         key.text:SetVisibility(defaults and 1 or 3)
         showInherited(defaults and true or false)
-        if defaults then api.setText(inheritedKey,defaults) end
+        if defaults then
+            api.setText(inheritedKey,defaults)
+            local size=fitted(defaults,11)
+            if inheritedSize~=size then
+                inheritedSize=size
+                pcall(function() api.Theme.font(inheritedKey,api.theme,size);inheritedKey:SetFont(inheritedKey.Font) end)
+            end
+        end
         key.inner:SetBrushColor(instance.conflicted and bound and not instance.selecting and placeholder.conflict
             or shade((bound or instance.selecting) and 1 or defaults and 0.5 or 0.30))
         clear.box:SetVisibility(setting.optional and bound and 0 or 2)
