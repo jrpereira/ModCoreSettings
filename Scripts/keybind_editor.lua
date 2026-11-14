@@ -9,8 +9,10 @@
 -- Default=none|<FKey>|<FKey>|<trigger>, Optional=1, DefaultControl=IA_*,
 -- mcConflictScope=<name> (rows on a page sharing it must not bind the same key and trigger).
 local M={}
--- An unbound row retries its default keys once a second for at most this many seconds.
-local DEFAULT_TRIES=30
+-- An unbound row retries its default keys from its tick with growing gaps (1, 2, 4, 8 and
+-- 16 seconds): a key profile that loads late is still picked up within about 30 seconds,
+-- at the cost of a handful of global object scans rather than one a second.
+local DEFAULT_TRIES=5
 local function trim(s) return (s or ''):match('^%s*(.-)%s*$') end
 local function split(s)
     local out={};for part in ((s or '')..'|'):gmatch('(.-)|') do out[#out+1]=trim(part) end
@@ -324,11 +326,13 @@ function M.build(row,setting,context)
             return nil
         end
         -- A key profile that loads after the row was drawn still shows the default
-        -- keys: retry once a second, for at most 30 seconds of an open page.
+        -- keys: retry with doubling gaps, for about 30 seconds of an open page.
         if not bound and setting.defaultControl and self.defaults==nil and (self.defaultTries or 0)<DEFAULT_TRIES then
             local now=os.time()
-            if now~=self.defaultTried then
-                self.defaultTried=now;self.defaultTries=(self.defaultTries or 0)+1
+            if not self.defaultNext then self.defaultNext=now+1
+            elseif now>=self.defaultNext then
+                self.defaultTries=(self.defaultTries or 0)+1
+                self.defaultNext=now+2^self.defaultTries
                 if defaultKeys() then render() end
             end
         end

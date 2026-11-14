@@ -160,8 +160,30 @@ do
     idleEditor:set('none','none')
     local idleLine=find(idleRow.widget:GetContent():GetChildAt(1),function(w) return w.kind=='HorizontalBox' end)
     available=true
+    local clock=os.time
+    local now=clock()
+    os.time=function() return now end
+    assert(idleEditor:tick()==nil and not find(idleLine.children[3],function(w) return w.text=='Q' end),
+        'the first retry waits a second')
+    now=now+1
     assert(idleEditor:tick()==nil and find(idleLine.children[3],function(w) return w.text=='Q' and w.visibility==3 end),
         'an idle row shows the default once the key profile loads')
+    -- Retries back off: 1, 2, 4, 8 and 16 seconds apart, then stop.
+    local tries=0
+    local never={resolve=function() tries=tries+1;return nil,'key profile unavailable' end}
+    local slowEditor=Keybind.build(toggleRow(),setting,{api=api,tree={},modules={standardControls=never}})
+    slowEditor:set('none','none')
+    local first=tries
+    local at={}
+    for second=0,60 do
+        now=clock()+100+second
+        local before=tries
+        slowEditor:tick()
+        if tries>before then at[#at+1]=second end
+    end
+    os.time=clock
+    assert(table.concat(at,',')=='1,3,7,15,31',table.concat(at,','))
+    assert(tries-first==5,'at most five retries from the tick')
     -- A loaded profile that does not map the action is not asked again.
     local asked=0
     local unmapped={resolve=function() asked=asked+1;return nil,'standard control unavailable: IA_X' end}
