@@ -100,7 +100,7 @@ menu={
   `style='none'` hides it (`style='category'`, the default, shows it).
 - A group's `groups` are its subgroups, one level deep, shown after its own fields:
   `{id='Quickslots',label='Player Quickslots',groups={{id='Fangdango',label='Fangdango'}}}`.
-  A subgroup's heading is smaller and sits at the row indent; its fields indent
+  A subgroup's heading is smaller and sits 12 pixels right of the row indent; its fields indent
   20 pixels further, their labels 1pt smaller, in compact rows: 4 pixels shorter,
   values 1pt smaller (`mcWithin`). A subgroup with `style='none'` shows no heading,
   so its fields are drawn as the group's own. A group whose fields are all in subgroups still
@@ -518,9 +518,10 @@ rendered when its category heading is suppressed. `mcHeading` accepts
 `false`/`true` or `0`/`1` and defaults to `true` on categories.
 
 Set `mcWithin=<category>` on a category to make it a subgroup of that category:
-its heading is 15pt in the heading color at the row indent, 10 pixels below the
-rows above, with no rule, and its rows indent 10 pixels further with labels 3pt
-smaller. One level only: the named category cannot itself be a subgroup. DMM takes
+its heading is 15pt in the heading color, 12 pixels right of the row indent and
+10 pixels below the rows above, with no rule. Its rows indent 20 pixels further,
+their labels 1pt smaller, in compact rows: 4 pixels shorter, values 1pt smaller.
+One level only: the named category cannot itself be a subgroup. DMM takes
 no category without settings, so when the named category has no rows of its own,
 `mcWithinLabel=<text>` on its subgroups is its heading, drawn as a category heading
 before them and hidden while they all are. It cannot be combined with `mcParent`.
