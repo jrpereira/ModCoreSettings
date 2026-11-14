@@ -24,6 +24,9 @@
 - Load Order follows the order UE4SS starts Lua mods: `mods.txt` entries first, in file
   order, then the remaining folders by upper-cased name, so `ModA` now precedes `Mod_X`.
 
+- Saving a mod's settings no longer lists that mod under Recently Added: the `.old` and
+  `.new` copies made while saving are not counted as an update.
+
 ## v1.7.1
 
 - The Modules page places 33 more mods in a category by their folder name, from reviews of

@@ -14,9 +14,11 @@ local Json=require('mcs_module_json')
 local M={schema=2}
 
 -- Top-level files a mod or its player writes while playing; they never mark an update.
+-- .old and .new are safe_file's copies made while it replaces a file.
 local function generated(name)
     local lower=name:lower()
     return lower=='log_level.txt' or lower:match('%.log$') or lower:match('%.tmp$') or lower:match('%.bak$')
+        or lower:match('%.old$') or lower:match('%.new$')
         or (lower:match('%.ini$') and lower~='mod_settings.ini')
 end
 local RUNTIME={cache=true,logs=true}

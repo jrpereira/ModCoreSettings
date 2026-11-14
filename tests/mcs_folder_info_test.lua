@@ -37,6 +37,9 @@ assert(info.C.added==300 and not info.C.baseline and info.A.added==100)
 a.files[#a.files+1]='Settings.ini';a.files[#a.files+1]='session.log'
 info=boot(400,{a,b,c})
 assert(info.A.added==100,'run-time files are no update')
+a.files[#a.files+1]='config.ini.old';a.files[#a.files+1]='config.ini.new';sizes['/Mods/A/config.ini.old']=40
+info=boot(450,{a,b,c})
+assert(info.A.added==100 and info.A.updated==nil,'a saved setting\'s .old and .new copies are no update')
 sizes['/Mods/A/mod.json']=12
 info=boot(500,{a,b,c})
 assert(info.A.added==100 and info.A.updated==500,'an update keeps the install date and records the update')
