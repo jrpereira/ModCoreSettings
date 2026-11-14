@@ -5,10 +5,25 @@ local Tax=R.taxonomy
 local real=R.loadFolderCategories()
 assert(real.version==Tax.data.version and real.revision>=1 and real.folders['90days'][1]=='quests',
     'runtime loads the generated normalized M-to-C data')
-assert(R.normalizeFolderName('90 Days')=='90days'
-    and R.normalizeFolderName('E\204\129 STRA\225\186\158E')=='éstrasse',
+assert(R.normalizeFolderName('90 Days')=='90days' and package.loaded.mcs_unicode_data==nil,
+    'ASCII names never load the Unicode tables')
+assert(R.normalizeFolderName('E\204\129 STRA\225\186\158E')=='éstrasse',
     'folder normalization is case folded, Unicode aware, and separator independent')
 assert(R.tokens==nil and R.match==nil,'runtime registry does not compute fingerprints')
+-- The generated keys are normalized (the boot no longer checks them), and the ASCII fast
+-- path agrees with the Unicode path: a trailing middle dot (not alphanumeric) forces it.
+do
+    local count=0
+    for key in pairs(real.folders) do
+        count=count+1
+        assert(R.normalizeFolderName(key)==key and R.normalizeFolderName(key..'\194\183')==key,
+            'folder category key is not normalized: '..key)
+    end
+    assert(count>0)
+    for _,name in ipairs({'Mod_X','ModA','9_ModCore_Fangdango','Ab-c.D e!~','  Tab\tName  ','UPPER lower 123','@#$%'}) do
+        assert(R.normalizeFolderName(name)==R.normalizeFolderName(name..'\194\183'),name)
+    end
+end
 
 -- Usable categories: remap fixes invalid data first, then unknown ids are dropped.
 assert(table.concat(Tax:usable({'quests','retired'}),',')=='quests','invalid categories are dropped')

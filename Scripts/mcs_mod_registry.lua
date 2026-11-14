@@ -22,12 +22,10 @@ function M.loadFolderCategories(path)
     for name,categories in pairs(data.folders) do
         assert(type(name)=='string' and name~='' and not name:find('[/\\]'),
             'invalid normalized folder name')
-        local normalized=M.normalizeFolderName(name)
-        assert(normalized==name,'folder category key is not normalized')
-        assert(not folders[normalized],'duplicate normalized folder name')
+        -- Keys are normalized when the data is generated; mod_registry_test checks them.
         assert(type(categories)=='table','invalid folder categories')
         -- Rows are resolved on lookup, so one row the taxonomy rejects affects only its folder.
-        folders[normalized]=categories
+        folders[name]=categories
     end
     data.folders=folders
     return data

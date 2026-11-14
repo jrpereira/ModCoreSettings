@@ -1,7 +1,13 @@
 -- Unicode normalisation of folder names (NFC, case folding, alphanumerics only): the
 -- key both the boot index and the offline folder map use.
-local D=require('mcs_unicode_data')
-local M={unicodeVersion=D.version}
+-- The Unicode tables (~370 KB) load only for a name with a byte above 127; ASCII names,
+-- nearly all of them, take a fast path with the same result.
+local D=setmetatable({},{__index=function(self,key)
+    local data=require('mcs_unicode_data')
+    setmetatable(self,{__index=data})
+    return data[key]
+end})
+local M={}
 local function decompose(cp,out)
     if cp>=0xAC00 and cp<=0xD7A3 then
         local s=cp-0xAC00
@@ -65,6 +71,11 @@ local function alnum(cp)
 end
 M.isAlnum=alnum
 function M.anchor(value)
+    -- For ASCII, NFC changes nothing, case folding maps only A-Z, and the alphanumerics
+    -- are 0-9 and a-z.
+    if type(value)=='string' and not value:find('[\128-\255]') then
+        return (value:lower():gsub('[^0-9a-z]',''))
+    end
     local out={}
     for _,cp in utf8.codes(M.normalize(value)) do if alnum(cp) then out[#out+1]=utf8.char(cp) end end
     return table.concat(out)
