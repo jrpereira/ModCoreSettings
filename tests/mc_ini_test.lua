@@ -33,4 +33,16 @@ assert(Ini.set('','M','k',1)=='[M]\nk=1\n','empty text')
 assert(Ini.set('[A]\na=1','M','k',1)=='[A]\na=1\n\n[M]\nk=1\n','separated')
 assert(Ini.set('[A]\na=1\n\n','M','k',1)=='[A]\na=1\n\n[M]\nk=1\n','existing blank line kept')
 assert(not pcall(Ini.set,'','M','k','a;b') and not pcall(Ini.set,'','M','k=','1'),'unsafe text refused')
+-- A leading UTF-8 BOM hides no header; offsets and edits keep its bytes.
+local bom='\239\187\191'
+doc=Ini.parse(bom..'[A]\nk=1\n')
+assert(#doc.sections[1].entries==0 and doc.sections[2].name=='A' and doc.sections[2].entries[1].key=='k','BOM before a header')
+assert(doc.lines[1].text=='[A]' and doc.lines[1].start==1 and doc.text:sub(1,3)==bom,'the BOM stays in the text')
+doc=Ini.parse(bom..'k = 12 ; note\n')
+local e=doc.sections[1].entries[1]
+assert(e.key=='k' and e.value=='12' and doc.text:sub(e.valueFirst,e.valueLast)=='12','BOM before a key keeps offsets')
+assert(Ini.set(bom..'[A]\nk=1\n','A','k',2)==bom..'[A]\nk=2\n','set splices BOM text in place')
+assert(Ini.set(bom..'k=1','','k',3)==bom..'k=3','set on a BOM first line')
+assert(Ini.set(bom..'[A]\nk=1\n','A','j',5)==bom..'[A]\nk=1\nj=5\n','added key under a BOM header')
+assert(#Ini.parse('x'..bom..'[A]\n').sections==1,'only a leading BOM is skipped')
 print('PASS mc_ini')
