@@ -415,10 +415,9 @@ function M.arrange(providers, parse, report, options)
     for _, provider in ipairs(listed) do
         local folder = folderOf(provider) or provider.id
         if not counted[folder] then counted[folder] = true;moduleCount = moduleCount + 1 end
-        provider.mcTaxonomyEntry, provider.mcLoadIndex = nil, nil
+        provider.mcLoadIndex = nil
         if taxonomy then
             local entry = entryOf(provider)
-            provider.mcTaxonomyEntry = entry
             local preferred = entry.preferred
             if options.groupModules == false then
                 plain[#plain + 1] = provider
@@ -790,7 +789,6 @@ function M.install(pages, report, parse, folderVersion, folderManifest, grouping
             -- until the "and X more" entry is selected. A failure leaves DMM's own filtering.
             page.mcModuleCount=providers.mcModuleCount
             page.mcExpanded={}
-            local categoryFilter,tagFilter=options.categoryFilter,options.tagFilter
             local hidden = options.taxonomy~=nil or providers.mcFolded
             for _, provider in ipairs(providers) do
                 hidden = hidden or provider.mcBrowserHidden == true or provider.mcNoSettingsDeclared == true
@@ -816,9 +814,7 @@ function M.install(pages, report, parse, folderVersion, folderManifest, grouping
                     local rows, visible = {}, {}
                     for index, row in ipairs(self.allRows) do
                         local provider = providers[row.providerIndex]
-                        local entry=provider.mcTaxonomyEntry
-                        local allowed=not options.taxonomy or not entry or (options.taxonomy:matches(entry,categoryFilter,false)
-                            and options.taxonomy:matches(entry,tagFilter,true))
+                        local allowed=true
                         local folded=providers.mcFoldedAt and providers.mcFoldedAt[row.providerIndex]
                         if provider.mcBrowserMore then
                             allowed=not self.compatibleOnly and not self.mcExpanded[provider.mcBrowserMore]
@@ -884,14 +880,6 @@ function M.install(pages, report, parse, folderVersion, folderManifest, grouping
                     end
                     return showDetail(self,rowIndex)
                 end
-            end
-            function page:setCategoryFilter(values,mode)
-                if options.taxonomy then options.taxonomy:matches({categories={},parents={},tags={}}, {values=values,mode=mode},false) end
-                categoryFilter={values=values,mode=mode};self:setFilter(self.compatibleOnly)
-            end
-            function page:setTagFilter(values,mode)
-                if options.taxonomy then options.taxonomy:matches({categories={},parents={},tags={}}, {values=values,mode=mode},true) end
-                tagFilter={values=values,mode=mode};self:setFilter(self.compatibleOnly)
             end
             -- The hint counts module folders, not menu entries (headings, a mod listed under
             -- several categories, folded entries). With DMM's page api it is only the count of

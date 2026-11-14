@@ -1,4 +1,4 @@
--- Installed in DMM's own Lua state through DMM's startup extension API.
+-- Runs in DMM's own Lua state; dmm_extension installs it from the launcher.
 -- No second model, configuration writer, widget batch or polling loop.
 local M={version=1}
 local Manifest=require('mcs_manifest')

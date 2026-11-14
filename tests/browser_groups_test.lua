@@ -477,7 +477,7 @@ assert(placements[1].wrapper.visibility==0 and placements[2].wrapper.visibility=
     and mores[1].wrapper.visibility==1,'choosing the entry unfolds every group and hides it')
 print('PASS the folded entry lists mods without settings and opens nothing')
 
--- Taxonomy filtering combines independent category and tag sets.
+-- With the taxonomy every placement is listed, under its group headings.
 local filterPages={build=function(_,items)
     local page={allRows={},rows={},empty=widget(),scroll={ScrollToStart=function() end}}
     for index in ipairs(items) do page.allRows[index]={providerIndex=index,wrapper=widget(),widget=widget()} end
@@ -495,13 +495,8 @@ end)
 local placements={multi,solo}
 local filtered=filterPages.build({},placements,nil,{})
 assert(#filtered.rows==5 and filtered.mcModuleCount==2 and multi.mcBrowserLabel==nil)
-filtered:setTagFilter({'fix'},'all');assert(#filtered.rows==4)
-filtered:setCategoryFilter({'sounds'},'any');assert(#filtered.rows==0 and filtered.empty.visibility==0)
-filtered:setTagFilter({},'any');assert(#filtered.rows==2)
-filtered:setCategoryFilter({'gear','models'},'all');assert(#filtered.rows==4)
-filtered:setCategoryFilter({},'any');filtered:setFilter(false);assert(#filtered.rows==5)
-assert(not pcall(filtered.setCategoryFilter,filtered,{'vehicles'},'any'))
-print('PASS taxonomy row filtering combines independent category/tag sets')
+assert(filtered.setCategoryFilter==nil and filtered.setTagFilter==nil,'no category or tag filter API')
+print('PASS a taxonomy listing shows every placement')
 
 -- Through DMM's real parser the host page's tabs parse and open without a config file.
 local choicesPath=os.getenv('DMM_CHOICES_PATH')

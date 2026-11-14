@@ -101,7 +101,7 @@ their `mod.json` like any other mod.
   module appears once per top category its categories belong to; placements reuse
   the same provider and settings.
 - **Collections** follow, in the load order of their first module. A collection is
-  a `preferred` name shared by at least Preferred Category valid with # modules
+  a `preferred` name shared by at least Collections valid with # modules
   distinct folders; `preferred: author` uses the declared author. A module in a
   valid collection is listed only there. A `preferred` value naming a category
   counts as that category declared first and forms no collection.
@@ -120,12 +120,21 @@ Module totals, including the list's "N mods" count, and collection thresholds co
 distinct folders, not placements, headings or settings pages. Mods without settings
 are named without DMM's "No settings available" notice, dimmed to 50% (75% on hover,
 70% when selected) without the full highlight; "and N more" entries likewise sit at 50%
-and 75% on hover. Group modules and Preferred Category valid with # modules are saved
-in `config.ini` under `[Modules]`; No disables collections, and disabling module
-grouping lists each page once.
+and 75% on hover.
 
-`page:setCategoryFilter(ids, 'any'|'all')` and
-`page:setTagFilter(ids, 'any'|'all')` filter independently. The two filters combine
-with AND. These are browser
-API methods; no additional filter controls or density thresholds are introduced.
+The Settings page's Modules tab chooses the listing, saved in `config.ini` under
+`[Modules]`:
+
+- **Sort by** (`SortBy`): Categories (1, the default) groups as above; Recently
+  Added (2) lists mods by when they were installed or updated, newest first, in
+  sections by age; Alphabetical (0) lists every mod by name; Load Order (3) lists
+  them in load order, each with its number. The mod list's footer button (DMM's
+  Filter Mods, Backspace) moves to the next way and saves it the same way.
+- **Collections valid with # modules** (`PreferredCategoryMinimum`, No/2/3, with
+  Categories): the folders a collection needs; No disables collections.
+- **Modules appear in a single category** (`SingleCategory`, Off/On, with
+  Categories): a mod whose categories span several top categories is listed only
+  under the one holding most of them.
+- **Modules per row** (`ModulesPerRow`, 1/2/3, default 2): the columns of every
+  list's grid, in every sort.
 Parent sections are not subdivided automatically.

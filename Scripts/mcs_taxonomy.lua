@@ -167,42 +167,9 @@ function M.new(data)
         end
         return index
     end
-    function T:matches(entry,filter,isTag)
-        if not filter or not filter.values or #filter.values==0 then return true end
-        assert(filter.mode==nil or filter.mode=='any' or filter.mode=='all','invalid filter mode')
-        local requested
-        if isTag then requested=self:tags(filter.values) else
-            requested={}
-            for _,id in ipairs(array(filter.values)) do
-                if self.sections[id] then requested[#requested+1]=id
-                else requested[#requested+1]=self:categories({id})[1] end
-            end
-        end
-        local present={}
-        for _,id in ipairs(entry.categories or {}) do present[id]=true end
-        for _,id in ipairs(entry.parents or {}) do present[id]=true end
-        if isTag then present={};for _,id in ipairs(entry.tags or {}) do present[id]=true end end
-        for _,id in ipairs(requested) do
-            if filter.mode=='all' and not present[id] then return false end
-            if filter.mode~='all' and present[id] then return true end
-        end
-        return filter.mode=='all'
-    end
     return T
 end
 
-function M.load(path,read,json)
-    read=read or function(filePath)
-        local file,err=io.open(filePath,'rb')
-        assert(file,err or ('cannot read taxonomy: '..filePath))
-        local content=file:read(1048577)
-        local closed,closeErr=file:close()
-        assert(closed,closeErr);assert(content and #content<=1048576,'taxonomy exceeds 1 MiB')
-        return content
-    end
-    json=json or require('mcs_module_json')
-    return M.new(json.decode(read(path)))
-end
 function M.loadLua(path,loader)
     local data
     if loader then data=loader(path) else
