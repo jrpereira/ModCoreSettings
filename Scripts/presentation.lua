@@ -2005,37 +2005,49 @@ function M.install(choices,controls,pages,options)
                                 row.mcArrowsHot=hot
                             end
                         end
-                        -- A click on a picker's value zone steps like its arrow, while that
-                        -- arrow could be clicked, wrapping around at either end.
-                        for _,zone in ipairs(row.mcZones or {}) do
-                            local clicked
-                            clicked,zone.pressed,zone.pointer=released(zone.widget,zone.pressed,zone.pointer,
-                                not controller and zone.widget:IsHovered()==true)
-                            if clicked and zone.arrow and row.parts[zone.arrow].widget:GetIsEnabled() then
-                                step(self,i,zone.direction)
-                                return tick(self,queued,released,controller)
-                            end
-                            -- A click above a pip chooses it.
-                            if clicked and zone.choice~=nil and row.parts[2].widget:GetIsEnabled() then
-                                self:select(i,false)
-                                if self.model.pending[i]~=zone.choice then
-                                    self.model:set(i,zone.choice);self:refresh()
-                                    if adapted.feedback then adapted.feedback('Change') end
+                        -- Zones sit inside DMM's value button and edge arrows are DMM's own
+                        -- arrows, so the pointer is only over them on DMM's hovered row. They
+                        -- are polled there, on the selected row, and on a row still holding a
+                        -- press (a drag that left it). Tabs and switches sit outside DMM's
+                        -- parts, which DMM's hover does not see, so they are always polled.
+                        if self.hovered==i or self.current==i or row.mcEngaged then
+                            -- A click on a picker's value zone steps like its arrow, while that
+                            -- arrow could be clicked, wrapping around at either end.
+                            for _,zone in ipairs(row.mcZones or {}) do
+                                local clicked
+                                clicked,zone.pressed,zone.pointer=released(zone.widget,zone.pressed,zone.pointer,
+                                    not controller and zone.widget:IsHovered()==true)
+                                if clicked and zone.arrow and row.parts[zone.arrow].widget:GetIsEnabled() then
+                                    step(self,i,zone.direction)
+                                    return tick(self,queued,released,controller)
                                 end
-                                return tick(self,queued,released,controller)
+                                -- A click above a pip chooses it.
+                                if clicked and zone.choice~=nil and row.parts[2].widget:GetIsEnabled() then
+                                    self:select(i,false)
+                                    if self.model.pending[i]~=zone.choice then
+                                        self.model:set(i,zone.choice);self:refresh()
+                                        if adapted.feedback then adapted.feedback('Change') end
+                                    end
+                                    return tick(self,queued,released,controller)
+                                end
                             end
-                        end
-                        -- A click on the faint arrow at an end wraps around. It is taken here,
-                        -- before DMM sees it, sharing DMM's press state for that arrow.
-                        local edge=edgeArrow(row)
-                        if edge then
-                            local clicked
-                            clicked,edge.pressed,edge.pointer=released(edge.widget,edge.pressed,edge.pointer,
-                                not controller and edge.widget:IsHovered()==true)
-                            if clicked then
-                                step(self,i,edge==row.left and 1 or 2)
-                                return tick(self,queued,released,controller)
+                            -- A click on the faint arrow at an end wraps around. It is taken here,
+                            -- before DMM sees it, sharing DMM's press state for that arrow.
+                            local edge=edgeArrow(row)
+                            if edge then
+                                local clicked
+                                clicked,edge.pressed,edge.pointer=released(edge.widget,edge.pressed,edge.pointer,
+                                    not controller and edge.widget:IsHovered()==true)
+                                if clicked then
+                                    step(self,i,edge==row.left and 1 or 2)
+                                    return tick(self,queued,released,controller)
+                                end
                             end
+                            local engaged=false
+                            for _,zone in ipairs(row.mcZones or {}) do
+                                if zone.pressed or zone.pointer then engaged=true end
+                            end
+                            row.mcEngaged=engaged
                         end
                         -- A controller has no pointer to hover with; its presses come through focus.
                         for _,tab in ipairs(row.mcTabs or {}) do
@@ -2068,10 +2080,12 @@ function M.install(choices,controls,pages,options)
         function ui:isPressed()
             if isPressed(self) then return true end
             if self.active then
-                for _,row in ipairs(self.panels[self.active].rows) do
+                for i,row in ipairs(self.panels[self.active].rows) do
                     if row.visible then
                         for _,tab in ipairs(row.mcTabs or {}) do if tab.widget:IsPressed() then return true end end
-                        for _,zone in ipairs(row.mcZones or {}) do if zone.widget:IsPressed() then return true end end
+                        if self.hovered==i or self.current==i or row.mcEngaged then
+                            for _,zone in ipairs(row.mcZones or {}) do if zone.widget:IsPressed() then return true end end
+                        end
                     end
                 end
             end

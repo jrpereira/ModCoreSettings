@@ -1538,15 +1538,30 @@ do
     end
     local click=function(w) local clicked=w.clicked;w.clicked=false;return clicked,false,false end
     noteUi.model.pending[1]=0;noteUi:refresh()
-    last.widget.clicked=true;noteUi:tick({},click,false)
+    -- Zones are polled only on the hovered or selected row, or one still holding a press.
+    noteUi.current,noteUi.hovered=nil,nil
+    local polled=0
+    local counting=function(w) polled=polled+1;return click(w) end
+    last.widget.clicked=true;noteUi:tick({},counting,false)
+    assert(polled==0 and noteUi.model.pending[1]==0,'an unhovered, unselected row\'s zones are not polled')
+    noteUi.hovered=1
+    noteUi:tick({},click,false)
     assert(noteUi.model.pending[1]==7 and noteUi.current==1,'the right zone steps forward and selects the row')
+    noteUi.hovered=nil
+    local held=function(w) return false,w==first.widget,false end
+    noteUi:tick({},held,false)
+    noteUi.current=nil
+    polled=0
+    noteUi:tick({},function(w) polled=polled+1;return false,false,false end,false)
+    assert(polled>0,'a row still holding a press keeps being polled after the pointer leaves')
+    noteUi.current=1
     first.widget.clicked=true;noteUi:tick({},click,false)
     assert(noteUi.model.pending[1]==0,'the left zone steps back')
     noteRow.parts[3].widget:SetIsEnabled(false)
     last.widget.clicked=true;noteUi:tick({},click,false)
     assert(noteUi.model.pending[1]==0,'not while its arrow is disabled')
     noteRow.parts[3].widget:SetIsEnabled(true)
-    noteUi.current=nil
+    noteUi.current,noteUi.hovered=nil,1
     zones[#zones-1].widget.clicked=true;noteUi:tick({},click,false)
     assert(noteUi.model.pending[1]==values[#values] and noteUi.current==1,'a click above a pip chooses it')
     zones[2].widget.clicked=true;noteUi:tick({},click,false)
@@ -1650,6 +1665,7 @@ do
     local click=function(w) local clicked=w.clicked;w.clicked=false;return clicked,false,false end
     assert(noteRow.parts[3].widget.enabled==true,'the faint arrow takes clicks')
     noteUi.model.pending[1]=9;noteUi:refresh();settle(noteUi)
+    noteUi.hovered=1
     noteRow.parts[3].widget.clicked=true;noteUi:tick({},click,false)
     assert(noteUi.model.pending[1]==0 and noteUi.current==1,'past the last choice comes the first')
     assert(noteRow.value.RenderTranslation.X==12,'sliding in from the right, the side clicked')
@@ -1660,7 +1676,7 @@ do
         'before the first choice comes the last, from the left')
     settle(noteUi)
     noteRow.renderLeft,noteRow.renderRight=true,false;noteUi:refresh()
-    noteUi.current=nil
+    noteUi.current,noteUi.hovered=nil,nil
 end
 noteRow.renderLeft,noteRow.renderRight=false,false
 noteRow.parts[1].widget:SetRenderOpacity(0);noteRow.parts[3].widget:SetRenderOpacity(0)
