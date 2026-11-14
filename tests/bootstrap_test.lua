@@ -4,21 +4,13 @@ local DMM='C:/Mods/DawnwalkerModMenu/Scripts/'
 local MCS='C:/Mods/1_ModCore_Settings/Scripts/'
 local MAIN,ORIGINAL,STAGE=DMM..'main.lua',DMM..test.original,DMM..test.stage
 
-local function directoryTree(installed)
-    local mods={__name='Mods'}
-    if installed then
-        mods.DawnwalkerModMenu={__name='DawnwalkerModMenu',Scripts={__name='Scripts',
-            __files={{__name='main.lua',__absolute_path=MAIN}}}}
-    end
-    return {Game={__name='Game',Binaries={__name='Binaries',Win64={__name='Win64',ue4ss={__name='ue4ss',Mods=mods}}}}}
-end
-
 local function environment(seed,options)
     options=options or {}
     local files,shared,scheduled,writes={},{},{},0
     for path,value in pairs(seed or {}) do files[path]=value end
     local env={scripts=options.scripts or MCS}
-    env.directories=function() return directoryTree(options.missing~=true) end
+    -- No directory snapshot: DMM's folder is derived from this mod's Scripts path.
+    env.directories=function() error('no game directory scan') end
     env.read=function(path) return files[path] end
     env.write=function(path,value) writes=writes+1;files[path]=value;return true end
     env.remove=function(path) files[path]=nil;return true end
@@ -110,9 +102,15 @@ env,files=environment({[MAIN]=test.launcher(DMM,MCS)})
 events,log=recorder()
 assert(Bootstrap.run(log,function() end,env)==false and has(events,'DMM_LAUNCHER_FAILED') and files[MAIN]==test.launcher(DMM,MCS))
 -- Without DMM there is nothing to do.
-env=environment({},{missing=true})
+env,files=environment({['C:/Mods/Other/Scripts/main.lua']='x'})
 events,log=recorder()
-assert(Bootstrap.run(log,function() end,env)==false and has(events,'DMM_REQUIRED'))
+assert(Bootstrap.run(log,function() end,env)==false and has(events,'DMM_REQUIRED:DawnwalkerModMenu is not installed'))
+assert(next(files)=='C:/Mods/Other/Scripts/main.lua' and next(files,next(files))==nil,'nothing is written')
+-- DMM's folder sits beside this mod's, whatever separator the path uses.
+env,files=environment({['C:\\Mods\\DawnwalkerModMenu\\Scripts\\main.lua']='dmm main'},{scripts='C:\\Mods\\1_ModCore_Settings\\Scripts\\'})
+events,log=recorder()
+assert(Bootstrap.run(log,function() end,env)=='waiting'
+    and files['C:\\Mods\\DawnwalkerModMenu\\Scripts\\main.dmm.lua']=='dmm main','a backslash path finds DMM too')
 print('PASS missing DMM files are reported without changes')
 
 -- The launcher itself: hooks run only while ModCoreSettings is enabled, and

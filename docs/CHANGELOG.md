@@ -33,6 +33,9 @@
 - Resetting a selected action or link row (Delete or the footer's Reset) no longer runs the
   action or opens the link; such rows have nothing to reset.
 
+- Startup takes one game-directory snapshot instead of two: DawnwalkerModMenu's folder is
+  found beside this mod's own.
+
 ## v1.7.1
 
 - The Modules page places 33 more mods in a category by their folder name, from reviews of

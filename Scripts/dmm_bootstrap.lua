@@ -76,68 +76,16 @@ local function launcher(dmmScripts,mcsScripts)
     return table.concat(lines,'\n')
 end
 
-local function child(node,wanted)
-    if type(node)~='table' then return nil end
-    wanted=wanted:lower()
-    for key,value in pairs(node) do
-        if type(value)=='table' and (tostring(key):lower()==wanted
-            or tostring(value.__name or ''):lower()==wanted) then return value end
+-- DMM's Scripts folder sits beside this mod's under Mods: derived from this mod's own
+-- Scripts path, so no directory snapshot is needed. Present when its main.lua, or its own
+-- main kept aside by an interrupted install, can be read.
+local function locate(env)
+    local mods,sep=env.scripts:match('^(.*[/\\])[^/\\]+[/\\][^/\\]+([/\\])$')
+    if not mods then return nil,'ModCoreSettings is not in a Mods folder' end
+    local directory=mods..'DawnwalkerModMenu'..sep..'Scripts'..sep
+    if env.read(directory..'main.lua')==nil and env.read(directory..ORIGINAL)==nil then
+        return nil,'DawnwalkerModMenu is not installed'
     end
-end
-
-local function modsRoot(directories)
-    local game=child(directories,'Game')
-    if not game and type(directories)=='table' then
-        for _,candidate in pairs(directories) do
-            if child(candidate,'Binaries') then
-                assert(not game,'ambiguous game directory')
-                game=candidate
-            end
-        end
-    end
-    return child(child(child(child(game,'Binaries'),'Win64'),'ue4ss'),'Mods')
-end
-
-local function runtime()
-    local function read(path)
-        local handle,err=io.open(path,'rb');if not handle then return nil,err end
-        local content,why=handle:read(MAX_FILE+1)
-        local closed,closeError=handle:close()
-        if not content or not closed then return nil,why or closeError or 'read failed' end
-        if #content>MAX_FILE then return nil,'file exceeds 256 KiB' end
-        return content
-    end
-    local function write(path,content)
-        local handle,err=io.open(path,'wb');if not handle then return nil,err end
-        local written,why=handle:write(content)
-        local closed,closeError=handle:close()
-        if not written or not closed then return nil,why or closeError or 'write failed' end
-        return true
-    end
-    local source=debug.getinfo(1,'S').source:gsub('^@','')
-    return {
-        directories=IterateGameDirectories,read=read,write=write,remove=os.remove,rename=os.rename,
-        scripts=source:match('^(.*[/\\])[^/\\]+$'),
-        get=function(key) return ModRef and ModRef:GetSharedVariable(key) end,
-        set=function(key,value) assert(ModRef,'ModRef unavailable');ModRef:SetSharedVariable(key,value) end,
-        defer=ExecuteInGameThread,
-    }
-end
-
-local function locate(gameDirectories)
-    local scripts=child(child(modsRoot(gameDirectories),'DawnwalkerModMenu'),'Scripts')
-    if not scripts then return nil,'DawnwalkerModMenu is not installed' end
-    local directory
-    for _,entry in pairs(scripts.__files or {}) do
-        if type(entry)=='table' and type(entry.__absolute_path)=='string' then
-            local candidate=entry.__absolute_path:match('^(.+[\\/])[^\\/]+$')
-            if candidate then
-                assert(not directory or directory==candidate,'ambiguous DMM Scripts directory')
-                directory=candidate
-            end
-        end
-    end
-    if not directory then return nil,'DawnwalkerModMenu Scripts directory is empty' end
     return directory
 end
 
@@ -203,11 +151,9 @@ function M.run(log,initialize,overrides)
         finished=true;return true
     end
 
-    local listed,gameDirectories=pcall(env.directories)
-    if not listed then log('DMM_REQUIRED','game directories unavailable: '..tostring(gameDirectories));return false end
-    local located,directory,locateError=pcall(locate,gameDirectories)
-    if not located or not directory then log('DMM_REQUIRED',tostring(located and locateError or directory));return false end
     if not env.scripts then log('DMM_LAUNCHER_FAILED','ModCoreSettings Scripts directory unavailable');return false end
+    local located,directory,locateError=pcall(locate,env)
+    if not located or not directory then log('DMM_REQUIRED',tostring(located and locateError or directory));return false end
     local installed,state=pcall(install,env,directory,env.scripts)
     if not installed then log('DMM_LAUNCHER_FAILED',tostring(state));return false end
     local changed=state~='current'
