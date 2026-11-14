@@ -18,9 +18,6 @@ local log=require('log_events').reporter(logger)
 local initialized=false
 local function initialize()
     if initialized then return true end
-    local Binding=require('dmm_binding')
-    local ok,err=Binding.install(log)
-    if not ok then log('DMM_BINDING_UNAVAILABLE',tostring(err));return false end
     initialized=true
     logger.info(VERSION or 'unversioned',' ready')
     return true

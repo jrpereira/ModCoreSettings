@@ -8,7 +8,6 @@ package.loaded.mcs_mod_registry={boot=function() scans=scans+1;return {modules={
     publishModuleIds=function(index,set) published_ids[#published_ids+1]=index end}
 local originalPrint=print
 print=function(value) captured[#captured+1]=value end
-package.loaded.dmm_binding={install=function() installed=true;return true end}
 package.loaded.dmm_bootstrap={run=function(log) assert(scans==1,'scan precedes DMM bootstrap');log('DMM_REQUIRED','missing DMM') end}
 dofile('Scripts/main.lua')
 print=originalPrint
@@ -16,20 +15,19 @@ assert(#captured==2 and captured[1]:find('SETTINGS_PAGE_UNAVAILABLE',1,true)
     and captured[2]:find('DMM_REQUIRED',1,true),'without a mod folder the page is not published')
 assert(not installed,'DMM readiness must gate MCS initialization')
 print('PASS startup explains missing DMM and remains inactive')
-package.loaded.dmm_binding={install=function() installed=true;return true end}
-package.loaded.dmm_bootstrap={run=function(_,start) assert(scans==2,'one scan per startup');return start() end}
+package.loaded.dmm_bootstrap={run=function(_,start) assert(scans==2,'one scan per startup');installed=start() end}
 dofile('Scripts/main.lua')
-assert(installed,'ready DMM handshake must initialize presentation')
+assert(installed==true,'a ready DMM handshake initializes')
 assert(#published_ids==2,'module ids are published after each scan')
-print('PASS ready DMM handshake initializes presentation')
+print('PASS ready DMM handshake initializes')
 
 installed=false
 package.loaded.mcs_mod_registry={boot=function() error('malformed register') end,mkdir=function() end}
-package.loaded.dmm_bootstrap={run=function(_,start) return start() end}
+package.loaded.dmm_bootstrap={run=function(_,start) installed=start() end}
 print=function(value) captured[#captured+1]=value end
 dofile('Scripts/main.lua')
 print=originalPrint
-assert(installed,'identification failure must not block presentation')
+assert(installed==true,'identification failure must not block initialization')
 assert(table.concat(captured,'\n'):find('MODULE_IDENTIFICATION_FAILED',1,true))
 print('PASS identification failure is logged without blocking DMM integration')
 

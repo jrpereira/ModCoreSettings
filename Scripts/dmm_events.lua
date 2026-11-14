@@ -1,9 +1,9 @@
--- Runs in DMM's Lua state. Recreates DMM's lifecycle boundaries without editing
--- DMM: it wraps the settings panel that controls.build returns and DMM's
--- native-actions owner, whose close() is the first step of closing the menu host.
--- Every emission is guarded so a failing listener never breaks DMM.
+-- Runs in DMM's Lua state. Recreates DMM's menu-closing boundary without editing DMM: it
+-- wraps the settings panel that controls.build returns (its hide) and DMM's native-actions
+-- owner, whose close() is the first step of closing the menu host. Every emission is
+-- guarded so a failing listener never breaks DMM.
 local M={version=1}
-local names={providerPrepared=true,providerRefreshed=true,hostClosing=true}
+local names={hostClosing=true}
 
 function M.bus(report)
     report=report or function() end
@@ -38,38 +38,7 @@ function M.attach(modules,bus,report)
     controls.build=function(tree,providers,api)
         local ui=build(tree,providers,api)
         local pc=api and api.pc
-        local function context(index)
-            return {tree=tree,provider=index and providers[index],panel=index and ui.panels[index],pc=pc}
-        end
-        local function built(index) local panel=ui.panels[index];return panel and panel.built==true end
-        local prepare,show,refresh,hide=ui.prepare,ui.show,ui.refresh,ui.hide
-        -- A page's rows exist once prepare or show has built them.
-        function ui:prepare(index,...)
-            local before=built(index)
-            local n,results=pass(prepare(self,index,...))
-            if not before and built(index) then emit('providerPrepared',context(index)) end
-            return table.unpack(results,1,n)
-        end
-        function ui:show(index,...)
-            local before=built(index)
-            local n,results=pass(show(self,index,...))
-            if not before and built(index) then emit('providerPrepared',context(index)) end
-            emit('providerRefreshed',context(index))
-            return table.unpack(results,1,n)
-        end
-        -- Rows that appear or disappear change the page DMM shows.
-        function ui:refresh(...)
-            local panel=self.active and self.panels[self.active]
-            local before={}
-            for i,row in ipairs(panel and panel.rows or {}) do before[i]=row.visible end
-            local n,results=pass(refresh(self,...))
-            if panel and self.panels[self.active]==panel then
-                for i,row in ipairs(panel.rows) do
-                    if row.visible~=before[i] then emit('providerRefreshed',context(self.active));break end
-                end
-            end
-            return table.unpack(results,1,n)
-        end
+        local hide=ui.hide
         function ui:hide(...)
             local n,results=pass(hide(self,...))
             emit('hostClosing',{tree=tree,pc=pc})

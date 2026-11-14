@@ -68,8 +68,6 @@ extension={
         -- The crash-safe file reader and replacer shared by the modules below.
         local io_=module('vendor/safe_file')
         package.loaded.safe_file=io_
-        -- The hidden-widget text formats MCS's two states share.
-        package.loaded.mcs_protocols=module('mcs_protocols')
         -- A picker choice's own sound (mcChoiceSounds), for the presentation below.
         package.loaded.mcs_choice_sound=module('mcs_choice_sound')
         local navigation=module('navigation')
@@ -88,7 +86,6 @@ extension={
         package.loaded.mcs_module_json=indexJson
         local taxonomy=taxonomyModule.loadLua(directory..'../data/module_categories.lua')
         local config=module('init_config')
-        local lifecycle=module('dmm_lifecycle')
         local menuPages=module('menu_pages')
         local pageLinks=module('page_links')
         local menuSlots=module('menu_slots')
@@ -110,7 +107,6 @@ extension={
         assert(type(mapped.install)=='function','mapped preset installer unavailable')
         assert(type(presentation.install)=='function','presentation installer unavailable')
         assert(type(config.install)=='function','configuration installer unavailable')
-        assert(type(lifecycle.publisher)=='function','lifecycle publisher unavailable')
 
         -- Innermost: every other wrapper sees this module's settings among DMM's own.
         local fieldTypes=fieldTypesModule.new(report)
@@ -172,10 +168,6 @@ extension={
         pageLinks.install(dmm.pages,slots)
         -- Outermost: a rebuild after Apply runs every wrapper above with DMM's arguments.
         indexRefresh.install(dmm.pages,report)
-        local publisher=lifecycle.publisher(report)
-        for _,name in ipairs({'providerPrepared','providerRefreshed','hostClosing'}) do
-            dmm.events:on(name,function(context) publisher:publish(name,context) end)
-        end
         ModRef:SetSharedVariable('MC_DMM_Extension_v1.ready','1')
     end,
 }

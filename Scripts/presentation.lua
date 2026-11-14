@@ -1,28 +1,10 @@
 -- Runs in DMM's Lua state. Uses its existing menu tick and model, never a timer.
 local M={version=1}
 local Manifest=require('mcs_manifest')
-local Protocols=require('mcs_protocols')
 local ChoiceSound=require('mcs_choice_sound')
-local dirtySignalPrefix=Protocols.valueDirty
 local function trim(s) return (s or ''):match('^%s*(.-)%s*$') end
 -- The player of choice sounds (mcChoiceSounds); report(event,detail) receives failures.
 function M.choiceSoundPlayer(report) return ChoiceSound.player(nil,report) end
-local function identityText(value)
-    return tostring(value):gsub('%%','%%25'):gsub('\n','%%0A'):gsub('\r','%%0D')
-end
-local function settingIdentity(index,provider,setting)
-    local values,labels=setting.values or {},setting.labels or {}
-    assert(#values==#labels and #values<=64,'invalid setting identity choices')
-    local fields={Protocols.setting:sub(1,-2),tostring(index),identityText(provider.id),identityText(setting.id),
-        setting.kind or '',tostring(setting.minimum or ''),tostring(setting.maximum or ''),
-        tostring(setting.step or ''),tostring(setting.decimals or ''),identityText(setting.prefix or ''),
-        identityText(setting.suffix or ''),tostring(#values)}
-    for _,value in ipairs(values) do fields[#fields+1]=identityText(value) end
-    for _,label in ipairs(labels) do fields[#fields+1]=identityText(label) end
-    local result=table.concat(fields,'\n')
-    assert(#result<=16384,'setting identity exceeds 16 KiB')
-    return result
-end
 -- DMM's settings page widths in its 1920-wide design: rows and the header strip are ROW_WIDTH
 -- wide; PAGE_WIDTH is the width of the page itself.
 local ROW_WIDTH,PAGE_WIDTH=572,584
@@ -395,6 +377,69 @@ function M.wrapList(text,limit)
     return table.concat(lines,'\n'),math.max(#lines,1)
 end
 
+-- A changed setting's label is italic, with a star after it. Italic is the label font's own
+-- italic face when it has one (looked up once per font), else its skew plus 0.2.
+local italicFaces={}
+local function faceName(value)
+    if value==nil then return '' end
+    return type(value)=='string' and value or value:ToString()
+end
+local function italicOf(font)
+    local key=''
+    pcall(function() key=font.FontObject:GetFullName() end)
+    if italicFaces[key]==nil then
+        local best,face=0,''
+        pcall(function()
+            local entries=font.FontObject.CompositeFont.DefaultTypeface.Fonts
+            local function inspect(entry)
+                pcall(function() entry=entry:get() end)
+                local candidate=faceName(entry.Name)
+                local lower=candidate:lower()
+                if lower:find('italic',1,true) or lower:find('oblique',1,true) then
+                    local rank=(lower:find('bold',1,true) or lower:find('black',1,true)) and 1 or 2
+                    if rank>best then best,face=rank,candidate end
+                end
+            end
+            if type(entries)=='table' then for _,entry in ipairs(entries) do inspect(entry) end
+            else entries:ForEach(function(_,entry) inspect(entry) end) end
+        end)
+        italicFaces[key]=face
+    end
+    return italicFaces[key]
+end
+-- Shows the label in its dirty face, or back in its base face (captured from the label
+-- the first time, and again after each restyle).
+local function dirtyFace(row,dirty)
+    local label=row.mcLabel
+    local font=label.Font
+    local base=row.mcBaseFace
+    if not base then
+        base={face=faceName(font.TypefaceFontName),skew=tonumber(font.SkewAmount) or 0};row.mcBaseFace=base
+    end
+    local italic=dirty and italicOf(font) or ''
+    local face=italic~='' and italic or base.face
+    local skew=dirty and italic=='' and base.skew+0.2 or base.skew
+    local previousFace,previousSkew,changed=font.TypefaceFontName,font.SkewAmount,false
+    if faceName(font.TypefaceFontName)~=face then font.TypefaceFontName=FName and FName(face) or face;changed=true end
+    if (tonumber(font.SkewAmount) or 0)~=skew then font.SkewAmount=skew;changed=true end
+    if changed then
+        local ok,err=pcall(label.SetFont,label,font)
+        if not ok then font.TypefaceFontName,font.SkewAmount=previousFace,previousSkew;error(err,0) end
+    end
+end
+-- Shows or hides a row's dirty star and italic face. Rows without a star (headings in the
+-- title row, navigation and read-only rows) are never dirty.
+-- report(event,detail) (optional) receives a failure; the value is shown either way.
+local function dirtyLabel(row,dirty,report)
+    if not row.mcStar or not row.mcLabel or row.mcHeader or row.mcDirty==dirty then return end
+    row.mcDirty=dirty
+    local ok,err=pcall(function()
+        row.mcStar:SetVisibility(dirty and 4 or 2)
+        dirtyFace(row,dirty)
+    end)
+    if not ok and report then report('DIRTY_LABEL_FAILED',tostring(err)) end
+end
+
 function M.style(label,level,api)
     local style=styles[level]
     if not style then return end
@@ -528,6 +573,9 @@ function M.install(choices,controls,pages,options)
                 return api.feedback(action,...)
             end
         end
+        -- DMM marks a changed value with ' *'. The value shows without it; the row's label
+        -- turns italic with a star instead, on the same frame. Apply, Restore and reset
+        -- rewrite the value, which clears them.
         adapted.setText=function(widget,value)
             local signal=valueSignals[widget]
             if not signal then return api.setText(widget,value) end
@@ -535,9 +583,8 @@ function M.install(choices,controls,pages,options)
             local clean=setting and not ui.model.error
                 and choices.format(setting,ui.model.pending[signal.index]) or nil
             local dirty=clean~=nil and value==clean..' *'
-            local display=dirty and clean or value
-            api.setText(signal.marker,dirtySignalPrefix..(dirty and '1' or '0')..'\n'..display)
-            return api.setText(widget,display)
+            dirtyLabel(signal.row,dirty,api.log)
+            return api.setText(widget,dirty and clean or value)
         end
         -- A rule like a heading's, under an mcCategory row: DMM adds the row to the page
         -- after building its buttons, so the rule follows once the next heading or row
@@ -694,7 +741,7 @@ function M.install(choices,controls,pages,options)
         local function toggleShell(setting) return setting.kind=='toggle' or setting.kind=='extension' end
         -- The dirty star follows the label text: label and star share a box in the
         -- label's place, so the star moves with the text and never overlaps it.
-        -- ModCoreSettings' dirty labels show and hide it. The box clips, so a label
+        -- dirtyLabel shows and hides it. The box clips, so a label
         -- longer than its column is cut there instead of reaching the controls.
         local function starAfter(label)
             local padding=label.Slot.Padding
@@ -780,15 +827,7 @@ function M.install(choices,controls,pages,options)
                     local p=row.widget.Slot.Padding
                     row.widget.Slot:SetPadding({Left=-toggleShift,Top=p.Top,Right=p.Right,Bottom=p.Bottom})
                 end
-                local identity=api.caption(tree,settingIdentity(i,providers[index],setting))
-                identity:SetVisibility(1)
-                add(row.wrapper:GetContent(),identity)
-                if row.value then
-                    local marker=api.caption(tree,dirtySignalPrefix..'0\n')
-                    marker:SetVisibility(1)
-                    add(row.wrapper:GetContent(),marker)
-                    valueSignals[row.value]={marker=marker,index=i}
-                end
+                if row.value then valueSignals[row.value]={row=row,index=i} end
                 local level=setting.mcHeading and 1 or setting.mcFont
                 M.style(row.mcLabel,level,api)
                 if settingLabelSizes[level] then api.Theme.font(row.mcLabel,api.theme,settingLabelSizes[level]) end
@@ -803,9 +842,6 @@ function M.install(choices,controls,pages,options)
                 if setting.mcHeader and ui.mcHeaderHost then
                     assert(not panel.mcHeader,'only one level-one setting per provider')
                     local placeholder=new('SizeBox')
-                    local path=assert(row.wrapper:GetFullName():match('^%S+ (.+)$'))
-                    local marker=api.caption(tree,Protocols.headerRow..path)
-                    api.need(placeholder:SetContent(marker),'MCS header identity')
                     placeholder:SetVisibility(1)
                     local children={}
                     for n=0,panel.scroll:GetChildrenCount()-1 do
@@ -1573,7 +1609,6 @@ function M.install(choices,controls,pages,options)
                     end
                 end
             end
-            local pageReady=false
             for i,row in ipairs(self.panels[self.active].rows) do
                 local setting=self.model.items[i]
                 if row.mcHeader then row.wrapper:SetVisibility(row.visible and 0 or 1) end
@@ -1746,11 +1781,6 @@ function M.install(choices,controls,pages,options)
                 end
             end
             local panel=self.panels[self.active]
-            local visible={}
-            for i,row in ipairs(panel.rows) do visible[i]=row.visible and '1' or '0' end
-            local visibilitySignature=table.concat(visible)
-            if panel.mcVisibility and panel.mcVisibility~=visibilitySignature then pageReady=true end
-            panel.mcVisibility=visibilitySignature
             if panel.mcBlocks then
                 local signatureParts,orderedFlat={},{}
                 local function reorder(blocks)
@@ -1787,7 +1817,6 @@ function M.install(choices,controls,pages,options)
                             for _,child in ipairs(block.children) do add(panel.scroll,child.widget):SetPadding(child.padding) end
                         end
                     end
-                    if panel.mcLayoutBuilt then pageReady=true end
                     panel.mcOrder=signature
                     panel.mcLayoutBuilt=true
                 end
@@ -1823,11 +1852,16 @@ function M.install(choices,controls,pages,options)
                         local nested=not beforeCategory and subgroupRow(setting)
                         local style=beforeCategory and 'category' or nested and 'nested' or 'row'
                         if row.mcCategoryStyle~=style then
+                            -- The restyle starts from the base face; a dirty row keeps its
+                            -- dirty face on the new style.
+                            if row.mcDirty then dirtyFace(row,false) end
                             api.Theme.font(row.mcLabel,api.theme,beforeCategory and categorySize
                                 or nested and 14-nestedShrink or 14)
                             row.mcLabel:SetFont(row.mcLabel.Font)
                             api.Theme.textColor(row.mcLabel,beforeCategory and 'muted' or 'body')
                             starStyle(row)
+                            row.mcBaseFace=nil
+                            if row.mcDirty then dirtyFace(row,true) end
                             row.mcCategoryStyle=style
                         end
                         local labelSlot=toggleShell(setting) and row.widget:GetContent().Slot
@@ -1930,13 +1964,6 @@ function M.install(choices,controls,pages,options)
                 if row.parts and #row.parts==3 and not row.mcTabs and (row.mcConflictRed or false)~=red then
                     conflictStyle(row,red)
                     row.mcConflictRed=red
-                end
-            end
-            if pageReady then
-                -- Cached panels have no stable child index after eviction.
-                -- Notify decorators directly without changing the selected widget.
-                if api.events then
-                    api.events:emit('providerRefreshed',{tree=tree,provider=providers[self.active],panel=panel,pc=api.pc})
                 end
             end
             return result

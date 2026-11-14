@@ -36,6 +36,11 @@
 - Startup takes one game-directory snapshot instead of two: DawnwalkerModMenu's folder is
   found beside this mod's own.
 
+- A changed setting's star and italic label now update on the same frame as the edit,
+  drawn in DawnwalkerModMenu's own Lua state. ModCoreSettings no longer polls open pages
+  from its second state (every 50 to 250 ms), and rows carry no hidden identity or signal
+  captions; the "Error: no identity" row states are gone with them.
+
 ## v1.7.1
 
 - The Modules page places 33 more mods in a category by their folder name, from reviews of

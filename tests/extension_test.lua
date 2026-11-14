@@ -66,9 +66,6 @@ loadfile=function(path)
             assert(native==package.loaded.nativeactions)
             return 'hint'
         end} end
-        if name=='dmm_lifecycle' then
-            return {publisher=function() return {publish=function(_,event) installs[#installs+1]={name='publish',event=event} end} end}
-        end
         return {install=function(...)
             installs[#installs+1]={name=name,args={...}}
         end}
@@ -82,8 +79,8 @@ local callbacks={}
 local events={on=function(_,name,callback) callbacks[name]=callback end}
 local settingsApi={}
 extension.install({version=1,choices=choices,controls=controls,pages=pages,events=events,settingsApi=settingsApi})
-local order={'mc_ini','mcs_manifest','safe_file','mcs_protocols','mcs_choice_sound','navigation','mapped_presets','menu_contributions','presentation','mod_requirements','browser_groups','module_categories','mcs_taxonomy','mcs_module_json',
- 'init_config','dmm_lifecycle','menu_pages','page_links','menu_slots','page_hooks','field_types','keybind_editor','range_editor','editor_input','editor_hint','standard_keys','standard_controls',
+local order={'mc_ini','mcs_manifest','safe_file','mcs_choice_sound','navigation','mapped_presets','menu_contributions','presentation','mod_requirements','browser_groups','module_categories','mcs_taxonomy','mcs_module_json',
+ 'init_config','menu_pages','page_links','menu_slots','page_hooks','field_types','keybind_editor','range_editor','editor_input','editor_hint','standard_keys','standard_controls',
  'settings_notify','sort_button','menu_data','index_refresh'}
 assert(#loaded==#order)
 for n,name in ipairs(order) do assert(loaded[n]:match(name..'%.lua$'),'load '..n) end
@@ -140,9 +137,7 @@ assert(hooks=='hooks' and manifest=='manifest for MCC' and context.page=='MCC',
 assert(installs[9].name=='page_links' and installs[9].args[1]==pages)
 assert(installs[10].name=='index_refresh' and installs[10].args[1]==pages
  and type(installs[10].args[2])=='function','the index refresh wraps outermost')
-for _,name in ipairs({'providerPrepared','providerRefreshed','hostClosing'}) do
- assert(type(callbacks[name])=='function');callbacks[name]({});assert(installs[#installs].event==name)
-end
+assert(next(callbacks)==nil,'the extension itself listens to no lifecycle event')
 assert(shared['MC_DMM_Extension_v1.ready']=='1')
 assert(not pcall(extension.install,{version=2,choices=choices,controls=controls,pages=pages,events=events}))
 assert(not pcall(extension.install,{version=1,choices=choices,controls=controls,events=events}))

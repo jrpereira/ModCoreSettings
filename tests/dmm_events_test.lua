@@ -4,20 +4,16 @@ local reports={}
 local function report(event,detail) reports[#reports+1]=event..':'..tostring(detail) end
 local bus=Events.bus(report)
 local seen={}
-for _,name in ipairs({'providerPrepared','providerRefreshed','hostClosing'}) do
-    bus:on(name,function(context) seen[#seen+1]={name=name,context=context} end)
-end
+bus:on('hostClosing',function(context) seen[#seen+1]={name='hostClosing',context=context} end)
+assert(not pcall(bus.on,bus,'providerRefreshed',function() end),'only hostClosing is offered')
 
--- A stand-in for DMM's controls.build: page rows are built on first prepare or show.
+-- A stand-in for DMM's controls.build.
 local tree,pc={name='tree'},{name='pc'}
 local providers={{id='A'},{id='B'}}
 local controls={build=function(_,list,_)
     local ui={panels={}}
-    for i in ipairs(list) do ui.panels[i]={rows={{visible=true},{visible=true}}} end
-    function ui:prepare(index) self.panels[index].built=true end
-    function ui:show(index) self.panels[index].built=true;self.active=index;return 'shown',index end
-    function ui:refresh(hide) if hide then self.panels[self.active].rows[2].visible=false end;return 'refreshed' end
-    function ui:hide() self.active=nil end
+    function ui:show(index) self.active=index;return 'shown',index end
+    function ui:hide() self.active=nil;return 'hidden' end
     return ui
 end}
 local native={opened=0,closed=0}
@@ -26,33 +22,20 @@ function native.close() native.closed=native.closed+1 end
 Events.attach({controls=controls,nativeactions=native},bus,report)
 
 local ui=controls.build(tree,providers,{pc=pc})
-ui:prepare(1)
-assert(#seen==1 and seen[1].name=='providerPrepared' and seen[1].context.provider.id=='A'
-    and seen[1].context.panel==ui.panels[1] and seen[1].context.tree==tree and seen[1].context.pc==pc)
-ui:prepare(1)
-assert(#seen==1,'an already built page is not prepared again')
 local shown,index=ui:show(2)
-assert(shown=='shown' and index==2,'wrapped calls return what DMM returns')
-assert(seen[2].name=='providerPrepared' and seen[2].context.provider.id=='B' and seen[3].name=='providerRefreshed')
-print('PASS pages report when they are built and shown')
-
-assert(ui:refresh()=='refreshed' and #seen==3,'a refresh that changes no row is quiet')
-ui:refresh(true)
-assert(#seen==4 and seen[4].name=='providerRefreshed' and seen[4].context.provider.id=='B')
-print('PASS a refresh reports only when rows appear or disappear')
-
-ui:hide()
-assert(seen[5].name=='hostClosing' and seen[5].context.tree==tree)
+assert(shown=='shown' and index==2 and #seen==0,'other calls pass through untouched')
+assert(ui:hide()=='hidden','wrapped calls return what DMM returns')
+assert(seen[1].name=='hostClosing' and seen[1].context.tree==tree)
 local opened=native.new(pc,tree)
 assert(opened.owner==pc and opened.tree==tree and native.opened==1)
 native.close()
-assert(native.closed==1 and seen[6].name=='hostClosing' and seen[6].context.tree==tree and seen[6].context.pc==pc)
+assert(native.closed==1 and seen[2].name=='hostClosing' and seen[2].context.tree==tree and seen[2].context.pc==pc)
 native.close()
-assert(native.closed==2 and #seen==6,'only a menu that was opened reports closing')
+assert(native.closed==2 and #seen==2,'only a menu that was opened reports closing')
 print('PASS leaving a page and closing the menu report hostClosing')
 
 -- A failing listener is reported and never breaks DMM's own call.
-bus:on('providerRefreshed',function() error('listener failure') end)
-assert(select(1,ui:show(1))=='shown')
-assert(reports[#reports]:find('LIFECYCLE_CALLBACK_FAILED:providerRefreshed',1,true))
+bus:on('hostClosing',function() error('listener failure') end)
+assert(ui:hide()=='hidden')
+assert(reports[#reports]:find('LIFECYCLE_CALLBACK_FAILED:hostClosing',1,true))
 print('PASS listener failures are isolated from DMM')

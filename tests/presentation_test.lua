@@ -145,10 +145,6 @@ local theme={font=function(label,_,size) label.Font.Size=size end,textColor=func
 setmetatable(theme,{__index=function() return noop end})
 local api={construct=widget,need=assert,Theme=theme,theme={assets={}},caption=function(_,text) local w=widget();w.text=text;return w end,
     setText=function(w,text) w.text=text end,describe=noop,actions=noop,status=noop,log=noop}
-api.events={emit=function(_,name,context)
-    assert(name=="providerRefreshed")
-    context.panel.readyEvents=(context.panel.readyEvents or 0)+1
-end}
 api.button=function(tree,text) local b=widget();local l=api.caption(tree,text);b:SetContent(l);return b,l end
 local choices={parse=function() return items end,format=function(setting,value)
     for i,candidate in ipairs(setting.values or {}) do
@@ -750,10 +746,8 @@ assert(ui.model.pending[1]==1 and row.mcTabs[2].selected)
 assert(ui.panels[1].rows[2].mcLabel.text=='Slot 1')
 assert(position(independent)<position(ui.panels[1].headings[2].widget))
 assert(position(ui.panels[1].headings[2].widget)<position(ui.panels[1].headings[3].widget))
-assert(ui.panels[1].readyEvents==1,'Reordering must notify existing decorators that row paths changed')
 ui:refresh();ui:prepare(1);assert(scroll:GetChildrenCount()==count,'No duplicate widgets on reuse')
 assert(textCount('Interaction: Independent')==1 and textCount('Interaction: Selective')==1,'Reuse must not duplicate parent headings')
-assert(ui.panels[1].readyEvents==1,'Unchanged refresh must not repeat page events')
 local header=ui.panels[1].rows[4]
 assert(header.mcHeader and header.wrapper:GetParent()==ui.mcHeaderHost)
 assert(header.mcPlaceholder.visible==1 and header.mcLabel.Font.Size==22)
@@ -762,22 +756,48 @@ assert(header.mcLabel.Slot.Padding.Left==0 and ui.panels[1].rows[1].mcLabel.Slot
 ui.model.pending[4]=0
 ui.mcTestSetText(header.value,'Off *')
 assert(header.value.text=='Off','Dirty suffix must never flicker in the value text')
-local signal
+assert(header.mcDirty==nil,'the level-one row in the title shows no dirty state')
+-- Nothing hidden is added to rows: no identity or signal captions.
 for _,child in ipairs(header.wrapper:GetContent().children) do
-    if child.text and child.text:match('^MC_VALUE_DIRTY_1\n') then signal=child end
+    assert(not (child.text and child.text:match('^MC_')),'no hidden protocol captions')
 end
-assert(signal and signal.text=='MC_VALUE_DIRTY_1\n1\nOff')
 ui.model.committed[4]=0
 ui.mcTestSetText(header.value,'Off')
-assert(signal.text=='MC_VALUE_DIRTY_1\n0\nOff',
-    'Apply must signal clean state even when the displayed value text is unchanged')
+assert(header.value.text=='Off')
+-- A value written with DMM's ' *' shows the row's star and italic face on that write; a
+-- clean write (Apply, Restore, reset) clears both, and a restyle keeps a dirty row italic.
+do
+    local starred
+    for i,r in ipairs(ui.panels[1].rows) do
+        if not starred and r.mcStar and r.value and not r.mcHeader and ui.model.items[i].mcFont==nil and r.mcCategoryStyle then starred=i end
+    end
+    local r=ui.panels[1].rows[starred]
+    local clean=choices.format(ui.model.items[starred],ui.model.pending[starred])
+    local skew=r.mcLabel.Font.SkewAmount or 0
+    ui.mcTestSetText(r.value,clean..' *')
+    assert(r.value.text==clean and r.mcStar.visible==4 and r.mcLabel.Font.SkewAmount==skew+0.2,
+        'a dirty write shows the star and slants the label')
+    r.mcCategoryStyle=nil;ui:refresh()
+    assert(r.mcCategoryStyle~=nil and r.mcLabel.Font.SkewAmount==skew+0.2 and r.mcStar.visible==4,'a restyle keeps the dirty face')
+    ui.mcTestSetText(r.value,clean)
+    assert(r.mcStar.visible==2 and r.mcLabel.Font.SkewAmount==skew,'a clean write clears both')
+    -- A font with an italic face uses it instead of a slant.
+    local font=r.mcLabel.Font
+    font.TypefaceFontName='Regular'
+    font.FontObject={GetFullName=function() return 'Font Test' end,
+        CompositeFont={DefaultTypeface={Fonts={{Name='Regular'},{Name='Bold Italic'},{Name='Italic'}}}}}
+    r.mcBaseFace=nil
+    ui.mcTestSetText(r.value,clean..' *')
+    assert(r.mcLabel.Font.TypefaceFontName=='Italic' and r.mcLabel.Font.SkewAmount==skew,'the italic face, not bold')
+    ui.mcTestSetText(r.value,clean)
+    assert(r.mcLabel.Font.TypefaceFontName=='Regular','back to the base face')
+    font.FontObject=nil
+end
 ui.model:set(1,0);ui:refresh()
-assert(ui.panels[1].readyEvents==2,'Visibility and ordering changes must coalesce into one page-ready event')
 ui.model.visibilityOverride=true
 function ui.model:visibility() return {true,true,true,true,self.visibilityOverride,true} end
 ui:refresh()
-assert(ui.panels[1].readyEvents==3,'Visibility-only changes must notify decorators after DMM refresh')
-ui:refresh();assert(ui.panels[1].readyEvents==3,'Stable visibility must not repeat page-ready events')
+ui:refresh()
 ui.active=nil;local calls=0
 ui:tick({},function() calls=calls+1 end,false);assert(calls==0,'Closed menus never inspect tabs')
 items[1].group='Player';items[1].label='Quickslots'
