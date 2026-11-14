@@ -43,15 +43,11 @@ end
 function M.scan(folder,files,read)
     read=read or Registry.read
     local hits,foundCategories={},{};local sourceCount=0
-    local ordered={};for _,entry in ipairs(files) do ordered[#ordered+1]=entry end
-    table.sort(ordered,function(a,b)
-        return (type(a)=='table' and a.relative_path or a)<(type(b)=='table' and b.relative_path or b)
-    end)
-    for _,entry in ipairs(ordered) do
-        local path=type(entry)=='table' and entry.relative_path or entry
+    local ordered={};for _,path in ipairs(files) do ordered[#ordered+1]=path end
+    table.sort(ordered)
+    for _,path in ipairs(ordered) do
         -- A mod's own backup copies of its code are not evidence of what it does.
-        if Registry.safePath(path) and not path:lower():find('backup',1,true)
-            and not (type(entry)=='table' and entry.is_symlink) then
+        if Registry.safePath(path) and not path:lower():find('backup',1,true) then
             local name=path:match('([^/\\]+)$')
             if path:lower():match('%.lua$') and not ignored[name] and not path:find('/vendor/',1,true) and not path:match('^Scripts/mcs_') then
                 local text=assert(read(folder..'/'..path),'unreadable source: '..path)
@@ -77,9 +73,7 @@ function M.scan(folder,files,read)
     local categoriesOk,categories=pcall(Taxonomy.categories,Taxonomy,raw)
     if #raw==0 or not categoriesOk then categories={} end
     local reason=sourceCount==0 and 'no_source' or #categories==0 and (#raw==0 and 'no_pattern' or 'ambiguous') or 'pattern'
-    local classified=#categories>0
-    local purpose=classified and #categories==1 and categories[1] or nil
-    return {category=purpose or 'other',categories=classified and categories or {'other'},purpose=purpose,reason=reason,
-        classified=classified,source_files=sourceCount,evidence=hits,version=2}
+    -- Classified exactly when reason is 'pattern'; otherwise categories is {'other'}.
+    return {categories=#categories>0 and categories or {'other'},reason=reason,evidence=hits}
 end
 return M

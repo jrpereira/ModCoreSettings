@@ -161,13 +161,12 @@ assert(files['Mods/Ordinary/config.ini']=='[General]\nEnabled=1\n','ordinary pro
 local writes=fs.writes
 wrapped.open({id='Test',path='missing',choices=ordinarySettings,testOnly=true})
 assert(fs.writes==writes,'test-only provider touched configuration')
-local contributed={id='MCT.page',path='Mods/Contributed/mod_settings.ini',choices=ordinarySettings,
-    mcManifest='[Setting.Enabled]\nId=Enabled\n'}
+-- Planning uses the provider's parsed settings; no manifest is read, so a page without a
+-- manifest file (a contributed one) initializes too.
+local contributed={id='MCT.page',path='Mods/Contributed/mod_settings.ini',choices=ordinarySettings}
 wrapped.fs=nil
 assert(files['Mods/Contributed/mod_settings.ini']==nil)
 local opened=wrapped.open(contributed)
-assert(not opened.error,'contributed pages use their in-memory manifest: '..tostring(opened.error))
+assert(not opened.error,'pages initialize from their parsed settings: '..tostring(opened.error))
 assert(files['Mods/Contributed/config.ini']=='[General]\nEnabled=1\n','contributed provider was not initialized')
-assert(wrapped.open({id='NoFile',path='Mods/Missing/mod_settings.ini',choices=ordinarySettings}).error
-    :find('configuration metadata unavailable',1,true),'a missing manifest still fails without mcManifest')
 print('PASS in-state config planning preserves bytes, validates paths and recovers transactions')

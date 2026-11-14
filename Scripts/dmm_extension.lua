@@ -38,29 +38,22 @@ end
 
 local extension
 extension={
-    id='ModCoreSettings',
-    apiVersion=1,
-    -- Loads DMM's modules ahead of DMM's main, recreates its lifecycle events,
-    -- then installs exactly as before.
+    -- Loads DMM's modules ahead of DMM's main and hooks them.
     launch=function()
-        local events=module('dmm_events')
-        local controls=require('controls')
-        local bus=events.bus(report)
-        events.attach({controls=controls,nativeactions=require('nativeactions')},bus,report)
-        extension.install({version=1,choices=require('choices'),controls=controls,
-            pages=require('pages'),events=bus,settingsApi=require('dmm_api')})
+        return extension.install(require('choices'),require('controls'),require('pages'),
+            require('nativeactions'),require('dmm_api'))
     end,
-    install=function(dmm)
+    -- DMM's choices, controls, pages, nativeactions and dmm_api modules.
+    install=function(choices,controls,pages,native,settingsApi)
         -- First load every module and check every precondition; DMM's modules are only
         -- wrapped once all of them hold, so a broken install wraps nothing.
-        assert(type(dmm)=='table' and dmm.version==1,'unsupported DMM extension API')
-        assert(type(dmm.choices)=='table' and type(dmm.controls)=='table' and type(dmm.pages)=='table',
+        assert(type(choices)=='table' and type(controls)=='table' and type(pages)=='table',
             'DMM extension modules unavailable')
-        assert(type(dmm.events)=='table' and type(dmm.events.on)=='function','DMM lifecycle events unavailable')
+        assert(type(native)=='table' and type(native.new)=='function','DMM native actions unavailable')
         assert(ModRef and type(ModRef.GetSharedVariable)=='function','DMM shared variables unavailable')
         assert(type(ModRef.SetSharedVariable)=='function','DMM extension handshake unavailable')
-        local native=require('nativeactions')
-        assert(type(native)=='table' and type(native.new)=='function','DMM native actions unavailable')
+        -- DMM's menu-closing event, recreated on its modules.
+        local events=module('dmm_events')
         -- The manifest reader the modules below share; DMM's require resolves in DMM's
         -- folder, so it is placed in package.loaded under a name only this mod uses.
         package.loaded.mc_ini=module('vendor/mc_ini')
@@ -108,6 +101,8 @@ extension={
         assert(type(presentation.install)=='function','presentation installer unavailable')
         assert(type(config.install)=='function','configuration installer unavailable')
 
+        local bus=events.bus(report)
+        events.attach({controls=controls,nativeactions=native},bus,report)
         -- Innermost: every other wrapper sees this module's settings among DMM's own.
         local fieldTypes=fieldTypesModule.new(report)
         fieldTypes:register('keybind',keybind)
@@ -116,16 +111,16 @@ extension={
         -- FName is callable userdata, not a function.
         local editorInput=editorInputModule.new({register=RegisterKeyBind,keys=Key,
             key=FName~=nil and function(name) return {KeyName=FName(name)} end or nil})
-        fieldTypes:install({choices=dmm.choices,controls=dmm.controls,settingsApi=dmm.settingsApi,
+        fieldTypes:install({choices=choices,controls=controls,settingsApi=settingsApi,
             confirm=editorInput,pointer=editorInput.pointer,
-            hint=editorHint.install(native,dmm.pages,FName~=nil and FName or nil),
+            hint=editorHint.install(native,pages,FName~=nil and FName or nil),
             standardControls=standardControls})
         -- Outside field types' numbers-only filter: v2 subscribers also get text values.
-        settingsNotify.install(dmm.settingsApi,report)
-        navigation.install(dmm.choices)
-        mapped.install(dmm.choices,dmm.controls)
-        presentation.install(dmm.choices,dmm.controls,dmm.pages,{keyColumn=keybind.layout,
-            textTable=contributions.textTable,playerExists=playerExists,events=dmm.events})
+        settingsNotify.install(settingsApi,report)
+        navigation.install(choices)
+        mapped.install(choices,controls)
+        presentation.install(choices,controls,pages,{keyColumn=keybind.layout,
+            textTable=contributions.textTable,playerExists=playerExists,events=bus})
         local mods=directory:match('^(.*[/\\])[^/\\]+[/\\]Scripts[/\\]$')
         local folderManifest=browserGroups.folderManifest(mods)
         -- DMM's mod-list filter button becomes Sort by, saved in this mod's config.ini.
@@ -134,14 +129,14 @@ extension={
         local function read(path)
             return assert(io_.read(path),'unreadable '..path)
         end
-        browserGroups.install(dmm.pages,report,function(content) return dmm.choices.parse(content) end,
+        browserGroups.install(pages,report,function(content) return choices.parse(content) end,
             browserGroups.folderVersion(mods),folderManifest,
             moduleCategories.reader(directory..'../cache/modules_register.json',directory..'../config.ini',nil,
                 {taxonomy=taxonomy,json=indexJson,report=report,
                     seenPath=directory..'../cache/folder_info.json'}),read,sortButton)
-        config.install(dmm.choices)
+        config.install(choices)
         -- Hooks storage sits inside the slot model, which must stay outermost.
-        pageHooks.install(dmm.choices,report)
+        pageHooks.install(choices,report)
         local loadHooks=pageHooks.loader()
         -- A mod folder's name as the browser shows it: its mod.json name, else the folder.
         local function moduleName(folder)
@@ -158,16 +153,16 @@ extension={
             return hooks,pageHooks.manifest(hooks,context,compile),context
         end
         -- Outermost open: inner wrappers only ever see the host's own unspliced settings.
-        local slots=menuSlots.install(dmm.choices,report,contributions,read)
+        local slots=menuSlots.install(choices,report,contributions,read)
         -- Wrapped after browser groups so contributed pages exist before ModCore grouping runs.
         local function stored(page)
             return pageHooks.stored(page.menu),pageHooks.context(page)
         end
-        menuPages.install(dmm.pages,function(content) return dmm.choices.parse(content) end,
+        menuPages.install(pages,function(content) return choices.parse(content) end,
             menuPages.reader(contributions,ModRef,read,report),report,slots,read,hooked,compile,stored)
-        pageLinks.install(dmm.pages,slots)
+        pageLinks.install(pages,slots)
         -- Outermost: a rebuild after Apply runs every wrapper above with DMM's arguments.
-        indexRefresh.install(dmm.pages,report)
+        indexRefresh.install(pages,report)
         ModRef:SetSharedVariable('MC_DMM_Extension_v1.ready','1')
     end,
 }

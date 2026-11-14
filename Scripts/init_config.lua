@@ -232,10 +232,9 @@ function M.install(choices,fs)
             return open(provider)
         end
         local ok,err=pcall(function()
-            -- Contributed pages carry their manifest in memory; there is no file at provider.path.
-            local manifest=assert(provider.mcManifest or fs.read(provider.path),'configuration metadata unavailable')
+            -- The provider's parsed settings; its manifest is not read again.
             planning=true
-            local planned,plan=pcall(M.plan,provider,manifest,choices,fs,provider.choices)
+            local planned,plan=pcall(M.plan,provider,nil,choices,fs,provider.choices)
             planning=false
             assert(planned,plan)
             if plan then M.commit(plan,fs) end

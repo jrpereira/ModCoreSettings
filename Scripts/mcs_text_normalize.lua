@@ -69,7 +69,6 @@ local function alnum(cp)
     end
     return false
 end
-M.isAlnum=alnum
 function M.anchor(value)
     -- For ASCII, NFC changes nothing, case folding maps only A-Z, and the alphanumerics
     -- are 0-9 and a-z.

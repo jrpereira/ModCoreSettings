@@ -5,7 +5,7 @@ local shared={}
 ModRef={SetSharedVariable=function(_,key,value) shared[key]=value end,
     GetSharedVariable=function(_,key) return shared[key] end}
 local originalLoadfile=loadfile
-local missing,constructed=nil,0
+local missing,constructed,attached=nil,0,nil
 debug.getinfo=function() return {source='@C:/Mods/1_ModCore_Settings/Scripts/dmm_extension.lua'} end
 loadfile=function(path)
     local name=assert(path:match('([^/\\]+)%.lua$'))
@@ -53,6 +53,11 @@ loadfile=function(path)
             assert(path=='C:/Mods/1_ModCore_Settings/Scripts/../data/module_categories.lua')
             return {version=3,data={version=3}}
         end} end
+        if name=='dmm_events' then
+            return {bus=function() return {on=function() end} end,attach=function(modules,bus)
+                attached={modules=modules,bus=bus,before=constructed}
+            end}
+        end
         if name=='mcs_module_json' then return {decode=function() return {} end} end
         if name=='sort_button' then return {install=function(native,path)
             constructed=constructed+1
@@ -73,13 +78,14 @@ loadfile=function(path)
 end
 package.loaded.nativeactions={new=function() end}
 local extension=assert(originalLoadfile('Scripts/dmm_extension.lua'))()
-assert(extension.id=='ModCoreSettings' and extension.apiVersion==1 and type(extension.install)=='function')
+assert(type(extension.install)=='function' and type(extension.launch)=='function')
 local choices,controls,pages={},{},{}
-local callbacks={}
-local events={on=function(_,name,callback) callbacks[name]=callback end}
 local settingsApi={}
-extension.install({version=1,choices=choices,controls=controls,pages=pages,events=events,settingsApi=settingsApi})
-local order={'mc_ini','mcs_manifest','safe_file','mcs_choice_sound','navigation','mapped_presets','menu_contributions','presentation','mod_requirements','browser_groups','module_categories','mcs_taxonomy','mcs_module_json',
+local native=package.loaded.nativeactions
+extension.install(choices,controls,pages,native,settingsApi)
+assert(attached and attached.modules.controls==controls and attached.modules.nativeactions==native and attached.before==0,
+    'the menu-closing event is attached on DMM\'s modules before any other wrapper')
+local order={'dmm_events','mc_ini','mcs_manifest','safe_file','mcs_choice_sound','navigation','mapped_presets','menu_contributions','presentation','mod_requirements','browser_groups','module_categories','mcs_taxonomy','mcs_module_json',
  'init_config','menu_pages','page_links','menu_slots','page_hooks','field_types','keybind_editor','range_editor','editor_input','editor_hint','standard_keys','standard_controls',
  'settings_notify','sort_button','menu_data','index_refresh'}
 assert(#loaded==#order)
@@ -137,24 +143,23 @@ assert(hooks=='hooks' and manifest=='manifest for MCC' and context.page=='MCC',
 assert(installs[9].name=='page_links' and installs[9].args[1]==pages)
 assert(installs[10].name=='index_refresh' and installs[10].args[1]==pages
  and type(installs[10].args[2])=='function','the index refresh wraps outermost')
-assert(next(callbacks)==nil,'the extension itself listens to no lifecycle event')
 assert(shared['MC_DMM_Extension_v1.ready']=='1')
-assert(not pcall(extension.install,{version=2,choices=choices,controls=controls,pages=pages,events=events}))
-assert(not pcall(extension.install,{version=1,choices=choices,controls=controls,events=events}))
+assert(not pcall(extension.install,choices,controls,nil,native,settingsApi),'pages are required')
+assert(not pcall(extension.install,choices,controls,pages,{},settingsApi),'native actions are required')
 -- A module that fails to load, even the last one, leaves DMM's modules untouched: every load
 -- and check runs before the first wrapper.
 for _,name in ipairs({'index_refresh','menu_data','sort_button','standard_controls'}) do
-    installs,constructed,shared,missing={},0,{},name
+    installs,constructed,shared,missing,attached={},0,{},name,nil
     local fresh=assert(originalLoadfile('Scripts/dmm_extension.lua'))()
-    local ok,err=pcall(fresh.install,{version=1,choices=choices,controls=controls,pages=pages,events=events,settingsApi=settingsApi})
+    local ok,err=pcall(fresh.install,choices,controls,pages,native,settingsApi)
     assert(not ok and tostring(err):find('cannot open',1,true),tostring(err))
-    assert(#installs==0 and constructed==0 and shared['MC_DMM_Extension_v1.ready']==nil,name..' failing wraps nothing')
+    assert(#installs==0 and constructed==0 and attached==nil and shared['MC_DMM_Extension_v1.ready']==nil,name..' failing wraps nothing')
 end
 missing=nil
 -- Without shared variables nothing is wrapped either.
 installs,constructed={},0
 local saved=ModRef;ModRef=nil
-assert(not pcall(extension.install,{version=1,choices=choices,controls=controls,pages=pages,events=events,settingsApi=settingsApi}))
+assert(not pcall(extension.install,choices,controls,pages,native,settingsApi))
 ModRef=saved
 assert(#installs==0 and constructed==0,'a missing ModRef wraps nothing')
 print('PASS pure-Lua DMM extension loads owned modules in order and rejects incompatible APIs')
