@@ -27,7 +27,7 @@ return {
         {id='SingleCategory',group='Listing',label='Modules appear in a single category',default=0,
             conditions={visible={field='SortBy',values={1}}},
             values={{value=0,label='Off'},{value=1,label='On'}}},
-        -- Grid columns of every group, shown in every sort; the ungrouped lists are one mod per line.
+        -- Grid columns of every list, shown and applied in every sort.
         {id='ModulesPerRow',group='Listing',label='Modules per row',default=2,
             values={{value=1,label='1'},{value=2,label='2'},{value=3,label='3'}}},
         -- Shown as is until ModCore Templates fills it (settings:templates); its rows keep

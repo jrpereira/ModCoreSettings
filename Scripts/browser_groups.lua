@@ -15,8 +15,8 @@ local HOST = 'ModCoreSettings'
 -- The MCS_Page value of that tab.
 local TABS = {tools=5}
 local COLLECTION_ICON = '⁂'
--- Every group is a grid of this many columns unless options.columns (1-3, [Modules]
--- ModulesPerRow) says otherwise; an ungrouped list is one mod per line.
+-- Every list is a grid of this many columns unless options.columns (1-3, [Modules]
+-- ModulesPerRow) says otherwise, the ungrouped Alphabetical and Load Order lists included.
 local GROUP_COLUMNS = 2
 -- The Recently added list's sections, newest first: key, title, and the age in seconds a
 -- mod's added time must be under (the last section takes the rest).

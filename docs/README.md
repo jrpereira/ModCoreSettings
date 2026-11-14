@@ -72,8 +72,9 @@ Settings page sets the rest:
   enough of them are installed (Collections valid with # modules: No, 2 or 3).
   Modules appear in a single category lists a mod under one top category only.
 - **Recently Added:** newest first, in sections from the last 24 hours to earlier.
-- **Alphabetical** and **Load Order** (numbered) list one mod per line.
-- **Modules per row** sets 1, 2 or 3 mods per row in Categories and Recently Added.
+- **Alphabetical** lists every mod by name; **Load Order** lists them in load order,
+  numbered.
+- **Modules per row** sets 1, 2 or 3 mods per row, in every sort.
 
 A module whose `mod.json` dependencies are not all loaded at a version they accept
 carries a red ⚠ at the right of its row. Its details list each requirement after
