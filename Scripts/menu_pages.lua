@@ -56,10 +56,10 @@ end
 
 local function generated(contribution,page,parse,hooked,compile,stored)
     local choices={}
-    local manifest,hooks,context=page.manifest,nil,nil
+    local manifest,hooks,context,menu=page.manifest,nil,nil,page.menu
     if page.hooks then
         assert(hooked,'page hooks unavailable')
-        hooks,manifest,context=hooked(page)
+        hooks,manifest,context,menu=hooked(page)
     elseif page.menu then
         assert(compile,'menu data unavailable')
         manifest=compile(page.menu,page)
@@ -67,9 +67,20 @@ local function generated(contribution,page,parse,hooked,compile,stored)
     if manifest then choices=parse(manifest) end
     -- DMM stores numbers only; a menu-data page that stores a setting of ModCoreSettings' own
     -- types (a range or keybind) or a keyed picker has its storage kept by ModCoreSettings.
-    if page.menu and page.menu.storage and stored then
+    -- So does a hooks page whose menu() declares storage and that has no load() of its own;
+    -- its action() is kept.
+    if menu and menu.storage and stored and not (hooks and hooks.load) then
         for _,choice in ipairs(choices) do
-            if choice.kind=='extension' or choice.mcKeys then hooks,context=stored(page);break end
+            if choice.kind=='extension' or choice.mcKeys then
+                local own=hooks
+                hooks,context=stored({id=page.id,configDirectory=page.configDirectory,menu=menu})
+                if own and own.action then
+                    local merged={action=own.action}
+                    for key,value in pairs(hooks) do merged[key]=value end
+                    hooks=merged
+                end
+                break
+            end
         end
     end
     local provider={id=page.id,name=page.name,author=page.author or contribution.id,
@@ -116,7 +127,8 @@ end
 -- state.inserts is keyed by provider address and slot name. slots (the menu_slots controller)
 -- parses addresses and checks slot declarations; without it rows are ignored and link pages hidden.
 -- A hidden page whose rows have no available slot is shown instead, so its settings stay reachable.
--- hooked(page) (optional) returns a hooks page's hooks, manifest text and context.
+-- hooked(page) (optional) returns a hooks page's hooks, manifest text, context and, from
+-- menu(), its menu data.
 -- compile(menu,page) (optional) turns a page's menu data into manifest text.
 -- stored(page) (optional) returns storage hooks and their context for a menu-data page.
 function M.apply(providers,contributions,parse,state,report,slots,hooked,compile,stored)

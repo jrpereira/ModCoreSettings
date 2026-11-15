@@ -185,3 +185,45 @@ assert(ok,warning)
 assert(template(files['/mct/templates.ini'])=='Fangdango_SingleUnderbar',files['/mct/templates.ini'])
 assert(#applied==1 and applied[1].id=='MCT4' and applied[1].event.values.MCT_Template=='Fangdango_SingleUnderbar')
 print('PASS keyed enums: slot rows store and publish their key through the source page')
+
+-- A hooks page whose menu() declares storage and has no load() of its own gets the same
+-- stored hooks; menu() runs on every build, so its choices can change between opens, and
+-- its action() is kept.
+do
+    local Pages=require('menu_pages')
+    local listed=CHOICES
+    local acted
+    local function liveMenu(values)
+        return {storage={file='templates.ini',section='Templates'},groups={{id='Player'}},
+            fields={{id='MCT_Template',group='Player',label='Template',values=values,default='None'}}}
+    end
+    local own={contract=1,menu=function() return liveMenu(listed) end,
+        action=function(_,id) acted=id end}
+    local function hooked(p)
+        local context=Hooks.context(p)
+        local text,data=Hooks.manifest(own,context,MenuData.manifest)
+        return own,text,context,data
+    end
+    local function stored(p) return Hooks.stored(p.menu,store),Hooks.context(p) end
+    local contribution={id='MCT',generation=1,pages={{id='Live',name='Live',hooks='/mct/live.lua',
+        configDirectory='/live'}}}
+    local providers,state={},{}
+    files['/live/templates.ini']='[Templates]\nMCT_Template=Preymonition_Ring\nMCT_Size=0\n'
+    Pages.apply(providers,{contribution},Choices.parse,state,report,nil,hooked,MenuData.manifest,stored)
+    local live=providers[1]
+    assert(live.id=='Live' and live.mcHooks.load and live.mcHooks.action==own.action,'stored hooks, own action kept')
+    model=Choices.open(live)
+    assert(model.pending[1]==3 and not model:dirty(),'the saved key loads')
+    -- The next build lists a choice more; the saved key keeps its choice.
+    listed={CHOICES[1],{key='Angel',label='Angel'},CHOICES[2],CHOICES[3]}
+    Pages.apply(providers,{contribution},Choices.parse,state,report,nil,hooked,MenuData.manifest,stored)
+    model=Choices.open(providers[1])
+    assert(#model.items[1].values==4 and model.pending[1]==4 and not model:dirty(),'a new choice, the key kept')
+    -- The saved key's choice is gone: the default shows, the file keeps the key until Apply.
+    listed={CHOICES[1],CHOICES[2]}
+    Pages.apply(providers,{contribution},Choices.parse,state,report,nil,hooked,MenuData.manifest,stored)
+    model=Choices.open(providers[1])
+    assert(model.pending[1]==1 and not model:dirty(),'the default shows')
+    assert(template(files['/live/templates.ini'])=='Preymonition_Ring','the key stays until Apply')
+end
+print('PASS keyed enums: a hooks page with menu() storage is stored by key and re-listed per build')

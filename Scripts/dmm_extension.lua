@@ -153,7 +153,8 @@ extension={
             local hooks=loadHooks(page.hooks)
             local context=pageHooks.context(page)
             context.moduleName=moduleName
-            return hooks,pageHooks.manifest(hooks,context,compile),context
+            local manifest,menu=pageHooks.manifest(hooks,context,compile)
+            return hooks,manifest,context,menu
         end
         -- Outermost open: inner wrappers only ever see the host's own unspliced settings.
         local slots=menuSlots.install(choices,report,contributions,read)

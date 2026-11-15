@@ -329,7 +329,14 @@ current value by id, navigation rows included. An error is logged as
 
 `menu` returns [menu data](#menu-data), `manifest` a settings manifest; a hooks
 file has one of them. Both get `context.moduleName(folder)`, a mod folder's name
-as the mod browser shows it.
+as the mod browser shows it. Both run each time the mod menu opens and after each
+Apply, so a page can list choices that change while the game runs.
+
+A hooks file without `load` whose `menu` declares `storage` is stored the way a
+menu-data page is: ranges, keybinds and keyed pickers by ModCoreSettings, in that
+file and section. Its `action` still runs. A keyed picker then keeps a saved key
+the current list no longer offers: the page shows the default, and the file keeps
+the key until the page is applied.
 
 `context` is `{page=<page id>,directory=<configDirectory>}`. With `load` and
 `apply`, ModCoreSettings never reads or writes the page's config file: `load`

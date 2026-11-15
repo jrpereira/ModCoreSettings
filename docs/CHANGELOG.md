@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- A page-hooks file whose `menu()` declares `storage` and has no `load()` is stored the
+  way a menu-data page is, keyed pickers included, so its choices can be listed afresh each
+  time the menu opens. Its `action()` still runs.
 - An error in ModCoreSettings while the menu builds a page, or in a settings page's controls,
   no longer stops Dawnwalker Mod Menu for the session. It is logged once as
   `MCS_BUILD_FAILED` (ERROR) with its cause, and from then on, until the game restarts,

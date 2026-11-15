@@ -60,14 +60,15 @@ function M.context(page)
 end
 
 -- Runs a page's manifest or menu hook; compile(menu) turns menu data into manifest text.
--- Errors propagate so the contributor is skipped.
+-- Returns the manifest text and, from menu(), the menu data. Errors propagate so the
+-- contributor is skipped.
 function M.manifest(hooks,context,compile)
     local copy={page=context.page,directory=context.directory,moduleName=context.moduleName}
     if hooks.menu then
         assert(compile,'menu data unavailable')
         local menu=hooks.menu(copy)
         assert(type(menu)=='table','menu() must return menu data')
-        return compile(menu)
+        return compile(menu),menu
     end
     local text=hooks.manifest(copy)
     assert(type(text)=='string' and not text:find('%z'),'manifest() must return text')
