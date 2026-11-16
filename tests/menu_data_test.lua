@@ -12,7 +12,7 @@ local function menu()
         groups={{id='MCT_1',label='Layout'},{id='Notes',style='none',conditions={visible={field='Style',values={1}}}}},
         fields={
             {id='Style',group='MCT_1',label='Style',default=0,widget='tabs',style='title',
-                values={{value=0,label='Swap'},{value=1,label='Stack',note='Two rows'},
+                values={{value=0,label='Swap',description='One row; 50% each.'},{value=1,label='Stack',note='Two rows'},
                     {value=2,label='Ring',module='9_ModCore_Example'}}},
             {id='Size',group='MCT_1',label='Size',default=100,values={min=10,max=200,step=5,suffix='%'},
                 description='How large; really.',conditions={label={field='Style',values={[1]='Stack size',[2]='Ring size'}}}},
@@ -38,6 +38,9 @@ assert(style:find('Type=picker',1,true) and style:find('PresetValues=0|1|2',1,tr
     and style:find('mcHeading=1',1,true) and style:find('mcChoiceNotes=1:Two rows;2:Example Mod',1,true)
     and style:find('ConfigFile=config.ini',1,true) and style:find('ConfigSection=Settings',1,true)
     and style:find('ConfigKey=Style',1,true))
+-- A choice's description, ';' and '%' escaped, for the side panel.
+assert(style:find('mcChoiceDescriptions=0:One row%3B 50%25 each.',1,true),'choice descriptions are written')
+fails('invalid value description',(function() local m=menu();m.fields[1].values[1].description='two\nlines';return m end)())
 -- An integer, inferred from its values.
 local size=section('Setting.Size')
 assert(size:find('Type=integer',1,true) and size:find('Minimum=10',1,true) and size:find('Maximum=200',1,true)

@@ -484,6 +484,18 @@ mcReadOnly=1
     assert(ids(page.choices)=='Page,One' and logs[1]:find('has its own rule',1,true),logs[1])
     assert(page.choices[2].group=='mcSlot.listed.1','a skipped entry does not use up a group name')
     assert(not pcall(Slots.parse,tabs:gsub('mcSlotGroups=1','mcSlotGroups=2'),page.choices))
+    -- With mcSlotLabel=1 the slot's first group takes the slot row's Label as a shown
+    -- heading; its rows keep their own labels.
+    local labelled=tabs:gsub('mcSlotGroups=1','mcSlotGroups=1\nmcSlotLabel=1')
+    local hidden=listing:gsub('mcLabel=First Things','mcLabel=First Things\nmcHeading=0')
+    files['/tabs/mod_settings.ini']=labelled
+    page=provider('Tabs','/tabs/mod_settings.ini',labelled)
+    Slots.parse(labelled,page.choices)
+    list=provider('Lister','/list/mod_settings.ini',hidden,true)
+    logs={}
+    assert(Slots.load(page,{listed={{contributor='Lister',source=list,settings={'One','Two'}}}},read,spy,report),logs[1])
+    assert(text:find('[Category.mcSlot.listed.1]\nmcLabel=Listed\nmcLevel=3\nVisibleWhen=Page',1,true),text)
+    assert(page.choices[2].label=='One','the first row keeps its label')
 end
 -- Subgroups keep their category under its slot name, and its drawn heading's label.
 do

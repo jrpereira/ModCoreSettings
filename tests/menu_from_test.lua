@@ -12,7 +12,10 @@ local function load(path,env)
     return load_(text,path,'t',env)
 end
 load_=load_ or _G.load
-local expand=From.expander({load=load,report=function(event,detail) reports[#reports+1]=event..' '..detail end,
+local heads={}
+local expand=From.expander({load=load,read=function(root,path,count)
+        local bytes=heads[root..'/'..path]; if not bytes then return nil,'no file' end return bytes:sub(1,count) end,
+    report=function(event,detail) reports[#reports+1]=event..' '..detail end,
     files=function(root,sub) local names=folders[root..'/'..sub]; if names==false then return nil,'boom' end return names or {} end})
 
 local LIST=[[return function(context)
@@ -111,6 +114,21 @@ expand(menu({{key='none',label='None'},{key='b',label='B'},{from='choices/escape
 local escaped=false
 for _,line in ipairs(reports) do if line:find('invalid subfolder',1,true) then escaped=true end end
 assert(escaped,'a subfolder may not leave the mod folder')
+
+-- context.head gives a file's first bytes, inside the mod folder only.
+heads['Mods/P/images/a.png']='HEADERBYTES'
+sources['Mods/P/Scripts/choices/head.lua']=[[return function(context)
+    local bytes=context.head('images/a.png',6)
+    local missing=context.head('images/none.png',4)
+    return {{key='h_'..bytes..'_'..tostring(missing),label='H'}}
+end]]
+assert(keys(expand(menu({{key='none',label='None'},{from='choices/head.lua',root='Mods/P'}},'none')))
+    =='none=None h_HEADER_nil=H default none','a list file reads a file\'s first bytes')
+sources['Mods/P/Scripts/choices/headescape.lua']=[[return function(context) return {{key=context.head('../x',4),label='X'}} end]]
+expand(menu({{key='none',label='None'},{key='b',label='B'},{from='choices/headescape.lua',root='Mods/P'}},'none'))
+local headEscaped=false
+for _,line in ipairs(reports) do if line:find('invalid path',1,true) then headEscaped=true end end
+assert(headEscaped,'head may not leave the mod folder')
 
 -- Entry checks.
 assert(pcall(From.entry,FROM,'x'))

@@ -14,6 +14,12 @@ edits and Apply; your mod applies the saved values to gameplay.
 - **Organize larger menus:** use tabs, cycling pickers, two-handle ranges,
   conditional rows, shared headings and navigation that does not change saved
   settings.
+- **List choices from files:** a keyed picker can list its choices from a mod's
+  own files, refreshed each time the menu opens; a choice may play a WAV file when
+  selected.
+- **Show a live preview:** a page can reserve a 16:9 preview in the side panel, which
+  its provider (ModCore Templates for template pages) draws from the page's current
+  values, applied or not.
 - **Offer coordinated presets:** one choice updates several settings in DMM's
   pending model; individual edits can return the selection to Custom.
 - **Share menu space:** contribute pages or insert settings into another mod's
@@ -78,6 +84,9 @@ Settings page sets the rest:
 - **Alphabetical** lists every mod by name; **Load Order** lists them in load order,
   numbered.
 - **Modules per row** sets 1, 2 or 3 mods per row, in every sort.
+- **Use Compact Style** (Off, Index or Everywhere) gives the mod menu the pause menu's
+  look in a loaded game: the game blurred behind a dark panel down the left and the page
+  drawn smaller, on the mod list only (Index) or on every page.
 
 A module whose `mod.json` dependencies are not all loaded at a version they accept
 carries a red ⚠ at the right of its row. Its details list each requirement after

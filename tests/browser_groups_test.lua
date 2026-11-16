@@ -498,6 +498,30 @@ assert(#filtered.rows==5 and filtered.mcModuleCount==2 and multi.mcBrowserLabel=
 assert(filtered.setCategoryFilter==nil and filtered.setTagFilter==nil,'no category or tag filter API')
 print('PASS a taxonomy listing shows every placement')
 
+-- A developer tool's row carries the first line of its description; none without one.
+do
+    local text=Groups.manifest({Tool=true},{},{{id='Tool',name='Sounds Explorer',
+        description=' Lists the game\'s sounds.\n\nRequirements\n- x '},{id='Bare',name='Bare'}})
+    assert(text:find('[Setting.MCS_Index_1]\nId=MCS_Index_1\nLabel=Sounds Explorer\n',1,true)
+        and text:find('\nDescription=Lists the game\'s sounds.\n',1,true)
+        and not text:match('%[Setting%.MCS_Index_2%][^%[]*Description'),'tool rows take their description')
+end
+print('PASS developer tool rows take their description')
+
+-- Every Listing setting on MCS's own page is described; Sort by describes each way too.
+do
+    local listing=0
+    for _,field in ipairs(require('mcs_page').fields) do
+        if field.group=='Listing' then
+            listing=listing+1
+            assert(type(field.description)=='string' and field.description~='',field.id..' has a description')
+        end
+    end
+    local text=require('menu_data').manifest(require('mcs_page'))
+    assert(listing==4 and text:find('\nmcChoiceDescriptions=2:Newest installs',1,true),'Sort by describes its choices')
+end
+print('PASS the Listing settings are described')
+
 -- Through DMM's real parser the host page's tabs parse and open without a config file.
 local choicesPath=os.getenv('DMM_CHOICES_PATH')
 if not choicesPath then print('SKIP index tabs parse: DMM_CHOICES_PATH is not set');return end

@@ -95,6 +95,7 @@ extension={
         local standardControls=module('standard_controls')
         local settingsNotify=module('settings_notify')
         local sortButtonModule=module('sort_button')
+        local compactStyleModule=module('compact_style')
         local menuData=module('menu_data')
         local menuFrom=module('vendor/menu_from')
         local previewPanel=module('preview_panel')
@@ -124,21 +125,40 @@ extension={
         settingsNotify.install(settingsApi,report)
         navigation.install(choices)
         mapped.install(choices,controls)
+        -- Use Compact Style, installed below; presentation asks it while it lays pages out.
+        local compactStyle
         presentation.install(choices,controls,pages,{keyColumn=keybind.layout,
+            compact=function(kind) return compactStyle and compactStyle.applies(kind) end,
             textTable=contributions.textTable,playerExists=playerExists,events=bus})
         local mods=directory:match('^(.*[/\\])[^/\\]+[/\\]Scripts[/\\]$')
         local folderManifest=browserGroups.folderManifest(mods)
         -- DMM's mod-list filter button becomes Sort by, saved in this mod's config.ini.
         local sortButton=sortButtonModule.install(native,directory..'../config.ini',
             io_.read,io_.write,report)
+        -- Use Compact Style: the pause menu's look in a loaded game, and a one-column list.
+        compactStyle=compactStyleModule.install(native,{report=report,
+            read=function() return io_.read(directory..'../config.ini') end,inGame=playerExists,
+            pause=function()
+                local menu=FindFirstOf('WBP_PauseMenu_C')
+                return menu and menu:IsValid() and menu or nil
+            end,
+            findMaterial=function(path)
+                local material=StaticFindObject(path)
+                return material and material:IsValid() and material or nil
+            end})
         local function read(path)
             return assert(io_.read(path),'unreadable '..path)
         end
+        local grouping=moduleCategories.reader(directory..'../cache/modules_register.json',directory..'../config.ini',nil,
+            {taxonomy=taxonomy,json=indexJson,report=report,seenPath=directory..'../cache/folder_info.json'})
         browserGroups.install(pages,report,function(content) return choices.parse(content) end,
             browserGroups.folderVersion(mods),folderManifest,
-            moduleCategories.reader(directory..'../cache/modules_register.json',directory..'../config.ini',nil,
-                {taxonomy=taxonomy,json=indexJson,report=report,
-                    seenPath=directory..'../cache/folder_info.json'}),read,sortButton)
+            function(...)
+                local options=grouping(...)
+                local columns=compactStyle and compactStyle.columns()
+                if columns and type(options)=='table' then options.columns=columns end
+                return options
+            end,read,sortButton)
         config.install(choices)
         -- Hooks storage sits inside the slot model, which must stay outermost.
         pageHooks.install(choices,report)
@@ -149,9 +169,15 @@ extension={
             return ok and type(fields)=='table' and fields.name or folder
         end
         -- Keyed pickers may list their choices from a mod's list file, run on every build so
-        -- files added while the game runs show the next time the menu opens.
+        -- files added while the game runs show the next time the menu opens. Listing the game
+        -- folder walks the whole install, so one build lists it once for every list file.
+        local building,gameTree
         local expand=menuFrom.expander({report=report,
-            files=menuFrom.gameFiles(function() return IterateGameDirectories() end)})
+            files=menuFrom.gameFiles(function()
+                if not building then return IterateGameDirectories() end
+                gameTree=gameTree or IterateGameDirectories()
+                return gameTree
+            end)})
         local function compile(menu)
             return menuData.manifest(expand(menu),{moduleName=moduleName})
         end
@@ -171,6 +197,10 @@ extension={
         menuPages.install(pages,function(content) return choices.parse(content) end,
             menuPages.reader(contributions,ModRef,read,report),report,slots,read,hooked,compile,stored)
         pageLinks.install(pages,slots)
+        -- Each build lists the game folder afresh, and drops the listing when it ends.
+        local listed=pages.build
+        local function forget(...) building,gameTree=false,nil;return ... end
+        pages.build=function(...) building,gameTree=true,nil;return forget(listed(...)) end
         -- A page's live preview, filled by its provider (ModCore Templates for template pages).
         local textures={}
         previewPanel.install(pages,{shared=ModRef,report=report,

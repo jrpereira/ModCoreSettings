@@ -30,7 +30,10 @@ assert(Config.merge('[Bindings]\nKey=0',global,choices)=='[Bindings]\nKey=0','un
 assert(Config.merge('[Other]\nThing=2',global,choices)=='Key=82\n[Other]\nThing=2')
 fails(function() Config.merge('[A]\nKey=1\n[B]\nKey=2',global,choices) end,'ambiguous')
 fails(function() Config.merge('[Bindings]\nKey=0\nKey=1',settings,choices) end,'duplicate')
-fails(function() Config.merge('[Bindings]\n[Bindings]',settings,choices) end,'duplicate config section')
+-- A repeated section is one section: its keys count once, and missing ones end its last occurrence.
+fails(function() Config.merge('[Bindings]\nKey=0\n[Bindings]\nKey=1',settings,choices) end,'duplicate')
+assert(Config.merge('[Bindings]\nKey=0\n[General]\nEnabled=1\n[Bindings]\nOther=2\n',settings,choices)
+    =='[Bindings]\nKey=0\n[General]\nEnabled=1\n[Bindings]\nOther=2\nMode=1\n','a repeated section opens')
 fails(function() Config.merge('[Bad',settings,choices) end,'malformed')
 fails(function() Config.merge('',{{key='Bad\nKey',default=0}},choices) end,'invalid ConfigKey')
 

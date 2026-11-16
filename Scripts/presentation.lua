@@ -44,9 +44,13 @@ local categorySize,categoryLeft,categoryTop,categoryRuleBottom,rowIndent=18,0,24
 -- A framed notice's text starts noticeFrameInset pixels inside its outline.
 local noticeFrameInset=10
 -- A framed notice's outline ends where the controls below it do, the value column's right
--- edge (pickerValuePadding inside it), not at the row's; its lines sit closer than a
--- description's.
-local noticeFrameRight,noticeLineHeight=nil,0.85
+-- edge (pickerValuePadding inside it), not at the row's: it is measured from the row's left
+-- edge, as the value column is, so it holds at any width the row is laid out at. Its
+-- lines sit closer than a description's.
+local noticeFrameWidth,noticeLineHeight=nil,0.85
+-- A link's underline is drawn linkUnderlineLift pixels above where its row puts it, and
+-- its text linkTextDrop pixels below.
+local linkUnderlineLift,linkTextDrop=4,1
 -- A subgroup's heading (mcWithin): subheadingSize points in the title color, subheadingShift
 -- pixels right of the row indent, subheadingTop pixels above, with no rule. Its rows indent
 -- nestedIndent pixels further, their labels nestedShrink points smaller.
@@ -119,7 +123,7 @@ local sliderValueLift=3
 -- (DMM's 12). A toggle's value takes the same column, so every value lines up.
 local pickerLabelWidth,pickerArrowWidth,pickerValueWidth,pickerValuePadding=330,20,240,4
 local pickerValueLeft=pickerLabelWidth+pickerArrowWidth
-noticeFrameRight=PAGE_WIDTH-(pickerValueLeft+pickerValueWidth-pickerValuePadding)
+noticeFrameWidth=pickerValueLeft+pickerValueWidth-pickerValuePadding-categoryLeft
 -- Each arrow is drawn pickerArrowInset pixels in from its box, towards the value: half the
 -- space between its art and the pips (the value's margin around them, and the art's own).
 local pickerArrowInset=math.floor(((pickerValueWidth-math.floor(pickerValueWidth*0.75/2)*2)/2+(pickerArrowWidth-10)/2)/2)
@@ -263,6 +267,24 @@ function M.parse(content,items)
         end
         return notes
     end
+    -- mcChoiceDescriptions=<value>:<text>;... describes a picker's choices: the side panel
+    -- shows the current choice's after the row's own. ';' and '%' come escaped (%3B, %25).
+    local function choiceDescriptions(r,s)
+        if r.mcChoiceDescriptions==nil then return nil end
+        assert(s.kind=='picker','mcChoiceDescriptions requires a picker')
+        local described={}
+        for entry in (r.mcChoiceDescriptions..';'):gmatch('(.-);') do
+            local value,text=entry:match('^%s*([^:]+):(.+)$')
+            value=tonumber(value)
+            text=text and trim(text:gsub('%%3B',';'):gsub('%%25','%%'))
+            assert(value and text and text~='' and #text<=1024 and described[value]==nil,'invalid mcChoiceDescriptions')
+            local valid=false
+            for _,v in ipairs(s.values) do if v==value then valid=true end end
+            assert(valid,'mcChoiceDescriptions value outside picker choices')
+            described[value]=text
+        end
+        return described
+    end
     -- mcDimValues=<value>|<value> fades the row while its own value is one of these.
     local function dimValues(r,s)
         if r.mcDimValues==nil then return nil end
@@ -344,6 +366,7 @@ function M.parse(content,items)
                 s.mcReferenceLabel=r.mcReferenceLabel
                 s.mcLabelRule=labelRule(r)
                 s.mcChoiceNotes=choiceNotes(r,s)
+                s.mcChoiceDescriptions=choiceDescriptions(r,s)
                 -- mcChoiceSounds=<value>:<event path>;... plays a choice's own sound
                 -- instead of DMM's when the row changes to it.
                 s.mcChoiceSounds=ChoiceSound.parse(r.mcChoiceSounds,s)
@@ -451,6 +474,42 @@ local function italicOf(font)
     end
     return italicFaces[key]
 end
+-- The heaviest face of a label's font whose name holds 'bold' (Afacad: Semi Bold), or ''.
+local boldFaces={}
+local function boldOf(font)
+    local key=''
+    pcall(function() key=font.FontObject:GetFullName() end)
+    if boldFaces[key]==nil then
+        local found=''
+        pcall(function()
+            local entries=font.FontObject.CompositeFont.DefaultTypeface.Fonts
+            local function inspect(entry)
+                pcall(function() entry=entry:get() end)
+                local name=faceName(entry.Name)
+                local lower=name:lower()
+                if lower:find('bold',1,true) and not lower:find('italic',1,true) and (found=='' or #name<#found) then found=name end
+            end
+            if type(entries)=='table' then for _,entry in ipairs(entries) do inspect(entry) end
+            else entries:ForEach(function(_,entry) inspect(entry) end) end
+        end)
+        boldFaces[key]=found
+    end
+    return boldFaces[key]
+end
+-- Compact headings (Use Compact Style): size points in the font's bold face, when it has one.
+local function compactHeading(label,api,size)
+    api.Theme.font(label,api.theme,size)
+    local font=label.Font
+    local face=boldOf(font)
+    if face~='' then font.TypefaceFontName=FName and FName(face) or face end
+    label:SetFont(font)
+end
+-- Under Use Compact Style section headings are COMPACT_HEADING of their size, the mod list
+-- COMPACT_LIST of its width, and rows lose their indent: a row's label sits rowIndent plus
+-- DMM's 12-pixel button inset further left (COMPACT_INSET); a subgroup's rows keep their
+-- nestedIndent under its heading.
+local COMPACT_HEADING,COMPACT_LIST,COMPACT_INSET=0.8,0.8,12
+
 -- Shows the label in its dirty face, or back in its base face (captured from the label
 -- the first time, and again after each restyle).
 local function dirtyFace(row,dirty)
@@ -496,6 +555,22 @@ end
 function M.install(choices,controls,pages,options)
     if controls.mcPresentationVersion then return false end
     local keyColumn=options and options.keyColumn
+    -- compact(kind) (optional): whether Use Compact Style applies to the mod list ('index')
+    -- or to settings pages ('settings') now.
+    local compact=options and options.compact or function() return false end
+    local function compactSettings() local ok,on=pcall(compact,'settings');return ok and on==true end
+    -- A row's label indent: the category's, one level in, and the row button's own inset;
+    -- compact, none of them.
+    local function rowLeft(nested,inset)
+        if compactSettings() then return (inset or 0)-COMPACT_INSET+(nested and nestedIndent or 0) end
+        return rowIndent+(nested and nestedIndent or 0)+(inset or 0)
+    end
+    local function headingSize() return compactSettings() and math.floor(categorySize*COMPACT_HEADING+0.5) or categorySize end
+    -- A category heading's size, and compact, its bold face.
+    local function categoryFont(label,api)
+        if compactSettings() then compactHeading(label,api,headingSize())
+        else api.Theme.font(label,api.theme,categorySize) end
+    end
     -- Where a keybind's key box (and a cycle button) starts: centred on a picker's value column.
     local function keyLeft() return pickerValueLeft+(pickerValueWidth-keyColumn.key)/2 end
     -- An mcTable row taller than this scrolls.
@@ -675,7 +750,7 @@ function M.install(choices,controls,pages,options)
                     local help=api.caption(tree,pendingHeading.help);help:SetAutoWrapText(true)
                     M.style(help,5,api)
                     local slot=api.need(parent:AddChild(help),'MCS group help')
-                    slot:SetPadding({Left=rowIndent,Top=0,Right=20,Bottom=8})
+                    slot:SetPadding({Left=compactSettings() and 0 or rowIndent,Top=0,Right=20,Bottom=8})
                     helpWidgets[pendingHeading.heading]=help
                 end
                 pendingHeading=nil
@@ -908,8 +983,9 @@ function M.install(choices,controls,pages,options)
                 local level=setting.mcHeading and 1 or setting.mcFont
                 M.style(row.mcLabel,level,api)
                 if settingLabelSizes[level] then api.Theme.font(row.mcLabel,api.theme,settingLabelSizes[level]) end
-                -- A notice with a link (a merged page's) is a point smaller than other notices.
-                if level==5 and linkRow(setting) then api.Theme.font(row.mcLabel,api.theme,styles[5][1]-1) end
+                -- A notice with a link (a merged page's) is two points smaller than other
+                -- notices, so its two lines fit its frame.
+                if level==5 and linkRow(setting) then api.Theme.font(row.mcLabel,api.theme,styles[5][1]-2) end
                 -- Theme.font only writes the property; a built label shows it after SetFont.
                 if level then row.mcLabel:SetFont(row.mcLabel.Font) end
                 starStyle(row)
@@ -1054,6 +1130,10 @@ function M.install(choices,controls,pages,options)
                             local lineBox=new('SizeBox');lineBox:SetHeightOverride(1)
                             api.need(lineBox:SetContent(underline),'MCS link underline')
                             add(text,lineBox):SetPadding({Left=0,Top=1,Right=0,Bottom=0})
+                            -- Drawn linkUnderlineLift pixels up, just under the letters
+                            -- rather than below the line's descender space.
+                            lineBox:SetRenderTranslation({X=0,Y=-linkUnderlineLift})
+                            label:SetRenderTranslation({X=0,Y=linkTextDrop})
                             label:SetRenderOpacity(linkIdleOpacity)
                         else
                             frame,outline=outlined(button)
@@ -1098,17 +1178,30 @@ function M.install(choices,controls,pages,options)
                         -- A notice with a link (a merged page's) is framed: a 1-pixel outline
                         -- round the whole row, the selection background just inside it.
                         if link and setting.mcFont==5 then
-                            for _,edge in ipairs({{h=0,v=1},{h=0,v=3},{h=1,v=0},{h=3,v=0}}) do
+                            -- Every edge is placed from the row's left edge: top and bottom
+                            -- noticeFrameWidth wide, the right one at its end.
+                            for _,edge in ipairs({{v=1},{v=3},{left=0},{left=noticeFrameWidth-1}}) do
                                 local bar=new('Border');bar:SetBrushColor(headerSeparatorDim)
                                 local box=new('SizeBox')
-                                if edge.h==0 then box:SetHeightOverride(1) else box:SetWidthOverride(1) end
+                                if edge.v then box:SetHeightOverride(1);box:SetWidthOverride(noticeFrameWidth)
+                                else box:SetWidthOverride(1) end
                                 api.need(box:SetContent(bar),'MCS notice frame')
-                                local barSlot=add(overlay,box);barSlot:SetHorizontalAlignment(edge.h);barSlot:SetVerticalAlignment(edge.v)
-                                barSlot:SetPadding({Left=edge.h==3 and 0 or categoryLeft,Top=edge.h~=0 and 1 or 0,
-                                    Right=noticeFrameRight,Bottom=edge.h~=0 and 1 or 0})
+                                local barSlot=add(overlay,box);barSlot:SetHorizontalAlignment(1)
+                                barSlot:SetVerticalAlignment(edge.v or 0)
+                                barSlot:SetPadding({Left=categoryLeft+(edge.left or 0),Top=edge.v and 0 or 1,
+                                    Right=0,Bottom=edge.v and 0 or 1})
                             end
                             row.mcFramed=true
-                            row.background.Slot:SetPadding({Left=categoryLeft+1,Top=1,Right=noticeFrameRight+1,Bottom=1})
+                            -- The selection background (an Image) just inside the frame:
+                            -- left-aligned at the frame's width, as its edges are.
+                            -- Without UMG's size override it fills the row at PAGE_WIDTH.
+                            if pcall(function() row.background:SetDesiredSizeOverride({X=noticeFrameWidth-2,Y=1}) end) then
+                                row.background.Slot:SetHorizontalAlignment(1)
+                                row.background.Slot:SetPadding({Left=categoryLeft+1,Top=1,Right=0,Bottom=1})
+                            else
+                                row.background.Slot:SetPadding({Left=categoryLeft+1,Top=1,
+                                    Right=PAGE_WIDTH-categoryLeft-noticeFrameWidth+1,Bottom=1})
+                            end
                             row.mcLabel.LineHeightPercentage=noticeLineHeight
                         end
                     end
@@ -1133,7 +1226,7 @@ function M.install(choices,controls,pages,options)
                             slot:SetPadding({Left=keyLeft(),Top=0,Right=0,Bottom=0})
                             row.widget:GetParent():SetWidthOverride(keyLeft()-indent)
                         end
-                        row.mcCyclePlace(rowIndent+(rowButtonInset[row.widget] or 0))
+                        row.mcCyclePlace(rowLeft(false,rowButtonInset[row.widget]))
                     else
                         slot:SetHorizontalAlignment(3)
                         slot:SetPadding({Left=0,Top=0,Right=pickerRightMargin,Bottom=0})
@@ -1516,18 +1609,25 @@ function M.install(choices,controls,pages,options)
                 local slot=heading.widget.Slot
                 local padding=slot.Padding
                 slot:SetPadding({Left=categoryLeft,Top=categoryTop,Right=padding.Right,Bottom=padding.Bottom})
-                api.Theme.font(heading.widget,api.theme,categorySize)
+                categoryFont(heading.widget,api)
                 if setting.mcGroup and setting.mcGroup.within then
                     heading.mcSubheading=true
-                    slot:SetPadding({Left=rowIndent+subheadingShift,Top=subheadingTop,Right=padding.Right,Bottom=padding.Bottom})
+                    slot:SetPadding({Left=compactSettings() and 0 or rowIndent+subheadingShift,Top=subheadingTop,
+                        Right=padding.Right,Bottom=padding.Bottom})
                     api.Theme.font(heading.widget,api.theme,subheadingSize)
                     local help=helpWidgets[heading.widget]
                     if help then
                         local p=help.Slot.Padding
-                        help.Slot:SetPadding({Left=rowIndent+nestedIndent,Top=p.Top,Right=p.Right,Bottom=p.Bottom})
+                        help.Slot:SetPadding({Left=compactSettings() and 0 or rowIndent+nestedIndent,Top=p.Top,Right=p.Right,Bottom=p.Bottom})
                     end
                 end
                 if setting.mcGroup then M.style(heading.widget,setting.mcGroup.font,api) end
+                -- A level of the group's own keeps its size; compact, it is bold too.
+                if compactSettings() and not heading.mcSubheading then
+                    if setting.mcGroup and styles[setting.mcGroup.font] then
+                        compactHeading(heading.widget,api,heading.widget.Font.Size)
+                    else categoryFont(heading.widget,api) end
+                end
                 if heading.mcSubheading then api.Theme.textColor(heading.widget,'title') end
                 -- Theme.font only writes the property; a built heading shows it after SetFont.
                 heading.widget:SetFont(heading.widget.Font)
@@ -1547,7 +1647,7 @@ function M.install(choices,controls,pages,options)
                                 -- and its rule.
                                 label:SetJustification(0)
                                 api.Theme.textColor(label,'muted')
-                                api.Theme.font(label,api.theme,categorySize);label:SetFont(label.Font)
+                                categoryFont(label,api);label:SetFont(label.Font)
                                 widget=api.construct('/Script/UMG.VerticalBox',tree)
                                 add(widget,label)
                                 local rule=api.construct('/Script/UMG.Border',tree);rule:SetBrushColor(headerSeparatorDim)
@@ -1965,8 +2065,8 @@ function M.install(choices,controls,pages,options)
                             -- The restyle starts from the base face; a dirty row keeps its
                             -- dirty face on the new style.
                             if row.mcDirty then dirtyFace(row,false) end
-                            api.Theme.font(row.mcLabel,api.theme,beforeCategory and categorySize
-                                or nested and 14-nestedShrink or 14)
+                            if beforeCategory then categoryFont(row.mcLabel,api)
+                            else api.Theme.font(row.mcLabel,api.theme,nested and 14-nestedShrink or 14) end
                             row.mcLabel:SetFont(row.mcLabel.Font)
                             api.Theme.textColor(row.mcLabel,beforeCategory and 'muted' or 'body')
                             starStyle(row)
@@ -1978,7 +2078,7 @@ function M.install(choices,controls,pages,options)
                             or row.mcLabel.Slot
                         local labelPadding=labelSlot.Padding
                         local indent=beforeCategory and categoryLeft
-                            or rowIndent+(nested and nestedIndent or 0)+(rowButtonInset[row.widget] or 0)
+                            or rowLeft(nested,rowButtonInset[row.widget])
                         if row.mcCyclePlace then row.mcCyclePlace(indent) end
                         local contentLeft=toggleShell(setting) and not row.background and indent+toggleShift or indent
                         -- A framed notice's text sits clear of its outline.
@@ -2249,6 +2349,8 @@ function M.install(choices,controls,pages,options)
     local function installControlHelp(page,tree,api)
         local title,copy=page.detailTitle,page.detailCopy
         if not (title and copy and page.controls and type(page.controls.description)=='function') then return end
+        -- The setting's title in the title colour, as the mod list's card names its mod.
+        api.Theme.textColor(title,'title')
         local stack=assert(copy:GetParent(),'MCS description parent')
         local children=childrenOf(stack)
         assert(#children==2 and children[1].widget:GetFullName()==title:GetFullName()
@@ -2283,8 +2385,30 @@ function M.install(choices,controls,pages,options)
         local controlsUi=page.controls
         local describe=controlsUi.description
         function controlsUi:description(index)
-            local result=describe(self,index)
+            -- A picker with choice descriptions describes its current choice after its own
+            -- text; DMM describes the selected setting again on every refresh, so a change
+            -- of value updates it.
             local setting=self.model and self.model.items and self.model.items[index]
+            local described=setting and setting.mcChoiceDescriptions
+            if described then
+                if setting.mcOwnDescription==nil then setting.mcOwnDescription=setting.description or '' end
+                local own=setting.mcOwnDescription
+                local choice=self.model.pending and described[self.model.pending[index]]
+                setting.description=choice and (own~='' and own..'\n\n'..choice or choice) or own
+            end
+            -- A tabs picker (a page's tabs) is titled by its selected tab, not its own label.
+            local ownLabel
+            if setting and setting.mcTabs and not linkRow(setting) and type(setting.values)=='table'
+                and #setting.values>=2 and self.model.pending then
+                for n,value in ipairs(setting.values) do
+                    if value==self.model.pending[index] and setting.labels and setting.labels[n] then
+                        ownLabel=setting.label;setting.label=setting.labels[n]
+                    end
+                end
+            end
+            local ok,result=pcall(describe,self,index)
+            if ownLabel then setting.label=ownLabel end
+            if not ok then error(result,0) end
             help.show(setting and setting.mcHelp)
             return result
         end
@@ -2367,9 +2491,30 @@ function M.install(choices,controls,pages,options)
             page.filterLabel.Slot:SetVerticalAlignment(1)
             -- The index has no filter: its button is a plain title that takes no input.
             page.filterButton:SetVisibility(4)
+            -- Use Compact Style on the mod list: its column COMPACT_LIST as wide, and its
+            -- group titles bold, COMPACT_HEADING of their size.
+            local compactIndex=false
+            pcall(function() compactIndex=compact('index')==true end)
+            local narrow=compactIndex and COMPACT_LIST or 1
+            local LIST_WIDTH,LIST_ROW_WIDTH=math.floor(LIST_WIDTH*narrow+0.5),math.floor(LIST_ROW_WIDTH*narrow+0.5)
             local header=assert(page.filterButton:GetParent(),'MCS mod-browser header')
             header:SetWidthOverride(LIST_ROW_WIDTH);header:ClearHeightOverride()
             local list=assert(header:GetParent(),'MCS mod-browser page')
+            -- DMM's own column and scroll boxes, 630 wide.
+            if compactIndex then
+                local column=list:GetParent()
+                local function width(widget)
+                    local ok,value=pcall(function() return widget.WidthOverride end)
+                    return ok and type(value)=='number' and value or nil
+                end
+                if column and width(column) then column:SetWidthOverride(math.floor(width(column)*narrow+0.5)) end
+                for _,child in ipairs(childrenOf(list)) do
+                    local box=child.widget
+                    if width(box) and width(box)>=LIST_WIDTH/narrow then
+                        box:SetWidthOverride(math.floor(box.WidthOverride*narrow+0.5))
+                    end
+                end
+            end
             local headerName=header:GetFullName()
             local children=childrenOf(list)
             list:ClearChildren()
@@ -2397,7 +2542,10 @@ function M.install(choices,controls,pages,options)
                         if type(indent)~='number' or indent< -80 or indent>80 then indent=0 end
                         M.style(label,browserLevel,api)
                         -- A group title is a size below its mods; its icon and rule mark it.
-                        if provider and provider.mcBrowserKind then api.Theme.font(label,api.theme,13) end
+                        if provider and provider.mcBrowserKind then
+                            if compactIndex then compactHeading(label,api,math.floor(13*COMPACT_HEADING+0.5))
+                            else api.Theme.font(label,api.theme,13) end
+                        end
                         -- The "and N more" entry is a size smaller than the mods it folds.
                         if provider and provider.mcBrowserMore then api.Theme.font(label,api.theme,12) end
                         if row.wrapper then

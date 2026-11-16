@@ -111,9 +111,12 @@ menu={
 
   | `type` | `values` | `default` | `widget` (first is the default) |
   |---|---|---|---|
-  | `enum` | `{{value=,label=,note=,module=,sound=},...}`, up to 64; or `key=` in place of `value=` | a value (a key) | `picker`, `tabs` (up to 8), `cycler`, `switch` (values 0 and 1), `text`, `table` |
+  | `enum` | `{{value=,label=,note=,module=,sound=,description=},...}`, up to 64; or `key=` in place of `value=` | a value (a key) | `picker`, `tabs` (up to 8), `cycler`, `switch` (values 0 and 1), `text`, `table` |
   | `integer` | `{min=,max=,step=,suffix=}`, whole numbers | a number | `slider` |
   | `range` | `{min=,max=,step=,suffix=,delta=}`, whole numbers | `{low,high}` | `range` |
+
+  A choice's `description` (up to 1024 characters, one line) follows the field's own in the
+  side panel while that choice is the value.
 
   A keyed enum gives every choice `key=` in place of `value=`, and its `default` as a
   key: `values={{key='None',label='None'},{key='Fangdango_SingleUnderbar',label='Single Underbar'}},
@@ -139,6 +142,8 @@ menu={
   return function(context)       -- context.directory: the mod folder
       local names=context.files('sounds')   -- names directly inside <mod>/sounds, unordered;
                                             -- {} when missing, nil and why on failure
+      -- context.head('images/x.png',24): a file's first bytes (at most 4096), nil and why
+      -- when unreadable; enough to check a picture's header before listing it
       return {{key='bell',label='Bell',note='cue'}}   -- display order; key, label, note, sound
   end
   ```
@@ -186,7 +191,8 @@ menu={
   (`mcChoiceSounds` on the picker; see [presentation metadata](#presentation-metadata)).
 - `slot='<name>'` makes a `text` field the page's [slot](#slot-rows) for other
   contributors' rows; `slotLabel=true` lets it name the first of them, and
-  `slotGroups=true` lets the rows keep their own groups (`mcSlotGroups`).
+  `slotGroups=true` lets the rows keep their own groups (`mcSlotGroups`). With both, the
+  slot names the first group instead: its heading shows with the slot's label.
 - `action=true` makes a navigation row (never stored; see [page hooks](#page-hooks));
   `link='<page id>'` or `'<provider>:<slot>'` opens that page.
 - The rest of the [presentation metadata](#presentation-metadata) is available as
@@ -393,16 +399,19 @@ column, dimmed until hovered or selected. Its label lines up with the rows aroun
 ### Live preview
 
 Menu data may declare `preview={background=<picture path>}`. While that page is shown,
-the bottom of the side panel holds a 16:9 preview (576 by 324, 20 above the panel's
-bottom; the description scrolls above it): the background picture, and over it an Overlay
-host 1920 by 1080, scaled to fit. ModCoreSettings shares it with the page's provider:
+the bottom of the side panel holds a 16:9 preview (576 by 324, 68 above the panel's
+bottom and 40 in from its left, where the header and description text start; the
+description scrolls above it): the background picture, and over it an Overlay host 1920 by
+1080, scaled to fit. Without a picture, or with one that cannot be read, nothing shows
+behind the host. The focus and sound buttons sit under the preview's right end; Focus, which blurs the background picture while on, is the panel's own and is not shared. ModCoreSettings
+shares the preview with the page's provider:
 
 | Shared variable | Value |
 |---|---|
 | `MCS.Preview.v1.host` | the host Overlay while open, else nil |
 | `MCS.Preview.v1.state` | `<revision> open <page id>` or `<revision> closed <page id>` |
-| `MCS.Preview.v1.values` | `<revision>`, then one `id=value` line per setting: the page's current values, applied or not |
-| `MCS.Preview.v1.sound` | the sound button over the preview: `auto` (default; the provider decides), `on` or `off`; it lasts the session |
+| `MCS.Preview.v1.values` | `<revision>`, then one `id=value` line per setting: the page's current values, applied or not; a keyed picker's as its key |
+| `MCS.Preview.v1.sound` | the sound button under the preview: `auto` (default; the provider decides), `on` or `off`; it lasts the session |
 | `MCS.Preview.v1.focus` | the selected setting's id, or empty |
 
 and runs the console command `MCS_Preview_v1` after each change: opening, closing, any

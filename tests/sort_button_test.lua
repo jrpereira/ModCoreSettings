@@ -75,8 +75,38 @@ assert(stack.children[1].justification==0 and label.justification==0 and stack.c
 assert(stack.Slot.padding.Left==12 and stack.Slot.padding.Right==28,'the label keeps its place')
 assert(stack.translation.X==0 and stack.translation.Y==-2,'both lines sit 2px higher')
 assert(buttonWidget.parent==overlay and #footer.children==0,'the button leaves the footer for the overlay')
-assert(buttonWidget.Slot.horizontal==1 and buttonWidget.Slot.padding.Left==480 and buttonWidget.Slot.padding.Bottom==84,
+assert(buttonWidget.Slot.horizontal==1 and buttonWidget.Slot.padding.Left==480 and buttonWidget.Slot.padding.Bottom==14,
     'a quarter of the way across, at the footer\'s height')
+-- The footer and page come down to where the game's own menus have theirs: on the native
+-- actions' first sync, the overlay's children 84 above the bottom go 14 above it and the
+-- page, 150 above it, ends 80 above it; others stay.
+do
+    local function child(bottom)
+        local w={Slot={Padding={Left=7,Top=1,Right=2,Bottom=bottom}}}
+        function w.Slot:SetPadding(p) self.Padding=p end
+        return w
+    end
+    local back,actions,page,other=child(84),child(84),child(150),child(40)
+    -- The actions' bounds: a 1380-wide box holding a scale box holding the actions row.
+    actions.WidthOverride=1380
+    local row={Slot={}}
+    function row.Slot:SetHorizontalAlignment(v) self.h=v end
+    local scale={GetContent=function() return row end}
+    function actions:GetContent() return scale end
+    local frame={children={back,actions,page,other}}
+    function frame:GetChildrenCount() return #self.children end
+    function frame:GetChildAt(i) return self.children[i+1] end
+    local synced=0
+    local lowering={new=function() return {sync=function() synced=synced+1 end} end}
+    Sort.install(lowering,'config',function() end,function() end,function(e,d) reports[#reports+1]=e..' '..d end)
+    local made=lowering.new('pc','tree',frame)
+    assert(back.Slot.Padding.Bottom==84,'nothing moves before the first sync')
+    made:sync('page');made:sync('page')
+    assert(synced==2 and back.Slot.Padding.Bottom==14 and actions.Slot.Padding.Bottom==14
+        and page.Slot.Padding.Bottom==80 and other.Slot.Padding.Bottom==40 and back.Slot.Padding.Left==7,
+        'footer 14 and page 80 above the bottom; the rest kept')
+    assert(row.Slot.h==3,'the actions packed to the right, as the game\'s own')
+end
 button:show(2,api,'tree')
 assert(#texts==2 and texts[2].text=='RECENTLY ADDED' and #row.children==2,'placed once, relabelled')
 assert(button:press(1)==0 and files.config=='[Modules]\nSortBy=0\n','a press saves the next way')

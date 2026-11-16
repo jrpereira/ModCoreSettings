@@ -126,6 +126,7 @@ local function widget()
     function w:SetFont(v) self.Font=v end
     function w:SetJustification(v) self.Justification=v end
     function w:SetWidthOverride(v) self.WidthOverride=v end
+    function w:SetDesiredSizeOverride(v) self.desiredOverride=v end
     function w:ClearWidthOverride() self.WidthOverride=nil end
     function w:SetHeightOverride(v) self.HeightOverride=v end
     function w:ClearHeightOverride() self.HeightOverride=nil;self.heightCleared=true end
@@ -284,8 +285,11 @@ end}
 -- DMM's lifecycle bus; the presentation listens for the menu closing.
 local lifecycle={}
 local lifecycleEvents={on=function(_,name,callback) lifecycle[name]=callback end}
+-- Use Compact Style, as a test sets it: 'settings' for settings pages.
+local compactKind
 assert(M.install(choices,controls,pages,{keyColumn={key=96,keyOffset=408},
-    textTable=require('menu_contributions').textTable,events=lifecycleEvents}))
+    textTable=require('menu_contributions').textTable,events=lifecycleEvents,
+    compact=function(kind) return compactKind==kind end}))
 assert(type(lifecycle.hostClosing)=='function','the presentation listens for the menu closing')
 assert(not M.install(choices,controls,pages))
 local browserProviders={
@@ -326,6 +330,7 @@ do
     assert(#help.children==3 and help.children[1]==page.detailTitle and help.children[2]==band
         and help.children[3]==page.detailCopy and band.Slot.Padding.Top==12 and page.detailCopy.Slot.Padding.Top==12,
         'the help box sits between the setting title and its description, 12 pixels apart')
+    assert(page.detailTitle.color=='title','the setting\'s title is in the title colour, like the mod list\'s')
     assert(band:GetContent()==controlHelp.text and controlHelp.text.Font.Size==10 and controlHelp.text.AutoWrapText
         and controlHelp.text.colorAndOpacity.SpecifiedColor.R==1 and controlHelp.text.colorAndOpacity.SpecifiedColor.A<1
         and band.BrushColor.A<0.2 and band.visible==1,'the help box is smaller wrapped text on a dim band, hidden at first')
@@ -337,6 +342,27 @@ do
         'a control without help shows only the description')
     page.controls:description(3)
     assert(band.visible==3 and page.detailCopy.visible==1,'an empty description collapses, leaving the help alone')
+    -- A picker with choice descriptions shows its current choice's after its own text.
+    local items=page.controls.model.items
+    items[4]={label='Template',description='',mcChoiceDescriptions={[1]='One row.',[2]='Two rows.'}}
+    items[5]={label='Layout',description='Own.',mcChoiceDescriptions={[2]='Two rows.'}}
+    page.controls.model.pending={nil,nil,nil,2,1}
+    page.controls:description(4)
+    assert(page.detailCopy.text=='Two rows.' and page.detailCopy.visible==4,'the current choice is described')
+    page.controls.model.pending[4]=1
+    page.controls:description(4)
+    assert(page.detailCopy.text=='One row.','and follows the value')
+    page.controls:description(5)
+    assert(page.detailCopy.text=='Own.','a choice without one leaves the row\'s own text')
+    page.controls.model.pending[5]=2
+    page.controls:description(5)
+    assert(page.detailCopy.text=='Own.\n\nTwo rows.','after the row\'s own text')
+    -- A page's tabs are titled by the selected tab, and keep their own label.
+    items[6]={label='Page',description='',mcTabs=true,values={0,1},labels={'Keys','Options'}}
+    page.controls.model.pending={nil,nil,nil,2,2,1}
+    page.controls:description(6)
+    assert(page.detailTitle.text=='Options' and items[6].label=='Page','titled by the selected tab')
+    items[4],items[5],items[6],page.controls.model.pending=nil,nil,nil,nil
     page.mcTestApi.setText(page.detailCopy,'Select a setting to see its description.')
     assert(band.visible==1 and page.detailCopy.visible==4,'any other description DMM writes hides the help')
 end
@@ -589,6 +615,8 @@ assert(#linked.panels[1].rows[1].mcTabs==1
 -- A link is underlined text, not an outlined choice; it glows only while hovered.
 local linkTab=linked.panels[1].rows[1].mcTabs[1]
 assert(linkTab.outline==nil and linkTab.underline,'a link has an underline and no outline')
+assert(linkTab.underline:GetParent().RenderTranslation.Y==-4 and linkTab.label.RenderTranslation.Y==1,
+    'the underline sits just under the letters, the text a pixel lower')
 assert(linkTab.underline.BrushColor.A<0.5 and linkTab.label.opacity<1,'an idle link is dimmed')
 -- A link row's label wraps in its column and the row grows from a 40-pixel minimum.
 local linkRow=linked.panels[1].rows[1]
@@ -606,10 +634,11 @@ local framed=controls.build(widget(),{{id='ModCoreTemplates.module.VisualExample
 framed.mcHeaderHost=widget()
 framed:show(1)
 local framedRow=framed.panels[1].rows[1]
-assert(framedRow.mcFramed and framedRow.mcLabel.Font.Size==11
+assert(framedRow.mcFramed and framedRow.mcLabel.Font.Size==10
     and framedRow.background.Slot.Padding.Left==1 and framedRow.background.Slot.Padding.Bottom==1
-    and framedRow.background.Slot.Padding.Right==25 and framedRow.mcLabel.LineHeightPercentage==0.85,
-    'a linked notice is framed, 11pt, lines closer, its selection background inside the frame,'
+    and framedRow.background.Slot.Padding.Right==0 and framedRow.background.Slot.HorizontalAlignment==1
+    and framedRow.background.desiredOverride.X==584 and framedRow.mcLabel.LineHeightPercentage==0.85,
+    'a linked notice is framed, 10pt, lines closer, its selection background inside the frame,'
     ..' which ends with the value column (24 short of the row)')
 items[1].mcFont=savedFont
 assert(not row.mcLabel.AutoWrapText and not row.wrapper.heightCleared,
@@ -767,6 +796,30 @@ assert(ui.panels[1].rows[2].mcLabel.text=='Slot 1')
 assert(position(independent)<position(ui.panels[1].headings[2].widget))
 assert(position(ui.panels[1].headings[2].widget)<position(ui.panels[1].headings[3].widget))
 ui:refresh();ui:prepare(1);assert(scroll:GetChildrenCount()==count,'No duplicate widgets on reuse')
+-- Compact settings pages: category headings 20% smaller (14), rows without their indent.
+do
+    compactKind='settings'
+    local compactUi=controls.build(widget(),{{id='ModCoreTemplates.module.VisualExample',choices=items}},api)
+    compactUi.mcHeaderHost=widget()
+    compactUi:show(1)
+    local heading=compactUi.panels[1].headings[3].widget
+    assert(heading.Font.Size==14 and heading.Slot.Padding.Left==0,'a compact category heading is 14pt at the edge')
+    -- Each row's label sits its row indent and DMM's 12-pixel button inset further left
+    -- than on the same page drawn plainly; a subgroup's rows keep their nested indent.
+    local moved=0
+    for n,compactRow in ipairs(compactUi.panels[1].rows) do
+        local plain=ui.panels[1].rows[n]
+        local function left(r) local slot=r and r.mcLabel and r.mcLabel.Slot;return slot and slot.Padding and slot.Padding.Left end
+        local before,after=left(plain),left(compactRow)
+        if before and after and before>0 then
+            assert(before-after==22,
+                'compact rows lose their indent: '..tostring(compactRow.mcLabel.text)..' '..before..' -> '..after)
+            moved=moved+1
+        end
+    end
+    assert(moved>0,'some rows were indented')
+    compactKind=nil
+end
 assert(textCount('Interaction: Independent')==1 and textCount('Interaction: Selective')==1,'Reuse must not duplicate parent headings')
 local header=ui.panels[1].rows[4]
 assert(header.mcHeader and header.wrapper:GetParent()==ui.mcHeaderHost)

@@ -11,7 +11,7 @@
 --      table={entries={{code=,text=},...},columns=}},...}}
 --
 -- A field's type is what it holds (the model) and its widget how it shows (the view):
---   type='enum'    values={{value=,label=,note=,module=,sound=},...}; default=<a value>
+--   type='enum'    values={{value=,label=,note=,module=,sound=,description=},...}; default=<a value>
 --                  widget='picker' (default) | 'tabs' (up to 8) | 'cycler' | 'switch'
 --                  (values 0 and 1) | 'text' (a shown value) | 'table' (with table=)
 --                  A keyed enum gives every choice key=<text> instead of value= and its
@@ -198,7 +198,8 @@ function M.manifest(menu,options)
             local keyed=type(choices[1])=='table' and choices[1].key~=nil
             record.keyed=keyed
             for c,choice in ipairs(choices) do
-                allowed(choice,{value=not keyed,key=keyed,label=true,note=true,module=true,sound=true},where..' value '..c)
+                allowed(choice,{value=not keyed,key=keyed,label=true,note=true,module=true,sound=true,description=true},
+                    where..' value '..c)
                 local id
                 if keyed then id=key(choice.key,where..' value key')
                 else id=number(choice.value,where..' value') end
@@ -206,6 +207,10 @@ function M.manifest(menu,options)
                 text(choice.label,where..' value label')
                 assert(choice.note==nil or choice.module==nil,where..': a value has a note or a module')
                 if choice.note~=nil then text(choice.note,where..' value note',64) end
+                if choice.description~=nil then
+                    assert(type(choice.description)=='string' and choice.description:find('%S')
+                        and #choice.description<=1024 and not choice.description:find('%c'),where..': invalid value description')
+                end
                 if choice.module~=nil then text(choice.module,where..' value module',255) end
                 if choice.sound~=nil then
                     assert(type(choice.sound)=='string' and (choice.sound=='none' or ChoiceSound.path(choice.sound)),
@@ -426,7 +431,7 @@ function M.manifest(menu,options)
         local function add(key,value) keys[#keys+1]={key,value} end
         if record.kind=='enum' then
             local own=byField[field.id]
-            local values,labels,notes,sounds,keys={},{},{},{},{}
+            local values,labels,notes,sounds,keys,described={},{},{},{},{},{}
             for n,choice in ipairs(field.values) do
                 values[n],labels[n]=format(own[choice.key or choice.value]),choice.label
                 keys[n]=choice.key
@@ -438,6 +443,10 @@ function M.manifest(menu,options)
                 end
                 if note then notes[#notes+1]=values[n]..':'..note end
                 if choice.sound then sounds[#sounds+1]=values[n]..':'..choice.sound end
+                -- A choice's description, its ';' and '%' escaped.
+                if choice.description then
+                    described[#described+1]=values[n]..':'..choice.description:gsub('%%','%%25'):gsub(';','%%3B')
+                end
             end
             -- DMM needs two choices; a single one (a button or shown value) repeats.
             if #values==1 then
@@ -447,6 +456,7 @@ function M.manifest(menu,options)
             add('PresetLabels',table.concat(labels,'|'))
             add('mcChoiceNotes',#notes>0 and table.concat(notes,';') or nil)
             add('mcChoiceSounds',#sounds>0 and table.concat(sounds,';') or nil)
+            add('mcChoiceDescriptions',#described>0 and table.concat(described,';') or nil)
             add('mcType',MC_TYPES[widget]);add('mcTabsWidth',field.tabsWidth)
             add('mcKeys',record.keyed and table.concat(keys,'|') or nil)
             local dimmed=field.conditions and field.conditions.dim

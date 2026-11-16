@@ -8,7 +8,7 @@ local groupOf=Manifest.groupOf
 -- Inserted rows render as plain DMM controls; source presentation keys are not copied,
 -- except a label rule naming an earlier inserted row and a picker's choice notes and sounds.
 local COPIED={'Id','Type','Label','Description','PresetValues','PresetLabels','Presets','Default',
-    'Minimum','Maximum','Step','Decimals','Prefix','Suffix','mcChoiceNotes','mcChoiceSounds','mcReadOnly'}
+    'Minimum','Maximum','Step','Decimals','Prefix','Suffix','mcChoiceNotes','mcChoiceSounds','mcChoiceDescriptions','mcReadOnly'}
 
 -- Raw [Setting] sections with their line span, as DMM's parser reads them, and the lines.
 local function sections(content)
@@ -73,7 +73,8 @@ local function insertion(source,id,slot,number,earlier,first,grouping)
     eligible(byId)
     local out={'[Setting.mcSlot.'..number..']'}
     local fields=slot.fields
-    local named=first and fields.mcSlotLabel=='1'
+    -- Under mcSlotGroups the host names the first group instead (regroup).
+    local named=first and fields.mcSlotLabel=='1' and not grouping
     for _,key in ipairs(COPIED) do
         local value=found[key]
         if named and key=='Label' then value=fields.Label end
@@ -105,7 +106,8 @@ end
 -- named mcSlot.<slot>.<n>, so DMM heads them as any group. A group keeps its heading's
 -- presentation keys and takes the visibility of the slot's own group; a source group with
 -- a rule of its own is rejected, as its rows would be. A subgroup's mcWithin follows its
--- category's host name.
+-- category's host name. With mcSlotLabel=1 the slot's first group is headed by the slot
+-- row's Label, shown whatever its source heading's style.
 local GROUP_COPIED={'mcLabel','mcHeading','mcLevel','mcHelp','mcSilent','mcWithinLabel'}
 
 local function categories(content)
@@ -119,7 +121,7 @@ end
 
 -- Returns grouping(found) for one entry, which names (and records) the host group of each
 -- source group, and the Category sections those groups need.
-local function regroup(source,slotName,hostRule,counter,known)
+local function regroup(source,slotName,hostRule,counter,known,hostLabel)
     local own=categories(source.mcManifest or '')
     local added={}
     local function grouping(found)
@@ -132,9 +134,12 @@ local function regroup(source,slotName,hostRule,counter,known)
         counter.n=counter.n+1
         name='mcSlot.'..slotName..'.'..counter.n
         known[group]=name
-        local out={'[Category.'..name..']','mcLabel='..(category.mcLabel or group)}
+        local named=hostLabel and counter.n==1
+        local out={'[Category.'..name..']','mcLabel='..(named and hostLabel or category.mcLabel or group)}
         for _,key in ipairs(GROUP_COPIED) do
-            if key~='mcLabel' and category[key]~=nil then out[#out+1]=key..'='..category[key] end
+            if key~='mcLabel' and category[key]~=nil and not (named and key=='mcHeading') then
+                out[#out+1]=key..'='..category[key]
+            end
         end
         if category.mcWithin~=nil then
             local outer=category.mcWithin
@@ -190,7 +195,10 @@ function M.load(provider,inserts,read,parse,report)
                     local before,groupNames=counter.n,{}
                     for group,named in pairs(known[entry.source]) do groupNames[group]=named end
                     local grouping,headings
-                    if grouped then grouping,headings=regroup(entry.source,name,hostRule,counter,known[entry.source]) end
+                    if grouped then
+                        grouping,headings=regroup(entry.source,name,hostRule,counter,known[entry.source],
+                            section.fields.mcSlotLabel=='1' and section.fields.Label or nil)
+                    end
                     local fine,why=pcall(function()
                         for _,id in ipairs(entry.settings) do
                             assert(not used[id] and not ids[id],'setting id '..id..' is already on this page')

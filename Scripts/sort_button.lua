@@ -4,12 +4,43 @@
 -- native actions for the filter icon, which sits beside the button's label. It shows a
 -- small, faded "sort by" over the current way, and moves from DMM's footer to under the
 -- mod list, a quarter of the way across the screen.
+-- It also lowers DMM's footer (Back and the actions) to where the game's own menus have
+-- theirs, giving the page above the room it frees, and packs the actions to the right.
 local M={version=1}
 -- "sort by": text size and opacity; the current way's text size (DMM's footer uses 14). The button's left edge in DMM's 1920-wide design (a
 -- quarter of the screen, clear of Back), and its distance from the bottom, as DMM's footer.
 -- TEXT_RAISE lifts both lines without moving the glyph.
 local CAPTION_SIZE,CAPTION_OPACITY,LABEL_SIZE,TEXT_RAISE=11,0.75,12,2
-local LEFT,BOTTOM=480,84
+-- DMM's footer sits DMM_FOOTER above the bottom and its page DMM_PAGE; the game's own
+-- settings pages keep theirs FOOTER above it, so the page ends PAGE above it.
+local DMM_FOOTER,DMM_PAGE,FOOTER=84,150,14
+-- The width of DMM's footer actions' bounds.
+local ACTIONS=1380
+local PAGE=DMM_PAGE-(DMM_FOOTER-FOOTER)
+M.FOOTER,M.PAGE=FOOTER,PAGE
+local LEFT=480
+
+-- Moves DMM's footer and page down: each of the design overlay's children placed
+-- DMM_FOOTER above the bottom (Back, the actions) goes FOOTER above it, and the page,
+-- DMM_PAGE above it, ends PAGE above it. Others are left as they are.
+function M.lower(overlay)
+    for index=0,overlay:GetChildrenCount()-1 do
+        local child=overlay:GetChildAt(index)
+        local slot=child and child.Slot
+        local padding=slot and slot.Padding
+        local bottom=padding and padding.Bottom
+        local moved=bottom==DMM_FOOTER and FOOTER or bottom==DMM_PAGE and PAGE or nil
+        if moved then slot:SetPadding({Left=padding.Left,Top=padding.Top,Right=padding.Right,Bottom=moved}) end
+        -- DMM's actions sit centred in their ACTIONS-wide bounds; the game packs its own to
+        -- the right, Back alone on the left.
+        local ok,width=pcall(function() return child.WidthOverride end)
+        if moved and ok and width==ACTIONS then
+            local scale=child:GetContent()
+            local actions=scale and scale:GetContent()
+            if actions and actions.Slot then actions.Slot:SetHorizontalAlignment(3) end
+        end
+    end
+end
 
 -- In the order a press cycles through: SortBy value and label.
 M.MODES={{value=2,label='Recently Added'},{value=1,label='Categories'},{value=0,label='Alphabetical'},
@@ -44,9 +75,22 @@ function M.install(native,configPath,read,write,report)
     local button={}
     local actions,label,shown,placed
     local new=native.new
-    native.new=function(...)
+    native.new=function(pc,tree,overlay,...)
         actions,label,shown,placed=nil,nil,nil,nil
-        actions=new(...)
+        actions=new(pc,tree,overlay,...)
+        -- DMM adds its footer actions after its native actions: the footer moves on their
+        -- first sync, once the menu is complete.
+        local sync,lowered=actions and actions.sync,false
+        if type(sync)=='function' and overlay then
+            function actions:sync(...)
+                if not lowered then
+                    lowered=true
+                    local ok,why=pcall(M.lower,overlay)
+                    if not ok then report('SORT_BUTTON_FAILED','footer: '..tostring(why)) end
+                end
+                return sync(self,...)
+            end
+        end
         return actions
     end
     local function valid(widget) return widget and widget:IsValid() and widget or nil end
@@ -88,7 +132,7 @@ function M.install(native,configPath,read,write,report)
         widget:RemoveFromParent()
         local moved=assert(overlay:AddChildToOverlay(widget),'sort button slot')
         moved:SetHorizontalAlignment(1);moved:SetVerticalAlignment(3)
-        moved:SetPadding({Left=LEFT,Top=0,Right=0,Bottom=BOTTOM})
+        moved:SetPadding({Left=LEFT,Top=0,Right=0,Bottom=FOOTER})
     end
     function button:show(value,api,tree)
         if shown==value and valid(label) then return end

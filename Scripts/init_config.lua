@@ -50,10 +50,9 @@ function M.merge(original,settings,choices)
     local entries,sections={},{}
     for _,parsed in ipairs(doc.sections) do
         local section=trim(parsed.name)
-        if parsed.header then
-            validateName(section,'config section')
-            assert(not sections[section],'duplicate config section '..section)
-        end
+        -- A repeated section is the same section (some mods append one per upgrade);
+        -- missing keys go at the end of its last occurrence.
+        if parsed.header then validateName(section,'config section') end
         sections[section]={finish=parsed.finish}
         for _,entry in ipairs(parsed.entries) do
             validateName(entry.key,'config key')

@@ -82,6 +82,10 @@ function M.manifest(openable, versions, tools)
         local name = version and entry.name .. ' v' .. version or entry.name
         local fields = {{'Id', id}, {'Label', label(name)}, {'Group', group},
             {'Type', 'picker'}, {'Default', 0}, {'PresetValues', '0|1'}}
+        -- The tool's own description (its first line) is the row's, for the side panel.
+        local about = type(entry.description) == 'string'
+            and entry.description:match('^[^\r\n]*'):gsub('%c', ' '):match('^%s*(.-)%s*$'):sub(1, 4096) or ''
+        if about ~= '' then fields[#fields + 1] = {'Description', about} end
         if openable[entry.id] then
             for _, field in ipairs({{'PresetLabels', 'Open|Open'}, {'mcNavigation', 1}, {'mcType', 'tab'},
                 {'mcLinkPage', type(openable[entry.id]) == 'string' and openable[entry.id] or entry.id}}) do

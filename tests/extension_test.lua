@@ -1,4 +1,6 @@
 local loaded={}
+-- A compact style makes the mod list one column (nil: as configured).
+local compactColumns
 local installs={}
 local fieldTypes={registered={}}
 local shared={}
@@ -77,6 +79,12 @@ loadfile=function(path)
             assert(native==package.loaded.nativeactions and path=='C:/Mods/1_ModCore_Settings/Scripts/../config.ini')
             return 'sort button'
         end} end
+        if name=='compact_style' then return {install=function(native,options)
+            constructed=constructed+1
+            assert(native==package.loaded.nativeactions and type(options.read)=='function'
+                and type(options.inGame)=='function' and type(options.pause)=='function')
+            return {columns=function() return compactColumns end}
+        end} end
         if name=='menu_contributions' then return {textTable='table decoder'} end
         if name=='menu_data' then return {manifest=function(menu) return menu end} end
         if name=='editor_input' then return {new=function() return {take=function() end,pointer='pointer'} end} end
@@ -94,6 +102,9 @@ package.loaded.nativeactions={new=function() end}
 local extension=assert(originalLoadfile('Scripts/dmm_extension.lua'))()
 assert(type(extension.install)=='function' and type(extension.launch)=='function')
 local choices,controls,pages={},{},{}
+-- DMM's page build, as the wrappers find it; a test sets what it does.
+local dmmBuild
+pages.build=function(...) return dmmBuild(...) end
 local settingsApi={}
 local native=package.loaded.nativeactions
 extension.install(choices,controls,pages,native,settingsApi)
@@ -101,7 +112,7 @@ assert(attached and attached.modules.controls==controls and attached.modules.nat
     'the menu-closing event is attached on DMM\'s modules before any other wrapper')
 local order={'dmm_events','mc_ini','mcs_manifest','safe_file','mcs_choice_sound','navigation','mapped_presets','menu_contributions','presentation','mod_requirements','browser_groups','module_categories','mcs_taxonomy','mcs_module_json',
  'init_config','menu_pages','page_links','menu_slots','page_hooks','field_types','keybind_editor','range_editor','editor_input','editor_hint','standard_keys','standard_controls',
- 'settings_notify','sort_button','menu_data','preview_panel','build_guard','index_refresh'}
+ 'settings_notify','sort_button','compact_style','menu_data','preview_panel','build_guard','index_refresh'}
 assert(#loaded==#order)
 for n,name in ipairs(order) do assert(loaded[n]:match(name..'%.lua$'),'load '..n) end
 -- Copied files load from Scripts/vendor; the extension's own modules from Scripts.
@@ -142,6 +153,10 @@ FindFirstOf=nil;os.time=clock
 assert(installs[4].args[1]==pages and type(installs[4].args[3])=='function'
     and installs[4].args[4]=='versions in C:/Mods/' and installs[4].args[5]=='manifests in C:/Mods/','browser groups get the parser and the Mods folder')
 assert(type(installs[4].args[6])=='function','browser groups read category and grouping preferences')
+assert(installs[4].args[6]().columns==nil,'the configured columns without a compact style')
+compactColumns=1
+assert(installs[4].args[6]().columns==1,'a compact style lists one column')
+compactColumns=nil
 assert(installs[4].args[8]=='sort button','the filter button sorts')
 assert(installs[5].args[1]==choices)
 assert(installs[6].name=='page_hooks' and installs[6].args[1]==choices,
@@ -162,6 +177,18 @@ local listed=installs[8].args[8]({storage={file='c.ini',section='S'},groups={{id
     values={{key='none',label='None'},{from='choices/x.lua',root='C:/Mods/P'}},default='none'}}})
 assert(listed.fields[1].values[1].key=='none' and listed.fields[1].values[2].key=='a',
     'compile hands menu data through the from expander')
+-- One build lists the game folder once for all its list files, and the next build lists it afresh.
+local walks=0
+local walk=IterateGameDirectories
+IterateGameDirectories=function() walks=walks+1;return walk() end
+local compile=installs[8].args[8]
+local menu={storage={file='c.ini',section='S'},groups={{id='G'}},fields={{id='F',group='G',label='F',
+    values={{key='none',label='None'},{from='choices/x.lua',root='C:/Mods/P'}},default='none'}}}
+dmmBuild=function(tree) compile(menu);compile(menu);return 'page for '..tree end
+assert(pages.build('tree')=='page for tree' and walks==1,'a build walks the game folder once, '..walks)
+assert(pages.build('tree')=='page for tree' and walks==2,'the next build walks it again')
+compile(menu);compile(menu)
+assert(walks==4,'outside a build every list walks it')
 IterateGameDirectories=nil
 assert(installs[9].name=='page_links' and installs[9].args[1]==pages)
 assert(installs[10].name=='preview_panel' and installs[10].args[1]==pages and installs[10].args[2].shared==ModRef

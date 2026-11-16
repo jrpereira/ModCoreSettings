@@ -6,11 +6,14 @@ ModCore Settings (MCS) extends Dawnwalker Mod Menu (DMM) with richer controls an
 [list]
 [*]Keyboard and mouse keybind editors with Tap/Hold choices, optional clearing and inherited game-key display.
 [*]Tabs, cycling pickers, two-handle ranges, conditional rows, shared headings and navigation that does not alter saved settings.
+[*]Keyed pickers that list their choices from a mod's own files, refreshed each time the menu opens, optionally playing a WAV file as each choice is selected.
+[*]Live previews: a page can reserve a 16:9 preview in the side panel, drawn by its provider from the page's current values.
 [*]Mapped presets that update several pending settings together and recognize custom edits.
 [*]Generated pages and shared menu slots, so related mods can present settings together while retaining their own storage.
 [*]Apply notifications after successful saves, numbers and text, without configuration polling.
 [*]Missing-default initialization that preserves existing choices and unrelated configuration.
 [*]A Modules page that lists every installed mod by category, by when it was added, alphabetically or in load order, with collections and 1 to 3 mods per row. Modules whose declared requirements are missing or at the wrong version are marked, and their details list each requirement with the version loaded.
+[*]An optional compact style that gives the mod menu the pause menu's look in a loaded game, on the mod list or on every page.
 [/list]
 
 [b]Requirements and installation[/b]

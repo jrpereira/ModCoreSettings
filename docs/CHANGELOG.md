@@ -1,5 +1,36 @@
 # Changelog
 
+## v1.9.1
+
+- Options -> Use Compact Style (Off, Index or Everywhere; Off by default): in a loaded game
+  the mod menu takes the pause menu's look, the game blurred behind a dark panel down the
+  left, the page drawn at 80% from its top left without its dividers, section headings
+  bold and 20% smaller, rows without their indent, and the mod list one column, 20%
+  narrower; Index on the mod list, Everywhere on every page.
+- The mod menu's footer sits low, as in the game's own menus, Back on the left and the
+  actions packed to the right, and the page above it takes the 70 pixels it frees.
+- The Modules tab's settings, Sort by's choices and Developer Tools rows have descriptions.
+- A slot that keeps its rows' groups (`slotGroups`) and names them (`slotLabel`) heads its
+  first group with its own label.
+- A page's tabs are titled by the selected tab in the side panel, not by the row's label.
+- A setting's title above its description is white, as the mod list names its mods.
+- A picker choice may have a description: the side panel shows it after the setting's own
+  while that choice is the value.
+- A live preview's buttons read '<name>: <value>', the name dimmed and On and Auto bright,
+  Off italic and dimmed; Sound sits 20 pixels further right, and Focus, left of it, blurs
+  the background picture while on.
+- A page link's underline sits just under its letters.
+- A config file that repeats a section opens: the repeats count as one section, and
+  missing keys are added at the end of its last occurrence.
+- The mod list opens faster: building it lists the game folder once for all list files,
+  instead of once per picker that lists its choices.
+- A live preview without a background picture, or with one that cannot be read, shows
+  nothing behind its host instead of a white box.
+- A list file's `context.head(path, count)` reads a file's first bytes in the mod folder,
+  so it can leave out files it cannot use.
+- A live preview's sound button sits under the preview's right end instead of its top right.
+- A merged page's notice is two points smaller, instead of one.
+
 ## v1.9.0
 
 - Requires UE4SS Lua File Bridge and Sound Bridge 1.1.0 or newer. Without them MCS still
