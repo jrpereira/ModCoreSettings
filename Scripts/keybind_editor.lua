@@ -111,8 +111,10 @@ local placeholder={inherited={R=0.9,G=0.82,B=0.3,A=0.7},optional={R=0.6,G=0.6,B=
     conflict={R=0.55,G=0.08,B=0.06,A=0.6}}
 
 -- Column widths of the editor row: label | Mode, gap, key, gap, X. Other rows
--- align with the key column through keyOffset, measured from the label's start.
-M.layout={label=290,value=260,mode=66,gap=8,key=96,clear=28}
+-- align with the key column through keyOffset, measured from the label's start. The key
+-- box is 108 wide (96 grown 12%); presentation centres it in a picker's value column, so
+-- Mode and X sit beside it.
+M.layout={label=290,value=260,mode=66,gap=8,key=108,clear=28}
 M.layout.keyOffset=M.layout.label+M.layout.mode+M.layout.gap
 
 function M.build(row,setting,context)

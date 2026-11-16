@@ -96,6 +96,8 @@ extension={
         local settingsNotify=module('settings_notify')
         local sortButtonModule=module('sort_button')
         local menuData=module('menu_data')
+        local menuFrom=module('vendor/menu_from')
+        local previewPanel=module('preview_panel')
         local buildGuard=module('build_guard')
         local indexRefresh=module('index_refresh')
         assert(type(mapped.install)=='function','mapped preset installer unavailable')
@@ -146,8 +148,12 @@ extension={
             local ok,fields=pcall(folderManifest or error,folder)
             return ok and type(fields)=='table' and fields.name or folder
         end
+        -- Keyed pickers may list their choices from a mod's list file, run on every build so
+        -- files added while the game runs show the next time the menu opens.
+        local expand=menuFrom.expander({report=report,
+            files=menuFrom.gameFiles(function() return IterateGameDirectories() end)})
         local function compile(menu)
-            return menuData.manifest(menu,{moduleName=moduleName})
+            return menuData.manifest(expand(menu),{moduleName=moduleName})
         end
         local function hooked(page)
             local hooks=loadHooks(page.hooks)
@@ -165,6 +171,27 @@ extension={
         menuPages.install(pages,function(content) return choices.parse(content) end,
             menuPages.reader(contributions,ModRef,read,report),report,slots,read,hooked,compile,stored)
         pageLinks.install(pages,slots)
+        -- A page's live preview, filled by its provider (ModCore Templates for template pages).
+        local textures={}
+        previewPanel.install(pages,{shared=ModRef,report=report,
+            texture=function(path)
+                local cached=textures[path]
+                if cached and cached:IsValid() then return cached end
+                local library=StaticFindObject('/Script/Engine.Default__KismetRenderingLibrary')
+                local context=FindFirstOf('PlayerController')
+                if not (library and library:IsValid() and context and context:IsValid()) then return nil end
+                for _,candidate in ipairs({path,'ue4ss/'..path}) do
+                    local ok,texture=pcall(function() return library:ImportFileAsTexture2D(context,candidate) end)
+                    if ok and texture and texture:IsValid() then textures[path]=texture;return texture end
+                end
+                report('PREVIEW_FAILED','background unreadable: '..path)
+                return nil
+            end,
+            exec=function(command)
+                local controller=FindFirstOf('PlayerController')
+                local viewport=controller and controller:IsValid() and controller.Player and controller.Player.ViewportClient
+                if viewport then viewport:ProcessConsoleExec(command,nil,controller) end
+            end})
         -- Around every wrapper but the index refresh, so a rebuild after Apply is guarded too:
         -- the first error makes DMM build its own page for the rest of the session.
         guard:install()

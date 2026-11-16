@@ -157,12 +157,13 @@ end
 local colors={lit={R=0.95,G=0.63,B=0.08,A=0.9},dim={R=0.62,G=0.55,B=0.42,A=0.35},
     contour={R=1,G=1,B=1,A=1},none={R=1,G=1,B=1,A=0}}
 
--- The value column (as a picker's: control 190 wide, the line 75% of it), the line's
+-- The value column (as a picker's in presentation.lua: label 350, control 240 wide, the
+-- line 75% of it, so it matches pips and sliders), the line's
 -- heights (rest 2, span 4), the handle (3 wide, 10 tall, 14 when grabbed, from 2 above the
 -- line) and its 1-pixel contour, the line's place (bottom 4 above the row's) and the
 -- value's (lift 3 above the centre, shrink 2 points). Opacities: idle line 0.5, the other
 -- handle while one is grabbed 0.35.
-M.layout={label=330,value=210,control=190,share=0.75,rest=2,span=4,handle=3,marker=10,grabbed=14,
+M.layout={label=350,value=248,control=240,share=0.75,rest=2,span=4,handle=3,marker=10,grabbed=14,
     above=2,contour=1,bottom=4,lift=3,shrink=2,idle=0.5,row=40}
 
 function M.build(row,setting,context)

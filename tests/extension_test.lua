@@ -10,8 +10,14 @@ debug.getinfo=function() return {source='@C:/Mods/1_ModCore_Settings/Scripts/dmm
 loadfile=function(path)
     local name=assert(path:match('([^/\\]+)%.lua$'))
     -- Logging is real: it is loaded from the extension's folder before any module.
-    if name=='mc_log' or name=='log_events' then return originalLoadfile(assert(path:match('Scripts/.+$'))) end
+    if name=='mc_log' or name=='log_events' or name=='menu_from' then return originalLoadfile(assert(path:match('Scripts/.+$'))) end
     if name==missing then return nil,'cannot open '..path end
+    if path:find('/choices/',1,true) then
+        return load([[return function(context)
+            local names=context.files('sounds')
+            return {{key=names[1]:match('^cue_(%w+)'),label='A'}}
+        end]])
+    end
     loaded[#loaded+1]=path
     return function()
         if name=='menu_pages' then
@@ -72,6 +78,7 @@ loadfile=function(path)
             return 'sort button'
         end} end
         if name=='menu_contributions' then return {textTable='table decoder'} end
+        if name=='menu_data' then return {manifest=function(menu) return menu end} end
         if name=='editor_input' then return {new=function() return {take=function() end,pointer='pointer'} end} end
         if name=='editor_hint' then return {install=function(native)
             constructed=constructed+1
@@ -94,7 +101,7 @@ assert(attached and attached.modules.controls==controls and attached.modules.nat
     'the menu-closing event is attached on DMM\'s modules before any other wrapper')
 local order={'dmm_events','mc_ini','mcs_manifest','safe_file','mcs_choice_sound','navigation','mapped_presets','menu_contributions','presentation','mod_requirements','browser_groups','module_categories','mcs_taxonomy','mcs_module_json',
  'init_config','menu_pages','page_links','menu_slots','page_hooks','field_types','keybind_editor','range_editor','editor_input','editor_hint','standard_keys','standard_controls',
- 'settings_notify','sort_button','menu_data','build_guard','index_refresh'}
+ 'settings_notify','sort_button','menu_data','preview_panel','build_guard','index_refresh'}
 assert(#loaded==#order)
 for n,name in ipairs(order) do assert(loaded[n]:match(name..'%.lua$'),'load '..n) end
 -- Copied files load from Scripts/vendor; the extension's own modules from Scripts.
@@ -147,13 +154,25 @@ assert(installs[8].args[5]=='slots' and type(installs[8].args[6])=='function','m
 local hooks,manifest,context=installs[8].args[7]({id='MCC',hooks='/m/hooks.lua'})
 assert(hooks=='hooks' and manifest=='manifest for MCC' and context.page=='MCC',
  'menu pages receive a hooks resolver for hooks pages')
+-- compile resolves listed choices first, through UE4SS's directory tree.
+IterateGameDirectories=function()
+    return {Game={Binaries={Win64={ue4ss={Mods={P={sounds={__files={{__name='cue_a.wav'}}}}}}}}}}
+end
+local listed=installs[8].args[8]({storage={file='c.ini',section='S'},groups={{id='G'}},fields={{id='F',group='G',label='F',
+    values={{key='none',label='None'},{from='choices/x.lua',root='C:/Mods/P'}},default='none'}}})
+assert(listed.fields[1].values[1].key=='none' and listed.fields[1].values[2].key=='a',
+    'compile hands menu data through the from expander')
+IterateGameDirectories=nil
 assert(installs[9].name=='page_links' and installs[9].args[1]==pages)
+assert(installs[10].name=='preview_panel' and installs[10].args[1]==pages and installs[10].args[2].shared==ModRef
+    and type(installs[10].args[2].texture)=='function' and type(installs[10].args[2].exec)=='function',
+    'the preview panel wraps the pages, with shared variables, a picture loader and the console')
 assert(guarded and guarded.pages==pages and guarded.controls==controls and guarded.before==0 and guarded.attachedBefore,
     'the build guard keeps DMM\'s own builds before any other wrapper')
--- Counted before settings_notify left the list: page_links was the tenth install.
-assert(guarded.installedAt==10,'the build guard wraps every page wrapper but the index refresh')
-assert(installs[10].name=='index_refresh' and installs[10].args[1]==pages
- and type(installs[10].args[2])=='function','the index refresh wraps outermost')
+-- Counted before settings_notify left the list: the preview panel is the eleventh install.
+assert(guarded.installedAt==11,'the build guard wraps every page wrapper but the index refresh')
+assert(installs[11].name=='index_refresh' and installs[11].args[1]==pages
+ and type(installs[11].args[2])=='function','the index refresh wraps outermost')
 assert(shared['MC_DMM_Extension_v1.ready']=='1')
 assert(not pcall(extension.install,choices,controls,nil,native,settingsApi),'pages are required')
 assert(not pcall(extension.install,choices,controls,pages,{},settingsApi),'native actions are required')

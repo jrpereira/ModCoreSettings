@@ -21,9 +21,12 @@ local function boxWidth(widget,fallback)
     local ok,width=pcall(function() return widget:GetParent().WidthOverride end)
     return ok and tonumber(width) or fallback
 end
--- DMM's settings page widths in its 1920-wide design: rows and the header strip are ROW_WIDTH
--- wide; PAGE_WIDTH is the width of the page itself.
-local ROW_WIDTH,PAGE_WIDTH=572,584
+-- Settings page widths in DMM's 1280-wide page: rows and the header strip are ROW_WIDTH
+-- wide; PAGE_WIDTH is the width of the page itself. DMM builds its rows 584 wide in a
+-- 630-wide column; ModCoreSettings widens them to PAGE_WIDTH, leaving 20 for the column's
+-- scrollbar (12 of padding and 4 of bar, read live). The mod list keeps DMM's LIST_WIDTH
+-- rows and its LIST_ROW_WIDTH title.
+local ROW_WIDTH,PAGE_WIDTH,LIST_WIDTH,LIST_ROW_WIDTH=598,610,584,572
 -- A mod-list group title's padding in its highlight box (set live against the game).
 local HEADER_TITLE_PADDING={Left=-2,Top=6,Right=12,Bottom=-1}
 local styles={
@@ -34,9 +37,16 @@ local styles={
 -- choice, while the heading groups rows.
 local settingLabelSizes={[2]=20}
 -- A category heading, as the game's own settings draw theirs: categorySize points,
--- categoryLeft pixels left of the page edge, categoryTop pixels above, and a 1-pixel
--- rule under it. Rows under a category indent rowIndent pixels.
-local categorySize,categoryLeft,categoryTop,categoryRuleBottom,rowIndent=18,-2,24,4,10
+-- categoryLeft pixels from the page edge, categoryTop pixels above, and a 1-pixel rule
+-- under it. Rows under a category indent rowIndent pixels. DMM clips each row at the
+-- page edge, so a heading starting left of it loses its first glyph's edge.
+local categorySize,categoryLeft,categoryTop,categoryRuleBottom,rowIndent=18,0,24,4,10
+-- A framed notice's text starts noticeFrameInset pixels inside its outline.
+local noticeFrameInset=10
+-- A framed notice's outline ends where the controls below it do, the value column's right
+-- edge (pickerValuePadding inside it), not at the row's; its lines sit closer than a
+-- description's.
+local noticeFrameRight,noticeLineHeight=nil,0.85
 -- A subgroup's heading (mcWithin): subheadingSize points in the title color, subheadingShift
 -- pixels right of the row indent, subheadingTop pixels above, with no rule. Its rows indent
 -- nestedIndent pixels further, their labels nestedShrink points smaller.
@@ -87,8 +97,11 @@ local controlHelpText={SpecifiedColor={R=1,G=1,B=1,A=0.6},ColorUseRule=0}
 -- bottom; the pips (pipHeight) sit a pixel below its top, on the row's last pixels, and the
 -- current one (or the thumb) grows downwards while its row is hot. Below a choice note.
 -- The indicator spans pipShare of the value's width, centred; the pips share it, pipGap
--- apart, each as wide as its place allows (they differ by a pixel at most).
-local pipLimit,pipHeight,pipActiveHeight,pipBottom,pipGap,pipShare=16,2,4,-1,4,0.75
+-- apart (pipGapMany above pipGapLimit choices), each as wide as its place allows (they
+-- differ by a pixel at most).
+local pipLimit,pipHeight,pipActiveHeight,pipBottom,pipGap,pipShare=24,2,4,-1,4,0.75
+local pipGapLimit,pipGapMany=16,3
+local function pipGapFor(count) return count>pipGapLimit and pipGapMany or pipGap end
 local pipOn,pipOff={R=0.95,G=0.63,B=0.08,A=0.9},{R=0.62,G=0.55,B=0.42,A=0.35}
 -- A slider is drawn like a picker's indicator: its value sliderValueShrink points smaller,
 -- centred on the control, over a bar sliderShare of the control's width: the filled part
@@ -99,10 +112,17 @@ local pipOn,pipOff={R=0.95,G=0.63,B=0.08,A=0.9},{R=0.62,G=0.55,B=0.42,A=0.35}
 local sliderValueShrink,sliderShare,sliderMarkHeight,sliderMarkAbove,sliderBottom=2,0.75,10,2,2
 -- The slider's value sits sliderValueLift pixels above the control's centre.
 local sliderValueLift=3
--- A picker's value column in DMM's row: 330 of label and a 32-pixel arrow before it, 190
--- wide. A toggle's value takes the same column, so every value lines up.
-local pickerLabelWidth,pickerArrowWidth,pickerValueWidth=330,32,190
+-- A picker's value column: 330 of label and a pickerArrowWidth arrow before it,
+-- pickerValueWidth wide, and the other arrow after it, filling PAGE_WIDTH. DMM builds 32,
+-- 190 and 32; ModCoreSettings narrows the arrows to their art (10 wide) with 5 pixels each
+-- side and gives the room to the value, whose button keeps pickerValuePadding each side
+-- (DMM's 12). A toggle's value takes the same column, so every value lines up.
+local pickerLabelWidth,pickerArrowWidth,pickerValueWidth,pickerValuePadding=330,20,240,4
 local pickerValueLeft=pickerLabelWidth+pickerArrowWidth
+noticeFrameRight=PAGE_WIDTH-(pickerValueLeft+pickerValueWidth-pickerValuePadding)
+-- Each arrow is drawn pickerArrowInset pixels in from its box, towards the value: half the
+-- space between its art and the pips (the value's margin around them, and the art's own).
+local pickerArrowInset=math.floor(((pickerValueWidth-math.floor(pickerValueWidth*0.75/2)*2)/2+(pickerArrowWidth-10)/2)/2)
 -- A one-line picker row's height (DMM's is 40), and with choice notes; row labels are drawn
 -- labelDrop pixels lower; a toggle-shell row's button starts toggleShift pixels left, so its
 -- selection background starts where headings do.
@@ -826,11 +846,44 @@ function M.install(choices,controls,pages,options)
             end
             return overlay,bars
         end
+        -- DMM's row at ModCoreSettings' widths: the row PAGE_WIDTH wide and a picker's
+        -- arrows and value at pickerArrowWidth and pickerValueWidth, its value button padded
+        -- pickerValuePadding each side. Only sizes change; DMM's widgets stay as built.
+        local function widen(row)
+            if row.wrapper then row.wrapper:SetWidthOverride(PAGE_WIDTH) end
+            if not (row.parts and #row.parts==3) then return end
+            for n,width in ipairs({pickerArrowWidth,pickerValueWidth,pickerArrowWidth}) do
+                local box=row.parts[n].widget:GetParent()
+                if box then box:SetWidthOverride(width) end
+            end
+            -- The arrows move in towards the value, drawing and taking clicks there.
+            row.parts[1].widget:SetRenderTranslation({X=pickerArrowInset,Y=0})
+            row.parts[3].widget:SetRenderTranslation({X=-pickerArrowInset,Y=0})
+            -- DMM's buttons pad their content 12 each side (their style's NormalPadding),
+            -- set before ModCoreSettings sees them and not changed by a later style edit. The
+            -- content slot's padding is applied on top and takes effect at once, so it takes
+            -- that back: the arrows keep none (their 10-pixel art fits the narrower box), the
+            -- value pickerValuePadding before its own text inset.
+            for n,side in ipairs({0,pickerValuePadding,0}) do
+                local button=row.parts[n].widget
+                pcall(function()
+                    local style=button.WidgetStyle.NormalPadding
+                    local slot=button:GetContent().Slot
+                    local own=slot.Padding
+                    if row.mcOwnContentPadding==nil then row.mcOwnContentPadding={} end
+                    local base=row.mcOwnContentPadding[n] or {Left=own.Left,Right=own.Right}
+                    row.mcOwnContentPadding[n]=base
+                    slot:SetPadding({Left=side-(style.Left or 0)+base.Left,Top=own.Top,
+                        Right=side-(style.Right or 0)+base.Right,Bottom=own.Bottom})
+                end)
+            end
+        end
         local function decorate(index)
             local panel=ui.panels[index]
             if panel.mcPresented then return end
             for i,row in ipairs(panel.rows) do
                 local setting=providers[index].choices[i]
+                widen(row)
                 row.mcLabel=labels[row.widget]
                 -- Navigation and read-only rows are never dirty.
                 if row.mcLabel and not setting.mcNavigation and not setting.mcReadOnly then
@@ -855,6 +908,8 @@ function M.install(choices,controls,pages,options)
                 local level=setting.mcHeading and 1 or setting.mcFont
                 M.style(row.mcLabel,level,api)
                 if settingLabelSizes[level] then api.Theme.font(row.mcLabel,api.theme,settingLabelSizes[level]) end
+                -- A notice with a link (a merged page's) is a point smaller than other notices.
+                if level==5 and linkRow(setting) then api.Theme.font(row.mcLabel,api.theme,styles[5][1]-1) end
                 -- Theme.font only writes the property; a built label shows it after SetFont.
                 if level then row.mcLabel:SetFont(row.mcLabel.Font) end
                 starStyle(row)
@@ -1011,9 +1066,16 @@ function M.install(choices,controls,pages,options)
                             box=box,outline=outline,underline=underline,glow=false}
                     end
                     local overlay=row.background:GetParent()
-                    local slot=add(overlay,tabs);slot:SetHorizontalAlignment(3);slot:SetVerticalAlignment(2)
-                    local rightMargin=providerLink and pickerArrowWidth or pickerRightMargin
-                    slot:SetPadding({Left=0,Top=0,Right=rightMargin,Bottom=0})
+                    local slot=add(overlay,tabs);slot:SetVerticalAlignment(2)
+                    if providerLink then
+                        -- Placed from the row's left edge in a picker's value column, so it
+                        -- lines up with the values below whatever width the row is laid out at.
+                        slot:SetHorizontalAlignment(1)
+                        slot:SetPadding({Left=pickerValueLeft,Top=0,Right=0,Bottom=0})
+                    else
+                        slot:SetHorizontalAlignment(3)
+                        slot:SetPadding({Left=0,Top=0,Right=pickerRightMargin,Bottom=0})
+                    end
                     if setting.mcReadOnly and setting.mcReferenceLabel then
                         local reference,text=api.button(tree,setting.mcReferenceLabel)
                         reference.IsFocusable=false;reference:SetIsEnabled(false)
@@ -1032,6 +1094,22 @@ function M.install(choices,controls,pages,options)
                         row.mcLabel:SetAutoWrapText(true)
                         for _,box in ipairs({row.widget:GetParent(),row.wrapper}) do
                             box:ClearHeightOverride();box:SetMinDesiredHeight(40)
+                        end
+                        -- A notice with a link (a merged page's) is framed: a 1-pixel outline
+                        -- round the whole row, the selection background just inside it.
+                        if link and setting.mcFont==5 then
+                            for _,edge in ipairs({{h=0,v=1},{h=0,v=3},{h=1,v=0},{h=3,v=0}}) do
+                                local bar=new('Border');bar:SetBrushColor(headerSeparatorDim)
+                                local box=new('SizeBox')
+                                if edge.h==0 then box:SetHeightOverride(1) else box:SetWidthOverride(1) end
+                                api.need(box:SetContent(bar),'MCS notice frame')
+                                local barSlot=add(overlay,box);barSlot:SetHorizontalAlignment(edge.h);barSlot:SetVerticalAlignment(edge.v)
+                                barSlot:SetPadding({Left=edge.h==3 and 0 or categoryLeft,Top=edge.h~=0 and 1 or 0,
+                                    Right=noticeFrameRight,Bottom=edge.h~=0 and 1 or 0})
+                            end
+                            row.mcFramed=true
+                            row.background.Slot:SetPadding({Left=categoryLeft+1,Top=1,Right=noticeFrameRight+1,Bottom=1})
+                            row.mcLabel.LineHeightPercentage=noticeLineHeight
                         end
                     end
                     for _,part in ipairs(row.parts) do part.widget:GetParent():SetVisibility(1) end
@@ -1225,15 +1303,16 @@ function M.install(choices,controls,pages,options)
                     if count<=pipLimit then
                         local strip=new('HorizontalBox')
                         -- Pip n takes the n-th of count equal places (each with its gap), rounded.
-                        local step=(width+pipGap)/count
+                        local gap=pipGapFor(count)
+                        local step=(width+gap)/count
                         local function edge(n) return math.floor(n*step+0.5) end
                         for n=1,count do
                             local pip=new('Border');pip:SetBrushColor(pipOff)
-                            local each=math.max(1,edge(n)-edge(n-1)-pipGap)
+                            local each=math.max(1,edge(n)-edge(n-1)-gap)
                             local pipBox=new('SizeBox');pipBox:SetWidthOverride(each);pipBox:SetHeightOverride(pipHeight)
                             api.need(pipBox:SetContent(pip),'MCS picker pip')
                             local pipSlot=add(strip,pipBox)
-                            pipSlot:SetPadding({Left=n>1 and pipGap or 0,Top=pipTop,Right=0,Bottom=0});pipSlot:SetVerticalAlignment(1)
+                            pipSlot:SetPadding({Left=n>1 and gap or 0,Top=pipTop,Right=0,Bottom=0});pipSlot:SetVerticalAlignment(1)
                             pips[n],pipBoxes[n]=pip,pipBox
                         end
                         local stripSlot=api.need(box:SetContent(strip),'MCS picker pips')
@@ -1304,7 +1383,7 @@ function M.install(choices,controls,pages,options)
                         end
                         -- Choice n's place along the indicator: a pip and the gap before it, or
                         -- its share of the track; edges rounded as the pips' are.
-                        local place=count<=pipLimit and (width+pipGap)/count or width/count
+                        local place=count<=pipLimit and (width+pipGapFor(count))/count or width/count
                         local function edge(n) return n==count and width or math.floor(n*place+0.5) end
                         local inset=(value-width)//2
                         zone({arrow=1,direction=1},inset)
@@ -1902,6 +1981,8 @@ function M.install(choices,controls,pages,options)
                             or rowIndent+(nested and nestedIndent or 0)+(rowButtonInset[row.widget] or 0)
                         if row.mcCyclePlace then row.mcCyclePlace(indent) end
                         local contentLeft=toggleShell(setting) and not row.background and indent+toggleShift or indent
+                        -- A framed notice's text sits clear of its outline.
+                        if row.mcFramed then contentLeft=contentLeft+noticeFrameInset end
                         if labelPadding.Left~=contentLeft then
                             labelSlot:SetPadding({Left=contentLeft,Top=labelPadding.Top,
                                 Right=labelPadding.Right,Bottom=labelPadding.Bottom})
@@ -1916,7 +1997,7 @@ function M.install(choices,controls,pages,options)
                             row.mcToggleIndent=indent
                         end
                         -- A keybind's key box is centred on a picker's value column, whatever
-                        -- the row's indent; the editor ends at the row's 584 less the button's
+                        -- the row's indent; the editor ends at the row's PAGE_WIDTH less the button's
                         -- 12-pixel right padding.
                         local keyLane=keyColumn and setting.kind=='extension' and setting.editor=='keybind'
                             and row.widget:GetContent()
@@ -2123,6 +2204,8 @@ function M.install(choices,controls,pages,options)
                             local clicked
                             clicked,tab.pressed,tab.pointer=released(tab.widget,tab.pressed,tab.pointer,tab.hovered)
                             if clicked and tab.enabled then
+                                -- A link opens only when clicked or confirmed (page_links).
+                                if linkRow(self.model.items[i]) then self.model.mcActivateLink=true end
                                 self:select(i,false);self.model:set(i,tab.value);self:refresh()
                                 if adapted.feedback then adapted.feedback('Change') end
                                 return tick(self,queued,released,controller)
@@ -2285,7 +2368,7 @@ function M.install(choices,controls,pages,options)
             -- The index has no filter: its button is a plain title that takes no input.
             page.filterButton:SetVisibility(4)
             local header=assert(page.filterButton:GetParent(),'MCS mod-browser header')
-            header:SetWidthOverride(ROW_WIDTH);header:ClearHeightOverride()
+            header:SetWidthOverride(LIST_ROW_WIDTH);header:ClearHeightOverride()
             local list=assert(header:GetParent(),'MCS mod-browser page')
             local headerName=header:GetFullName()
             local children=childrenOf(list)
@@ -2296,7 +2379,7 @@ function M.install(choices,controls,pages,options)
                 slot:SetPadding(child.padding)
                 if child.widget:GetFullName()==headerName then
                     local line=api.construct('/Script/UMG.SizeBox',tree)
-                    line:SetWidthOverride(ROW_WIDTH);line:SetHeightOverride(2)
+                    line:SetWidthOverride(LIST_ROW_WIDTH);line:SetHeightOverride(2)
                     api.need(line:SetContent(api.Theme.image(tree,api.theme,'horizontal',api)),'MCS mod-browser divider')
                     api.need(list:AddChild(line),'MCS mod-browser divider slot')
                     inserted=true
@@ -2318,7 +2401,7 @@ function M.install(choices,controls,pages,options)
                         -- The "and N more" entry is a size smaller than the mods it folds.
                         if provider and provider.mcBrowserMore then api.Theme.font(label,api.theme,12) end
                         if row.wrapper then
-                            row.wrapper:SetWidthOverride(PAGE_WIDTH-2*indent)
+                            row.wrapper:SetWidthOverride(LIST_WIDTH-2*indent)
                             local slot=row.wrapper.Slot
                             local padding=slot.Padding
                             slot:SetPadding({Left=indent,Top=padding.Top,
@@ -2337,7 +2420,7 @@ function M.install(choices,controls,pages,options)
             -- wrapping to two lines before it is cut off; a 'row' page on a line of its own,
             -- also left-aligned. Each line keeps a blank margin on its left. Hidden
             -- pages keep their place in the list.
-            local ICON,ICON_HEIGHT,BAR,GAP,CELLS,WIDTH=40,54,20,8,3,PAGE_WIDTH
+            local ICON,ICON_HEIGHT,BAR,GAP,CELLS,WIDTH=40,54,20,8,3,LIST_WIDTH
             local KIND_INDENT,CELL_LINE_HEIGHT=10,0.8
             -- A grid cell's height and its name's padding above and below. The "and N
             -- more" cell takes a grid place like a mod; starting a row, its smaller text sits

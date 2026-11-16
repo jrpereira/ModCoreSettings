@@ -1,7 +1,46 @@
 # Changelog
 
-## Unreleased
+## v1.9.0
 
+- Requires UE4SS Lua File Bridge and Sound Bridge 1.1.0 or newer. Without them MCS still
+  runs, with less: no file dates or atomic config writes, and no sound for a picked file.
+- A live preview's sound button (top right): Auto (the default; the provider decides, and
+  Preymonition sounds while a sound setting is selected), On or Off. The selected setting
+  is shared as `MCS.Preview.v1.focus`, the button as `MCS.Preview.v1.sound`.
+- A choice's sound may be a WAV file: selecting it plays the file, centred and as recorded,
+  through UE4SS Lua Sound Bridge (1.1.0), and the next selection stops it. A list file
+  names the file in the mod's folder (`sound='sounds/x.wav'`).
+- A page can show a live preview: menu data with `preview={background=<picture>}` gets a
+  16:9 area at the bottom of the side panel, the picture behind a 1920 by 1080 screen
+  scaled to fit. The page's provider fills it, told through shared variables and the
+  `MCS_Preview_v1` command, with the page's values, applied or not, after every change.
+- A picker's arrows are drawn halfway in towards its pips, closer to the value.
+- A merged page's notice (with its link) is a point smaller, its lines closer, and framed
+  by a thin outline that ends with the value column, its selection background just inside it.
+- Key boxes are 12% wider (108 pixels), still centred in the value column; Mode and X move
+  out to make room.
+- Left and Right move a range's markers on a row merged into another page (for example
+  ModCore Controls' options); only Enter reached it before.
+- Ranges take the same 240-pixel value column as pickers and sliders, their line as wide as
+  the pips and slider bars.
+- Settings rows are wider and their values roomier: rows take 610 of the 630-pixel
+  settings column (DMM builds 584), leaving the scrollbar its 16. A picker's arrows narrow
+  to 20 pixels, close to their art, and its value column grows from 190 to 240 pixels with
+  4 pixels of button padding each side instead of 12, so the text has 224 pixels instead of
+  158. Toggles, sliders, tabs, keys, ranges, links and notes follow the wider value column.
+  The mod list keeps its widths.
+- Pickers show one pip per choice up to 24 choices (was 16), 3 pixels apart above 16; more
+  choices show the track and thumb.
+- A page link opens with Enter (controller: A) or a click, no longer with Left or Right.
+- A link's text sits in a picker's value column on every row, so it lines up with the
+  values below it; a notice's link no longer sits further right.
+- Category headings, notices and their rules start at the page edge instead of 2 pixels
+  left of it, where the row's clipping cut off the first letter's edge.
+- Keyed pickers can list their choices from a mod's own list file: a `{from=, root=}` entry
+  among the choices is replaced, each time the menu opens and after each Apply, by what
+  `<root>/Scripts/<from>` returns, given the mod's folder listing. Files a mod adds while the
+  game runs show the next time the menu opens. A failing list keeps its last good choices
+  and is logged once as `MENU_LIST_FAILED`.
 - A page-hooks file whose `menu()` declares `storage` and has no `load()` is stored the
   way a menu-data page is, keyed pickers included, so its choices can be listed afresh each
   time the menu opens. Its `action()` still runs.

@@ -314,7 +314,7 @@ assert(page.mcTestControlArea.children[3]:GetContent()==page.controls.mcHeaderTa
     'The header tab strip must sit directly beneath the divider')
 local statusBox=page.controls.mcHeaderStatus.box
 assert(#page.controls.mcHeaderTabs.children==1 and page.controls.mcHeaderTabs.children[1]==statusBox
-    and statusBox:GetContent()==page.controlStatus and statusBox.WidthOverride==572
+    and statusBox:GetContent()==page.controlStatus and statusBox.WidthOverride==598
     and statusBox.Slot.HorizontalAlignment==1 and statusBox.Slot.VerticalAlignment==1
     and statusBox.Slot.Padding.Top==4,
     'The page status must start the header row beneath the divider, keeping its padding')
@@ -584,7 +584,7 @@ linked.mcHeaderHost=widget()
 linked:show(1)
 assert(#linked.panels[1].rows[1].mcTabs==1
     and linked.panels[1].rows[1].mcTabs[1].label.text=='Consumables'
-    and linked.panels[1].rows[1].mcTabs[1].box.MinDesiredWidth==190,
+    and linked.panels[1].rows[1].mcTabs[1].box.MinDesiredWidth==240,
     'page links must display one clickable tab, as wide as a picker value')
 -- A link is underlined text, not an outlined choice; it glows only while hovered.
 local linkTab=linked.panels[1].rows[1].mcTabs[1]
@@ -598,6 +598,20 @@ for _,box in ipairs({linkRow.widget:GetParent(),linkRow.wrapper}) do
         'link rows grow to fit their label, from a 40-pixel minimum')
 end
 assert(linkRow.widget:GetParent().WidthOverride==330,'a link label takes a picker label column')
+-- A notice with a link (a merged page's) is a point smaller and framed, the selection
+-- background inside the frame.
+local savedFont=items[1].mcFont
+items[1].mcFont=5
+local framed=controls.build(widget(),{{id='ModCoreTemplates.module.VisualExample',choices=items}},api)
+framed.mcHeaderHost=widget()
+framed:show(1)
+local framedRow=framed.panels[1].rows[1]
+assert(framedRow.mcFramed and framedRow.mcLabel.Font.Size==11
+    and framedRow.background.Slot.Padding.Left==1 and framedRow.background.Slot.Padding.Bottom==1
+    and framedRow.background.Slot.Padding.Right==25 and framedRow.mcLabel.LineHeightPercentage==0.85,
+    'a linked notice is framed, 11pt, lines closer, its selection background inside the frame,'
+    ..' which ends with the value column (24 short of the row)')
+items[1].mcFont=savedFont
 assert(not row.mcLabel.AutoWrapText and not row.wrapper.heightCleared,
     'ordinary tab rows keep a fixed single-line label')
 local linkSet=linked.model.set
@@ -607,7 +621,8 @@ function linked.model:set(index,value)
 end
 linked.panels[1].rows[1].mcTabs[1].widget.clicked=true
 linked:tick({},function(w) local clicked=w.clicked;w.clicked=false;return clicked,false,false end,false)
-assert(linked.model.linkActivated,'the single link tab must activate even at its default value')
+assert(linked.model.linkActivated and linked.model.mcActivateLink,
+    'the single link tab must activate even at its default value, marked as a click')
 items[1].mcNavigation,items[1].mcLinkPage=nil,nil
 -- A read-only status whose choices share one label lines up with link rows: one button
 -- in a picker's value column that cannot be pressed.
@@ -619,7 +634,7 @@ status.mcHeaderHost=widget()
 status:show(1)
 local statusRow=status.panels[1].rows[1]
 assert(#statusRow.mcTabs==1 and statusRow.mcTabs[1].label.text=='No settings'
-    and statusRow.mcTabs[1].box.MinDesiredWidth==190 and statusRow.widget:GetParent().WidthOverride==330
+    and statusRow.mcTabs[1].box.MinDesiredWidth==240 and statusRow.widget:GetParent().WidthOverride==330
     and statusRow.mcTabs[1].enabled==false,
     'a read-only one-label status shows one disabled button placed like a link')
 items[1].mcReadOnly,items[1].mcNavigation=nil,true
@@ -628,7 +643,7 @@ local action=controls.build(widget(),{{id='ModCoreTemplates.module.VisualExample
 action.mcHeaderHost=widget()
 action:show(1)
 local actionRow=action.panels[1].rows[1]
-assert(#actionRow.mcTabs==1 and actionRow.mcTabs[1].label.text=='Play' and actionRow.mcTabs[1].box.MinDesiredWidth==190
+assert(#actionRow.mcTabs==1 and actionRow.mcTabs[1].label.text=='Play' and actionRow.mcTabs[1].box.MinDesiredWidth==240
     and actionRow.mcTabs[1].enabled==true,'a one-label navigation action shows one button that can be pressed')
 local actionSets=0
 local actionSet=action.model.set
@@ -715,8 +730,9 @@ local tabSlot=row.mcTabs[1].box:GetParent().Slot
 assert(tabSlot.HorizontalAlignment==3 and tabSlot.Padding.Right==24,
     'Tab pickers must align right with a 24-pixel inset')
 local linkTab=linked.panels[1].rows[1].mcTabs[1]
-assert(linkTab.outline==nil and linkTab.box:GetParent().Slot.Padding.Right==32,
-    'Provider links sit in a picker value column, ending at its right arrow')
+local linkSlot=linkTab.box:GetParent().Slot
+assert(linkTab.outline==nil and linkSlot.HorizontalAlignment==1 and linkSlot.Padding.Left==350
+    and linkSlot.Padding.Right==0,'Provider links sit in a picker value column, placed from the row\'s left edge')
 assert(row.mcTabs[1].selected and not row.mcTabs[2].selected)
 assert(ui.panels[1].rows[2].mcLabel.text=='Slot 5')
 local scroll=ui.panels[1].scroll
@@ -733,13 +749,13 @@ for _,child in ipairs(scroll.children) do if child.text=='Interaction: Independe
 assert(position(independent)<position(ui.panels[1].headings[3].widget),'Parent must precede its subgroup headings')
 assert(position(ui.panels[1].headings[3].widget)<position(ui.panels[1].headings[2].widget),'Primary category must precede secondary')
 assert(ui.panels[1].headings[2].widget.visible==1,'mcHeading=0 must collapse only the category heading')
--- A category heading is drawn like the game's own: 18pt, 2 pixels left, 24 above, with
+-- A category heading is drawn like the game's own: 18pt, at the page edge, 24 above, with
 -- a 1-pixel rule right after it that shows and hides with it.
 local shownHeading=ui.panels[1].headings[3].widget
 local shownRule=scroll.children[position(shownHeading)+1]
-assert(shownHeading.Font.Size==18 and shownHeading.Slot.Padding.Left==-2 and shownHeading.Slot.Padding.Top==24
-    and shownRule.HeightOverride==1 and shownRule.Slot.Padding.Left==-2 and shownRule.visible==4,
-    'A category heading is larger, nudged left, spaced above and ruled beneath')
+assert(shownHeading.Font.Size==18 and shownHeading.Slot.Padding.Left==0 and shownHeading.Slot.Padding.Top==24
+    and shownRule.HeightOverride==1 and shownRule.Slot.Padding.Left==0 and shownRule.visible==4,
+    'A category heading is larger, at the page edge, spaced above and ruled beneath')
 local hiddenHeading=ui.panels[1].headings[2].widget
 assert(scroll.children[position(hiddenHeading)+1].visible==1,'A collapsed heading hides its rule')
 assert(ui.panels[1].rows[2].visible and independent.visible==4,'Hidden subgroup heading must retain rows and visible parent')
@@ -828,13 +844,13 @@ assert(#headerRow.mcTabs==#items[1].values and #headerTabs.children==2*#items[1]
     and headerRow.value.visible==1 and headerTabs.visible==0,
     'Every header choice must be a tab between separators, replacing the value text')
 local tabsWidth=headerRow.mcHeaderTabsWidth
-assert(tabsWidth==2*110+3 and statusBox.WidthOverride==572-tabsWidth-12 and statusBox.Slot.Padding.Top==4,
+assert(tabsWidth==2*110+3 and statusBox.WidthOverride==598-tabsWidth-12 and statusBox.Slot.Padding.Top==4,
     'The page status must stay beneath the divider, left of the header tabs')
 headerRow.mcHeaderTabsWidth=8*70+9;pickerHeader:refresh()
-assert(statusBox.WidthOverride==572 and statusBox.Slot.Padding.Top==4+29,
+assert(statusBox.WidthOverride==598 and statusBox.Slot.Padding.Top==4+29,
     'A page status without room beside the tabs must drop below them at full width')
 headerRow.mcHeaderTabsWidth=tabsWidth;pickerHeader:refresh()
-assert(statusBox.WidthOverride==572-tabsWidth-12 and statusBox.Slot.Padding.Top==4,
+assert(statusBox.WidthOverride==598-tabsWidth-12 and statusBox.Slot.Padding.Top==4,
     'The page status must return beside the tabs when they fit again')
 headerRow.mcTabs[2].widget.clicked=true
 pickerHeader:tick({},function(w) local clicked=w.clicked;w.clicked=false;return clicked,false,false end,false)
@@ -981,7 +997,7 @@ assert(tableRow.mcLabel.visible==1 and not tableRow.mcTabs,'the table replaces t
 local function centred(slot) return slot.HorizontalAlignment==2 and slot.VerticalAlignment==2 end
 for c,column in ipairs(grid.children) do
     for row,box in ipairs(column.children) do
-        assert(box.HeightOverride==line and box.WidthOverride==math.floor(536/6) and centred(box.children[1].Slot),
+        assert(box.HeightOverride==line and box.WidthOverride==math.floor(562/6) and centred(box.children[1].Slot),
             'every line is the same height, its pair centred in the column')
         local pair=box.children[1]
         local codeBox,textBox=pair.children[1],pair.children[2]
@@ -1029,7 +1045,7 @@ initial:show(1)
 for i=1,2 do
     local row=initial.panels[1].rows[i]
     assert(row.mcLabel.Font.Size==18 and row.mcLabel.color=='muted'
-        and (i==1 and row.mcLabel or row.widget:GetContent()).Slot.Padding.Left==-2
+        and (i==1 and row.mcLabel or row.widget:GetContent()).Slot.Padding.Left==0
         and row.widget.WidgetStyle.NormalPadding.Left==0
         and row.widget.WidgetStyle.PressedPadding.Left==0
         and row.wrapper.Slot.Padding.Top==24 and row.wrapper.Slot.Padding.Bottom==4,
@@ -1072,8 +1088,17 @@ do
     ordered:show(1)
     local picker,toggle=ordered.panels[1].rows[1],ordered.panels[1].rows[2]
     assert(picker.widget.WidgetStyle.NormalPadding.Left==0 and toggle.widget.WidgetStyle.NormalPadding.Left==0
-        and picker.parts[3].widget.WidgetStyle.NormalPadding.Left==16,
+        and picker.parts[3].widget~=toggle.widget,
         'the label after a picker is its own row, not the picker\'s right arrow')
+    -- DMM's style padding stays; the content slot takes it back, so the arrows' art keeps
+    -- no inset and the value 4 before its own text inset.
+    local function inset(button,side)
+        return (button.WidgetStyle.NormalPadding[side] or 0)+button:GetContent().Slot.Padding[side]
+    end
+    assert(inset(picker.parts[1].widget,'Left')==0 and inset(picker.parts[3].widget,'Right')==0,
+        'the narrowed arrows keep no padding')
+    assert(picker.parts[1].widget.RenderTranslation.X==17 and picker.parts[3].widget.RenderTranslation.X==-17,
+        'the arrows are drawn halfway in towards the pips')
     -- A navigation picker separating colliding keybinds shows its choice and arrows in red,
     -- and returns to DMM's colors when the collision clears.
     ordered.model.mcConflictPickers={[1]=true};ordered:refresh()
@@ -1113,7 +1138,7 @@ do
     built:show(1)
     local heading=built.panels[1].rows[1]
     assert(heading.mcLabel.Font.Size==18 and heading.mcLabel.color=='muted'
-        and heading.mcLabel.Slot.Padding.Left==-2
+        and heading.mcLabel.Slot.Padding.Left==0
         and heading.wrapper.Slot.Padding.Top==24,'the category row looks like a category heading')
     assert(heading.wrapper.Slot.Padding.Bottom==0,'its rule hugs it')
     -- Its rule follows it as a heading's does, and shows and hides with it.
@@ -1121,7 +1146,7 @@ do
     local at
     for n,child in ipairs(children) do if child==heading.wrapper then at=n end end
     local rule=at and children[at+1]
-    assert(rule and rule.HeightOverride==1 and rule.Slot.Padding.Left==-2 and rule.Slot.Padding.Bottom==4
+    assert(rule and rule.HeightOverride==1 and rule.Slot.Padding.Left==0 and rule.Slot.Padding.Bottom==4
         and rule.visible==4,'the category row is ruled beneath like a heading')
     local rules=0
     for _,child in ipairs(children) do if child.HeightOverride==1 and child.visible~=1 then rules=rules+1 end end
@@ -1136,7 +1161,7 @@ do
     local line=heading.mcLabel:GetParent()
     assert(line==heading.widget:GetContent() and line.children[1]==heading.mcLabel
         and line.children[2]==heading.mcStar and heading.mcStar.text=='*' and heading.mcStar.visible==2
-        and heading.mcLabel.Slot.Padding.Left==-2 and heading.mcLabel.Slot.Size.SizeRule==0
+        and heading.mcLabel.Slot.Padding.Left==0 and heading.mcLabel.Slot.Size.SizeRule==0
         and heading.mcStar.Slot.Padding.Left==4 and heading.mcStar.Slot.Padding.Right==8
         and heading.mcStar.Font.Size==18,'the star follows the category row label, in its font')
     local toggleRow=built.panels[1].rows[2]
@@ -1147,7 +1172,7 @@ do
     function built.model:visibility() return {false,true,true} end
     built:refresh()
     local row=built.panels[1].rows[2]
-    assert(row.mcLabel.Font.Size==18 and row.widget:GetContent().Slot.Padding.Left==-2,
+    assert(row.mcLabel.Font.Size==18 and row.widget:GetContent().Slot.Padding.Left==0,
         'a hidden category row indents nothing')
     assert(rule.visible==1,'a hidden category row hides its rule')
     assert(not pcall(M.parse,'[Setting.Visual1]\nId=Visual1\nmcCategory=1\nmcLevel=2\n',list),
@@ -1170,7 +1195,7 @@ do
     built:show(1)
     local panel=built.panels[1]
     local outer,inner,only=panel.headings[1],panel.headings[2],panel.headings[4]
-    assert(outer.widget.Font.Size==18 and outer.widget.Slot.Padding.Left==-2 and not outer.mcSubheading,
+    assert(outer.widget.Font.Size==18 and outer.widget.Slot.Padding.Left==0 and not outer.mcSubheading,
         'a category with rows keeps its heading')
     for _,heading in ipairs({inner,only}) do
         assert(heading.mcSubheading and heading.widget.Font.Size==15 and heading.widget.Slot.Padding.Left==22
@@ -1215,7 +1240,7 @@ do
     for _,child in ipairs(panel.scroll.children) do
         if child.children[1] and child.children[1].text=='Bare' then drawn=child end
     end
-    assert(drawn and drawn.children[1].Font.Size==18 and drawn.Slot.Padding.Left==-2 and drawn.Slot.Padding.Top==24
+    assert(drawn and drawn.children[1].Font.Size==18 and drawn.Slot.Padding.Left==0 and drawn.Slot.Padding.Top==24
         and drawn.children[2].HeightOverride==1,'a row-less category gets a heading with its rule')
     -- DMM draws a category heading left-justified in the muted colour; the drawn one matches.
     local label=drawn.children[1]
@@ -1316,7 +1341,7 @@ assert(#cycleRow.mcTabs==1 and cycleButton.label.text=='Consumables','only the c
 assert(cycleButton.label.Font.Size==13,'cycle text is 13pt')
 assert(cycleButton.box.WidthOverride==96 and cycleButton.box.HeightOverride==32,'the key box width')
 local cycleSlot=cycleButton.box.Slot
-assert(cycleSlot.HorizontalAlignment==1 and cycleSlot.Padding.Left==362+(190-96)/2,
+assert(cycleSlot.HorizontalAlignment==1 and cycleSlot.Padding.Left==350+(240-96)/2,
     'it is centred on a picker\'s value column, whatever the row indent')
 cycleButton.widget.clicked=true
 cycling:tick({},function(w) local clicked=w.clicked;w.clicked=false;return clicked,false,false end,false)
@@ -1346,14 +1371,14 @@ local switchRow=switching.panels[1].rows[1]
 local switch,flip=switchRow.mcOnOff,switchRow.mcTabs[1]
 assert(switch and #switchRow.mcTabs==1 and not switchRow.mcPipBox,'one switch and no indicator')
 assert(switch.box.WidthOverride==44 and switch.box.HeightOverride==20,'the switch is 44 by 20')
-assert(flip.box.WidthOverride==190 and flip.box.HeightOverride==nil and flip.box.Slot.HorizontalAlignment==1
-    and flip.box.Slot.VerticalAlignment==0 and flip.box.Slot.Padding.Left==362,'the clickable area is the value column, row-high')
+assert(flip.box.WidthOverride==240 and flip.box.HeightOverride==nil and flip.box.Slot.HorizontalAlignment==1
+    and flip.box.Slot.VerticalAlignment==0 and flip.box.Slot.Padding.Left==350,'the clickable area is the value column, row-high')
 assert(flip.widget:GetParent()==switch.box:GetParent():GetParent(),'the button spans the switch and its label')
 local lane=switch.box:GetParent()
 assert(lane.children[2]==switch.box and lane.children[1]==switch.text,'the label, then the switch at the right')
 assert(switch.text.Slot.Size.SizeRule==1 and switch.text.Justification==2 and switch.text.Slot.Padding.Right==12
     and switch.text.Slot.VerticalAlignment==2,'the label fills the rest, right-aligned and centred, 12 pixels from the switch')
-assert(lane.Slot.Padding.Right==(190-44)-(190-44)//2,'the switch is centred in the value column')
+assert(lane.Slot.Padding.Right==(240-44)-(240-44)//2,'the switch is centred in the value column')
 assert(switch.text.text=='Off','the label shows the current choice')
 assert(switch.text.opacity==0.75,'the label is a little dimmer than a value')
 assert(#switch.bars==4,'a four-bar outline')
@@ -1429,7 +1454,7 @@ local padUi=controls.build(widget(),{{choices=items}},api)
 padUi:show(1)
 local padRow=padUi.panels[1].rows[1]
 assert(padRow.mcWrapped.text==wrapped and padRow.mcWrapped.Font.Size==13,'the wrapped value is 13pt')
-assert(padRow.mcWrapped:GetParent().WidthOverride==584-230-24 and padRow.widget:GetParent().WidthOverride==230,
+assert(padRow.mcWrapped:GetParent().WidthOverride==610-230-24 and padRow.widget:GetParent().WidthOverride==230,
     'the value column is wider than DMM\'s picker value')
 assert(padRow.wrapper.HeightOverride==66,'the row grows to fit three lines')
 print('PASS wrapped read-only values break at commas in a wider column')
@@ -1453,10 +1478,10 @@ noteUi:show(1)
 local noteRow=noteUi.panels[1].rows[1]
 local noteBox=noteRow.mcNoteBox
 -- The note overlays the row with the value's width and place, read from DMM's
--- size boxes; these test rows have none, so DMM's 330+32 and 190 pixels apply.
+-- size boxes; these test rows have none, so DMM's 330+20 and 240 pixels apply.
 local noteSlot=noteBox.Slot
-assert(noteBox:GetParent()==noteRow.background:GetParent() and noteBox.WidthOverride==190
-    and noteSlot.HorizontalAlignment==1 and noteSlot.Padding.Left==362 and noteSlot.VerticalAlignment==3,
+assert(noteBox:GetParent()==noteRow.background:GetParent() and noteBox.WidthOverride==240
+    and noteSlot.HorizontalAlignment==1 and noteSlot.Padding.Left==350 and noteSlot.VerticalAlignment==3,
     'the note takes the value\'s width, under it')
 assert(noteRow.mcNote.Slot.HorizontalAlignment==2 and noteRow.mcNote.Slot.VerticalAlignment==2,
     'the note is centered in that space')
@@ -1478,12 +1503,12 @@ assert(noteBox.visible==1 and noteRow.value.Slot.Padding.Bottom==4 and noteRow.v
 -- in the row's bottom pixels below the note; half strength until its row is hovered.
 local pipBox=noteRow.mcPipBox
 assert(pipBox and #noteRow.mcPips==3 and pipBox:GetParent()==noteRow.background:GetParent()
-    and pipBox.WidthOverride==142 and pipBox.HeightOverride==4 and pipBox.Slot.Padding.Left==362+24
+    and pipBox.WidthOverride==180 and pipBox.HeightOverride==4 and pipBox.Slot.Padding.Left==350+30
     and pipBox.Slot.VerticalAlignment==3 and pipBox.Slot.Padding.Bottom==-1+6 and pipBox.HeightOverride==4 and pipBox.visible==3,
     'the indicator spans 75% of the value\'s width, centred, in the bottom pixels, never hit-tested')
 local widths={}
 for n,b in ipairs(noteRow.mcPipBoxes) do widths[n]=b.WidthOverride end
-assert(table.concat(widths,',')=='45,44,45' and noteRow.mcPipBoxes[2].Slot.Padding.Left==4,
+assert(table.concat(widths,',')=='57,58,57' and noteRow.mcPipBoxes[2].Slot.Padding.Left==4,
     'the pips fill it, 4 pixels apart, differing by a pixel at most: '..table.concat(widths,','))
 assert(-1+pipBox.HeightOverride<=noteBox.Slot.Padding.Bottom,'under a note, at its lowest, it sits below the note')
 -- A change animates over ticks; settle runs enough of them for it to finish.
@@ -1535,13 +1560,14 @@ do
     local values=noteUi.model.items[1].values
     local stack=noteRow.value:GetParent()
     assert(zones and #zones==#values+2 and stack:GetParent()==noteRow.parts[2].widget and stack.children[1]==noteRow.value
-        and noteRow.value.Slot.Padding.Left==4 and noteRow.value.Slot.VerticalAlignment==2
+        and noteRow.parts[2].widget.WidgetStyle.NormalPadding.Left+noteRow.value.Slot.Padding.Left==4+4
+        and noteRow.value.Slot.VerticalAlignment==2
         and stack.Slot.HorizontalAlignment==0 and stack.Slot.VerticalAlignment==0 and stack.Slot.Padding.Left==0,
         'the value text keeps its place and padding under the zones')
     local first,last=zones[1],zones[#zones]
     local lane=first.widget:GetParent():GetParent()
     local pipWidth=pipBox.WidthOverride
-    local valueWidth=noteRow.parts[2].widget:GetParent().WidthOverride or 190 -- the picker value column
+    local valueWidth=noteRow.parts[2].widget:GetParent().WidthOverride or 240 -- the picker value column
     assert(first.arrow==1 and last.arrow==3 and last.widget:GetParent()==lane and last.widget.Slot.Size.Value==1
         and first.widget:GetParent().WidthOverride==(valueWidth-pipWidth)//2 and first.widget.IsFocusable==false,
         'the left zone reaches the indicator; the right one fills the rest')
@@ -1621,19 +1647,19 @@ do
     local row=sliding.panels[1].rows[1]
     local surface=row.slider:GetParent()
     local bar=row.mcSlider
-    assert(bar and surface:GetParent().WidthOverride==190 and row.value:GetParent()==surface
+    assert(bar and surface:GetParent().WidthOverride==240 and row.value:GetParent()==surface
         and surface.children[1].visible==1,'one control in place of the track and value column')
-    assert(row.widget:GetParent().WidthOverride==362,'the control takes a picker\'s value column')
+    assert(row.widget:GetParent().WidthOverride==350,'the control takes a picker\'s value column')
     assert(row.value.Font.Size==12 and row.value.Slot.HorizontalAlignment==0 and row.value.Justification==1
         and row.value.Slot.VerticalAlignment==2 and row.value.Slot.Padding.Bottom==6 and row.value.visible==3,
         'the value is 2 points smaller, its text centred across the control, 3 pixels up, never hit-tested')
-    assert(bar.span==142 and bar.bar.WidthOverride==142 and bar.bar.HeightOverride==10 and bar.bar.Slot.Padding.Bottom==2
-        and row.slider.Slot.Padding.Left==24 and row.slider.Slot.Padding.Right==24 and row.slider.opacity==0,
+    assert(bar.span==180 and bar.bar.WidthOverride==180 and bar.bar.HeightOverride==10 and bar.bar.Slot.Padding.Bottom==2
+        and row.slider.Slot.Padding.Left==30 and row.slider.Slot.Padding.Right==30 and row.slider.opacity==0,
         'the bar takes 75% of the control, centred, and the invisible native slider spans it')
-    assert(bar.filled.WidthOverride==71 and bar.filled.HeightOverride==4,'the lit part is 4 tall, filled to the value')
+    assert(bar.filled.WidthOverride==90 and bar.filled.HeightOverride==4,'the lit part is 4 tall, filled to the value')
     assert(bar.filled:GetParent():GetParent().Slot.VerticalAlignment==1 and bar.markSlot.VerticalAlignment==1
         and bar.markSlot.HorizontalAlignment==1,'the strip and mark keep their own heights, top-aligned')
-    assert(bar.markSlot.Padding.Left==70 and #bar.mark.children==3 and bar.mark.children[2].WidthOverride==1
+    assert(bar.markSlot.Padding.Left==89 and #bar.mark.children==3 and bar.mark.children[2].WidthOverride==1
         and bar.mark.children[2].HeightOverride==10,'the 3-pixel mark is centred on the fill\'s end')
     assert(bar.bar.opacity==0.5 and bar.mark.visible==1,'idle: half strength, no mark')
     sliding.current=1;sliding:tick({},function() return false,false,false end,false)
@@ -1645,21 +1671,21 @@ do
     api.clock=function() return now end
     local idle=function() return false,false,false end
     sliding.model.pending[1]=0;sliding:refresh()
-    assert(bar.filled.WidthOverride==71,'the slide starts where the fill is')
+    assert(bar.filled.WidthOverride==90,'the slide starts where the fill is')
     now=now+0.05;sliding:tick({},idle,false)
-    assert(bar.filled.WidthOverride<71 and bar.filled.WidthOverride>0
+    assert(bar.filled.WidthOverride<90 and bar.filled.WidthOverride>0
         and bar.markSlot.Padding.Left==bar.filled.WidthOverride-1,'partway, the mark at the fill\'s end')
     now=now+0.2;sliding:tick({},idle,false)
     assert(bar.filled.WidthOverride==0 and bar.markSlot.Padding.Left==0,'at the minimum the mark stays inside the bar')
     sliding.model.pending[1]=100;sliding:refresh()
     now=now+0.25;sliding:tick({},idle,false)
-    assert(bar.filled.WidthOverride==142 and bar.markSlot.Padding.Left==139,'at the maximum too')
+    assert(bar.filled.WidthOverride==180 and bar.markSlot.Padding.Left==177,'at the maximum too')
     api.clock=nil
     for n=#items,1,-1 do items[n]=nil end
     for n,item in ipairs(saved) do items[n]=item end
 end
--- A toggle's value takes a picker's value column: its label ends at 362 whatever the indent,
--- and its value is 190 wide.
+-- A toggle's value takes a picker's value column: its label ends at 350 whatever the indent,
+-- and its value is 240 wide.
 do
     local saved={}
     for n,item in ipairs(items) do saved[n]=item end
@@ -1672,7 +1698,7 @@ do
     local content=row.widget:GetContent()
     local indent=content.Slot.Padding.Left
     assert(indent==26,'the toggle indents like other rows')
-    assert(content.children[1].WidthOverride==362-indent and content.children[2].WidthOverride==190
+    assert(content.children[1].WidthOverride==350-indent and content.children[2].WidthOverride==240
         and row.value:GetParent()==content.children[2],'its value lines up with a picker\'s')
     for n=#items,1,-1 do items[n]=nil end
     for n,item in ipairs(saved) do items[n]=item end
@@ -1712,23 +1738,38 @@ noteRow.parts[1].widget:SetIsEnabled(true);noteRow.parts[3].widget:SetIsEnabled(
 noteRow.left,noteRow.right=nil,nil
 noteUi.model.pending[1]=0;noteUi:refresh()
 -- Many choices: a track with a thumb at the current choice's place.
-local manyItems={{id='Many',kind='picker',group='G',label='Many',values={},labels={}}}
-for n=1,20 do manyItems[1].values[n]=n;manyItems[1].labels[n]=tostring(n) end
 local savedItems={};for n,item in ipairs(items) do savedItems[n]=item end
+-- Up to twenty-four choices are pips; above sixteen they sit 3 pixels apart.
+do
+    local pipItems={{id='Pips',kind='picker',group='G',label='Pips',values={},labels={}}}
+    for n=1,24 do pipItems[1].values[n]=n;pipItems[1].labels[n]=tostring(n) end
+    for n=#items,1,-1 do items[n]=nil end;items[1]=pipItems[1]
+    local pipUi=controls.build(widget(),{{choices=items}},api)
+    pipUi:show(1)
+    local row=pipUi.panels[1].rows[1]
+    local narrow,wide=math.huge,0
+    for n,b in ipairs(row.mcPipBoxes) do
+        narrow,wide=math.min(narrow,b.WidthOverride),math.max(wide,b.WidthOverride)
+        assert(n==1 or b.Slot.Padding.Left==3,'3 pixels apart')
+    end
+    assert(#row.mcPips==24 and narrow>=4 and wide-narrow<=1,'twenty-four pips, each at least 4 wide')
+end
+local manyItems={{id='Many',kind='picker',group='G',label='Many',values={},labels={}}}
+for n=1,30 do manyItems[1].values[n]=n;manyItems[1].labels[n]=tostring(n) end
 for n=#items,1,-1 do items[n]=nil end;items[1]=manyItems[1]
 local manyUi=controls.build(widget(),{{choices=items}},api)
-manyUi.model.pending[1]=20;manyUi:show(1)
+manyUi.model.pending[1]=30;manyUi:show(1)
 local thumb=manyUi.panels[1].rows[1].mcPipThumb
-assert(thumb and #manyUi.panels[1].rows[1].mcPips==0 and thumb.width==7 and thumb.slot.Padding.Left==142-7 and thumb.slot.Padding.Top==1,
-    'beyond sixteen choices a thumb marks the place along a track')
+assert(thumb and #manyUi.panels[1].rows[1].mcPips==0 and thumb.width==6 and thumb.slot.Padding.Left==180-6 and thumb.slot.Padding.Top==1,
+    'beyond twenty-four choices a thumb marks the place along a track')
 -- A change fades the thumb out, moves it, and fades it back in.
 do
     local now=50
     api.clock=function() return now end
     manyUi.model.pending[1]=1;manyUi:refresh()
-    assert(thumb.box.opacity==1 and thumb.slot.Padding.Left==142-7,'the thumb starts at its old place')
+    assert(thumb.box.opacity==1 and thumb.slot.Padding.Left==180-6,'the thumb starts at its old place')
     now=now+0.02;manyUi:tick({},function() return false,false,false end,false)
-    assert(thumb.box.opacity<1 and thumb.slot.Padding.Left==142-7,'fading out where it was')
+    assert(thumb.box.opacity<1 and thumb.slot.Padding.Left==180-6,'fading out where it was')
     now=now+0.25;manyUi:tick({},function() return false,false,false end,false)
     assert(thumb.box.opacity==1 and thumb.slot.Padding.Left==0,'back at full strength at its new place')
     api.clock=nil

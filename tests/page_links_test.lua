@@ -55,14 +55,20 @@ local page,model,calls,texts=setup(false)
 page.controls:show(1)
 model:set(2,1)
 assert(model.saved[2]==1,'ordinary settings still save')
+-- Left and Right on a link row set it without activating: nothing opens.
 model:set(1,0)
-assert(model.saved[1]==nil,'link activation saves nothing')
+assert(page.controls:tick()==false and #calls==2,'Left and Right do not open a link')
+-- A click or Enter marks the activation first.
+model.mcActivateLink=true
+model:set(1,0)
+assert(model.saved[1]==nil and model.mcActivateLink==nil,'link activation saves nothing')
 assert(page.controls:tick()==true)
-assert(table.concat(calls,',')=='show,tick,browser,detail 2','links open through the browser')
+assert(table.concat(calls,',')=='show,tick,tick,browser,detail 2','links open through the browser')
 assert(page.controls:tick()==false,'a link fires once')
 
 page,model,calls,texts=setup(true)
 page.controls:show(1)
+model.mcActivateLink=true
 model:set(1,0)
 assert(page.controls:tick()==true and texts[1]=='Apply or discard changes before leaving this page.')
 assert(not table.concat(calls,','):find('detail'))
@@ -71,6 +77,7 @@ local providers
 page,model,calls,texts,providers=setup(false)
 providers[1].choices[1].mcLinkPage='Empty'
 page.controls:show(1)
+model.mcActivateLink=true
 model:set(1,0)
 assert(page.controls:tick()==true and texts[1]=='Empty page is unavailable.')
 -- A page left out of the browser list opens through DMM's full row list; the listed rows return.
@@ -81,12 +88,14 @@ page.rows,page.allRows=listed,{{providerIndex=1},{providerIndex=3}}
 local opened
 function page:showDetail(row) opened=self.rows[row];calls[#calls+1]='detail '..row end
 page.controls:show(1)
+model.mcActivateLink=true
 model:set(1,0)
 assert(page.controls:tick()==true and opened==page.allRows[2] and page.rows==listed
     and table.concat(calls,',')=='show,tick,browser,detail 1','a hidden page opens through its link')
 providers[3].mcBrowserHidden=nil
 calls,opened={},nil
 page.controls:show(1)
+model.mcActivateLink=true
 model:set(1,0)
 assert(page.controls:tick()==true and opened==nil and texts[#texts]=='Target page is unavailable.',
     'only pages hidden from the browser open outside the listed rows')
@@ -162,6 +171,7 @@ do
         Links.install(pages,slots)
         f.page=pages.build({},providers,nil,{setText=function(_,copy) f.texts[#f.texts+1]=copy end})
         f.page.controls:show(1)
+        f.page.controls.model.mcActivateLink=true
         f.page.controls.model:set(1,1)
         return f
     end

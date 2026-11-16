@@ -89,7 +89,7 @@ local function generated(contribution,page,parse,hooked,compile,stored)
         choices=choices,settingsCount=#choices,choicesLoaded=true,deferred=false,
         path=page.configDirectory and (page.configDirectory:gsub('[/\\]+$','')..'/mod_settings.ini') or nil,
         mcContribution=contribution.id,mcBrowserGroup=page.group,mcBrowserIcon=page.icon,mcFolder=page.attach,mcManifest=manifest,
-        mcHooks=hooks,mcHookContext=context}
+        mcHooks=hooks,mcHookContext=context,mcPreview=menu and menu.preview or nil}
     if page.link then
         -- Opens another page; it is selectable although it has no settings of its own.
         provider.mcLinkSlot={address=page.link}

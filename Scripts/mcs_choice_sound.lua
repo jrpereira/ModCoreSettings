@@ -12,10 +12,18 @@ local STOP,LINEAR=0,4
 
 local function trim(s) return (s or ''):match('^%s*(.-)%s*$') end
 
--- A Wwise event path under /Game/: "/Game/A/B" or "/Game/A/B.B". Returns the full object
--- path, or nil.
+-- Whether a sound is a WAV file's path rather than a game event.
+function M.file(text)
+    return type(text)=='string' and #text<=1024 and text:lower():match('%.wav$')~=nil
+        and not text:find('[;|%c]') and not text:match('^/Game/')
+end
+
+-- A sound to play: a Wwise event path under /Game/ ("/Game/A/B" or "/Game/A/B.B"), returned
+-- as its full object path, or a WAV file's full path (played through UE4SSLuaSoundBridge),
+-- returned as it is. nil for anything else.
 function M.path(text)
     text=trim(text)
+    if M.file(text) then return text end
     if #text>MAX_PATH or not text:match('^/Game/[%w_/%-]+[%w_]$') and not text:match('^/Game/[%w_/%-]+%.[%w_]+$') then
         return nil
     end
@@ -61,6 +69,21 @@ function M.player(engine,report)
     local load=engine.LoadAsset or rawget(_G,'LoadAsset')
     local clock=engine.clock or os.clock
     local events,failed,last,playing={},{},nil,nil
+    -- WAV files play centred through UE4SSLuaSoundBridge, loaded once each.
+    local bridge=engine.SoundBridge or rawget(_G,'UE4SSLuaSoundBridge')
+    local files={}
+    local function playFile(path)
+        assert(bridge,'UE4SSLuaSoundBridge is not installed')
+        local sounds=bridge()
+        local sound=files[path]
+        if not sound or sound.released then
+            local why
+            sound,why=sounds.Load(path,{max_seconds=10})
+            files[path]=assert(sound,tostring(why))
+        end
+        local id=assert(sound:Play({}),'sound bridge refused the play')
+        playing={file=sound,id=id,sounds=sounds}
+    end
     local function object(name)
         local found=find(name)
         return valid(found) and found or nil
@@ -94,14 +117,15 @@ function M.player(engine,report)
     local function stop()
         local sound=playing
         playing=nil
-        if sound and valid(sound.event) then pcall(function() sound.event:ExecuteAction(STOP,nil,sound.id,STOP_FADE,LINEAR) end) end
+        if sound and sound.file then pcall(sound.sounds.Stop,sound.id)
+        elseif sound and valid(sound.event) then pcall(function() sound.event:ExecuteAction(STOP,nil,sound.id,STOP_FADE,LINEAR) end) end
     end
     return {stop=function() stop() end,play=function(_,path)
         local now=clock()
         if last and now-last<SPACING then return end
         last=now
         stop()
-        local ok,why=pcall(post,path)
+        local ok,why=pcall(M.file(path) and playFile or post,path)
         if ok then failed[path]=nil
         elseif not failed[path] then
             failed[path]=true

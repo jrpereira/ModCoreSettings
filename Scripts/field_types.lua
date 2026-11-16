@@ -414,7 +414,11 @@ function M.new(report)
                     for _,entry in ipairs(queued) do
                         for i,setting in ipairs(model.items) do
                             local instance=list[i]
-                            if setting==entry.setting and instance and instance.step then
+                            -- A slot row's step comes from its source page's model, whose
+                            -- setting is a different table with the same id (ids are unique
+                            -- on a page).
+                            if (setting==entry.setting or setting.id~=nil and setting.id==entry.setting.id)
+                                and instance and instance.step then
                                 local ok,value=pcall(instance.step,instance,entry.direction)
                                 if ok then edit(i,value) else report('FIELD_EDITOR_FAILED',setting.id..': '..tostring(value)) end
                             end
@@ -434,9 +438,19 @@ function M.new(report)
                     edit(i,instance:tick(pointerDown))
                 end,true)
                 local current=selected()
+                -- A link row (mcLinkPage) opens with Enter or A, as an editor confirms.
+                local linkSetting=model and not model.error and model.items and self.current
+                    and model.items[self.current]
+                local link=linkSetting and linkSetting.mcNavigation and linkSetting.mcLinkPage
+                    and linkSetting.values and linkSetting.values[1]~=nil
                 if confirm then
                     local wants=current and current.confirm~=nil
-                    local ok,pressed=pcall(confirm.take,wants,uiApi)
+                    local ok,pressed=pcall(confirm.take,wants or link,uiApi)
+                    if ok and pressed and link and not wants then
+                        model.mcActivateLink=true
+                        model:set(self.current,linkSetting.values[1])
+                        results[1]=true;results.n=math.max(results.n,1)
+                    end
                     if ok and pressed and wants then
                         local done,value=pcall(current.confirm,current)
                         if done then edit(self.current,value) else report('FIELD_EDITOR_FAILED',tostring(value)) end

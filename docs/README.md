@@ -39,9 +39,12 @@ DMM's numeric INI writer directly.
 
 ## Requirements and installation
 
-Use Dawnwalker, UE4SS with Lua 5.4, and DMM 1.0.7.1 (the declared minimum).
-Install and enable MCS under `Mods/1_ModCore_Settings`. MCS itself does not
-require UE4SSLuaEventBridge.
+Use Dawnwalker, UE4SS with Lua 5.4, DMM 1.0.7.1 (the declared minimum) and the UE4SS Lua
+Extensions' File Bridge and Sound Bridge, 1.1.0 or newer. Install and enable MCS under
+`Mods/1_ModCore_Settings`. MCS still runs without the two bridges, with less: no file
+dates for the mod browser or atomic config writes without the File Bridge, and no sound
+when you pick a mod's own sound file without the Sound Bridge. It does not need the Event
+Bridge.
 
 MCS renames DMM's `Scripts/main.lua` to `main.dmm.lua` and installs a launcher
 as `main.lua`. The launcher loads MCS inside DMM's Lua state, then runs DMM's

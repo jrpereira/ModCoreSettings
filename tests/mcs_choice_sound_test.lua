@@ -75,4 +75,21 @@ now=0.25;player:play('/Game/Missing.Missing')
 now=0.35;player:play('/Game/Missing.Missing')
 assert(#posted==3 and #reports==1 and reports[1]:find('CHOICE_SOUND_FAILED /Game/Missing.Missing',1,true),
     'a missing event is reported once')
+-- A WAV file plays centred through the sound bridge, loaded once; the next choice stops it.
+assert(Sound.path('C:/Mods/P/sounds/cue_ding.wav')=='C:/Mods/P/sounds/cue_ding.wav' and Sound.file('C:/x.WAV')
+    and not Sound.file('/Game/A.A') and Sound.path('C:/x.ogg')==nil,'WAV files are sounds too')
+local loadsByPath,plays,stops={},{},{}
+local bridge=setmetatable({},{__call=function()
+    return {Load=function(path) loadsByPath[path]=(loadsByPath[path] or 0)+1
+            return {path=path,Play=function(_,options) plays[#plays+1]={path=path,options=options};return #plays end} end,
+        Stop=function(id) stops[#stops+1]=id;return true end}
+end})
+local fileEngine={}
+for key,value in pairs(engine) do fileEngine[key]=value end
+fileEngine.SoundBridge=bridge
+local filePlayer=Sound.player(fileEngine)
+now=10;filePlayer:play('C:/Mods/P/sounds/cue_ding.wav')
+assert(#plays==1 and next(plays[1].options)==nil,'played centred, as recorded')
+now=11;filePlayer:play('C:/Mods/P/sounds/cue_ding.wav')
+assert(#plays==2 and stops[1]==1 and loadsByPath['C:/Mods/P/sounds/cue_ding.wav']==1,'loaded once; the next stops the last')
 print('PASS choice sound player')

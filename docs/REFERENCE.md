@@ -127,6 +127,32 @@ menu={
   (`mcKeys`); no position is saved or notified. It can fill another page's
   [slot](#slot-rows) and is still stored by its own page.
 
+  **Listed choices.** A keyed enum may hold `{from=<list file>, root=<mod folder>}` entries
+  among its choices. Every time the page is built (each time the menu opens, and after each
+  Apply) ModCoreSettings runs `<root>/Scripts/<from>` and puts the choices it returns in that
+  entry's place, so files a mod adds while the game runs show the next time the menu opens:
+
+  ```lua
+  values={{key='none',label='None'},{from='choices/cue_sounds.lua',root=modFolder},
+      {key='last',label='Last'}}
+  -- Scripts/choices/cue_sounds.lua
+  return function(context)       -- context.directory: the mod folder
+      local names=context.files('sounds')   -- names directly inside <mod>/sounds, unordered;
+                                            -- {} when missing, nil and why on failure
+      return {{key='bell',label='Bell',note='cue'}}   -- display order; key, label, note, sound
+  end
+  ```
+
+  The list file runs as pure Lua 5.4: the string, table, math and utf8 libraries and the base
+  functions that touch nothing else; no `io`, `os` or UE4SS globals. A fixed choice wins over
+  a listed one with its key wherever it stands, and between list files the first wins.
+  Choices with invalid keys or text are skipped. A list that fails or comes back empty keeps
+  its last good result. A `default` no choice offers shows as the first choice; with fewer
+  than two choices it is added as a placeholder, labelled as last listed or by its key, and a
+  field still under two choices is left off the page for that build, with every rule that
+  names it. Rules may name only fixed keys. Problems are logged once as `MENU_LIST_FAILED`.
+  Consumers that build menu data offline can copy `Scripts/vendor/menu_from.lua`.
+
   A `text` or `table` row is a shown value, never stored; one value with `action`
   or `link` makes a button. A range is ModCoreSettings' [range row](DEVELOPERS.md#add-a-range):
   `min` and `max` are its edges, or `{low marker's, high marker's}` bounds; `delta` is
@@ -153,7 +179,9 @@ menu={
   menu data holds single values only.
 - A value's `note` is shown small under it. `module='<mod folder>'` notes that
   mod's name, as the mod browser shows it.
-- A value's `sound` is a Wwise event path under `/Game/`, or `'none'`: it plays
+- A value's `sound` is a Wwise event path under `/Game/`, a WAV file's full path (played
+  centred, as recorded, through UE4SS Lua Sound Bridge 1.1.0; a list file names it in its
+  mod as `sounds/x.wav`), or `'none'`: it plays
   instead of DMM's change sound when the row changes to that value
   (`mcChoiceSounds` on the picker; see [presentation metadata](#presentation-metadata)).
 - `slot='<name>'` makes a `text` field the page's [slot](#slot-rows) for other
@@ -353,13 +381,33 @@ descriptor contract 3, which older ModCoreSettings builds skip.
 ### Page links
 
 A navigation picker with `mcLinkPage=<page id>` opens that page instead of saving
-a value. It requires `mcNavigation=1` and works in any manifest. With unapplied
+a value, when clicked or confirmed with Enter (controller: A); Left and Right do nothing
+on it. It requires `mcNavigation=1` and works in any manifest. With unapplied
 changes the link is refused and the page shows a status message.
 `mcLinkPage=<provider>:<slot>` opens the page that hosts that slot, sets its
 navigation pickers so the slot shows, and selects the slot's first row. With
 `mcType=tab`, a link shows its first choice as underlined text in a picker's value
 column, dimmed until hovered or selected. Its label lines up with the rows around it.
 `mcLevel=5` sets the row label in small (12pt) muted text, which suits a notice.
+
+### Live preview
+
+Menu data may declare `preview={background=<picture path>}`. While that page is shown,
+the bottom of the side panel holds a 16:9 preview (576 by 324, 20 above the panel's
+bottom; the description scrolls above it): the background picture, and over it an Overlay
+host 1920 by 1080, scaled to fit. ModCoreSettings shares it with the page's provider:
+
+| Shared variable | Value |
+|---|---|
+| `MCS.Preview.v1.host` | the host Overlay while open, else nil |
+| `MCS.Preview.v1.state` | `<revision> open <page id>` or `<revision> closed <page id>` |
+| `MCS.Preview.v1.values` | `<revision>`, then one `id=value` line per setting: the page's current values, applied or not |
+| `MCS.Preview.v1.sound` | the sound button over the preview: `auto` (default; the provider decides), `on` or `off`; it lasts the session |
+| `MCS.Preview.v1.focus` | the selected setting's id, or empty |
+
+and runs the console command `MCS_Preview_v1` after each change: opening, closing, any
+value changing, the selection moving and the sound button. Closing the page, or the menu, closes the preview. ModCore Templates fills
+it for template module pages; problems are logged once as `PREVIEW_FAILED`.
 
 ## Apply notifications
 

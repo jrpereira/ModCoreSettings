@@ -15,7 +15,7 @@ ModCore Settings (MCS) extends Dawnwalker Mod Menu (DMM) with richer controls an
 
 [b]Requirements and installation[/b]
 
-Requires The Blood of Dawnwalker, UE4SS with Lua 5.4 and Dawnwalker Mod Menu 1.0.7.1 or newer. Install and enable under Mods/1_ModCore_Settings. MCS installs a launcher in DMM's Scripts folder; restart if DMM has already loaded or after changing metadata. MCS itself does not require UE4SSLuaEventBridge.
+Requires The Blood of Dawnwalker, UE4SS with Lua 5.4 and Dawnwalker Mod Menu 1.0.7.1 or newer. Install and enable under Mods/1_ModCore_Settings. MCS installs a launcher in DMM's Scripts folder; restart if DMM has already loaded or after changing metadata. Also requires UE4SS Lua Extensions' File Bridge and Sound Bridge 1.1.0 or newer; without them MCS still runs, but without file dates and safe config writes, and without playing a mod's own sound files when you pick them.
 
 Keybinds require storage hooks and input handling in the consuming mod. Modifier chords, Escape bindings, wheel directions and gamepad capture are unsupported.
 

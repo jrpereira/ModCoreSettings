@@ -268,4 +268,8 @@ assert(not pcall(Presentation.parse,'[Category.A]\nmcWithin=B\n[Category.B]\nmcW
 assert(not pcall(Presentation.parse,'[Category.A]\nmcWithin=B\nmcWithinLabel=B\n',
     {{id='X',kind='picker',group='A',label='X',values={0,1},labels={'a','b'}},
      {id='Y',kind='picker',group='B',label='Y',values={0,1},labels={'a','b'}}}),'mcWithinLabel is for a category without rows')
+-- A live preview: a background picture path, nothing else.
+assert(Data.manifest(with(function(m) m.preview={background='C:/Mods/P/images/back.jpg'} end)),'a preview compiles')
+fails('unknown field',with(function(m) m.preview={picture='x'} end))
+fails('invalid menu preview background',with(function(m) m.preview={background=7} end))
 print('PASS menu data compiles to the manifest DMM and presentation read, and rejects invalid data')

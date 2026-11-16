@@ -5,6 +5,7 @@
 --                                                      -- page's configDirectory
 --  groups={{id=,label=,style=,conditions=,help=,silent=true,parent={label=},
 --      groups={<subgroup>,...}},...},
+--  preview={background=<picture path>},               -- optional: a live preview (preview_panel)
 --  fields={{id=,group=,label=,description=,type=,values=,default=,widget=,style=,silent=true,
 --      conditions=,action=true,link=,slot=,slotLabel=true,slotGroups=true,tabsWidth=,wrap=true,
 --      table={entries={{code=,text=},...},columns=}},...}}
@@ -19,6 +20,9 @@
 --                  field use its keys. Keys are letters, digits and _ . -, at most 128 bytes,
 --                  not a number, unique per field. Keyed enums need storage and are pickers,
 --                  tabs or cyclers that are not action or link rows.
+--                  A keyed enum may also hold {from=<list file>, root=<mod folder>} entries:
+--                  the choices that file lists, spliced in its place on every build
+--                  (vendor/menu_from.lua). They are resolved before this compiler runs.
 --   type='integer' values={min=,max=,step=,suffix=}; default=<number>; widget='slider'
 --   type='range'   values={min=,max=,step=,suffix=,delta=}; default={low,high}; widget='range'
 --                  min and max are an edge, or {low marker's, high marker's}; delta is the
@@ -95,7 +99,15 @@ end
 -- options.moduleName(folder) (optional) names a mod folder for choice notes.
 function M.manifest(menu,options)
     options=options or {}
-    allowed(menu,{storage=true,groups=true,fields=true},'menu')
+    allowed(menu,{storage=true,groups=true,fields=true,preview=true},'menu')
+    -- preview={background=<picture path>}: a live preview in the side panel (preview_panel).
+    if menu.preview~=nil then
+        allowed(menu.preview,{background=true},'menu preview')
+        if menu.preview.background~=nil then
+            assert(type(menu.preview.background)=='string' and #menu.preview.background<=1024
+                and not menu.preview.background:find('%c'),'invalid menu preview background')
+        end
+    end
     local storage=menu.storage
     if storage~=nil then
         allowed(storage,{file=true,section=true},'menu storage')

@@ -269,6 +269,15 @@ do
     model:set(1,0)
     ui:tick()
     assert(model.pending[1]=='1|3' and nav.value==1,'a native move left is a step; the shell returns to its middle')
+    -- A slot row: the step comes from its source page's model, whose setting is another
+    -- table with the same id; it still reaches the row's editor.
+    local copy={}
+    for key,value in pairs(setting) do copy[key]=value end
+    local source=choices.open({id='Source',testOnly=true,choices={copy}})
+    source:set(1,2)
+    ui:tick()
+    assert(model.pending[1]=='1|4','a slot row\'s step reaches its editor by id')
+    model:set(1,'1|3')
     model:set(1,'0|2')
     assert(model.pending[1]=='0|2','text values still reach DMM\'s model')
     model:change(1,nil)
@@ -284,3 +293,39 @@ do
     instance=nil
 end
 print('PASS field types route Left/Right, Enter and the footer hint to navigation editors')
+
+-- field_types: Enter (controller: A) on a link row opens it, as a click does.
+do
+    local registry=FieldTypes.new(function(event,detail) error(event..': '..tostring(detail)) end)
+    local link={id='L',label='Open',mcNavigation=true,mcLinkPage='Target',values={0}}
+    local plain={id='P',label='Plain',values={0,1}}
+    local sets={}
+    local choices={parse=function() return {} end,index=function() return 1 end,format=function() return '' end,
+        open=function(provider)
+            local model={items=provider.choices,pending={0,0},committed={0,0}}
+            function model:set(i,value) sets[#sets+1]={i,value,self.mcActivateLink} end
+            return model
+        end}
+    local controls={build=function(_,providers)
+        local ui={panels={{rows={{},{}}}}}
+        function ui:show(index) self.active=index;self.model=choices.open(providers[index]) end
+        function ui:refresh() end
+        function ui:tick() end
+        function ui:hide() self.active=nil end
+        return ui
+    end}
+    local presses,asked=0,nil
+    local confirm={take=function(wants) asked=wants;local pressed=presses>0;presses=0;return pressed and wants end}
+    registry:install({choices=choices,controls=controls,confirm=confirm,pointer=function() return false end})
+    local ui=controls.build({},{{id='P',choices={link,plain}}},{})
+    ui:show(1)
+    ui.current=1
+    assert(not ui:tick() and asked and #sets==0,'a selected link asks for Enter; nothing opens without it')
+    presses=1
+    assert(ui:tick()==true and #sets==1 and sets[1][1]==1 and sets[1][2]==0 and sets[1][3]==true,
+        'Enter opens the link, marked as an activation, and is not also DMM\'s Back')
+    ui.current=2
+    presses=1
+    assert(not ui:tick() and not asked and #sets==1,'Enter on an ordinary picker does nothing')
+end
+print('PASS field types open a link row with Enter')

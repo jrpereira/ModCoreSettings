@@ -83,7 +83,7 @@ assert(#line.children==5 and line.children[2].width==8 and line.children[4].widt
 local function inner(box) return find(box,function(w) return w.kind=='Border' end) end
 local modeText=find(line.children[1],function(w) return w.kind=='TextBlock' end)
 local keyText=find(line.children[3],function(w) return w.kind=='TextBlock' end)
-assert(line.children[1].width==66 and line.children[3].width==96,'Mode is 66 pixels wide')
+assert(line.children[1].width==66 and line.children[3].width==108,'Mode is 66 pixels wide, the key 108 (96 grown 12%)')
 assert(math.abs(inner(line.children[1]).brush.A-0.108)<1e-9
     and math.abs(inner(line.children[5]).brush.A-0.09)<1e-9,'Mode and X backgrounds are dimmed; Mode 20% stronger')
 local clearText=find(line.children[5],function(w) return w.kind=='TextBlock' end)

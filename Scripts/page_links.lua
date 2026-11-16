@@ -14,9 +14,15 @@ function M.wrap(page,providers,api,slots)
         local model=self.model
         if model and not model.mcPageLinks then
             local set=model.set
+            -- A link opens when its row is clicked or confirmed with Enter (controller: A),
+            -- which mark the model mcActivateLink first; Left and Right do nothing on it.
             function model:set(settingIndex,value)
                 local choice=providers[index].choices[settingIndex]
-                if choice and choice.mcLinkPage then pending=choice.mcLinkPage;return end
+                if choice and choice.mcLinkPage then
+                    if self.mcActivateLink then pending=choice.mcLinkPage end
+                    self.mcActivateLink=nil
+                    return
+                end
                 return set(self,settingIndex,value)
             end
             model.mcPageLinks=true
