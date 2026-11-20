@@ -32,6 +32,27 @@ local function validateName(value,label)
     assert(type(value)=='string' and value~='' and value==trim(value)
         and not value:find('[%c%[%]=;#]'), 'invalid '..label)
 end
+-- Storage a row leaves out comes from its page. ConfigFile: config.ini in the page's
+-- folder. ConfigSection: the page's [Mod] ConfigSection; without one, its [Mod] Id, but
+-- only for a row that also leaves out ConfigFile, so a row naming its file keeps finding
+-- its key in any section. ConfigKey: the row's Id, as DMM already parses it.
+function M.defaults(content,items)
+    local mod={}
+    for _,section in ipairs((require('mcs_manifest').sections(content))) do
+        if trim(section.name)=='Mod' then mod=section.fields end
+    end
+    local section=mod.ConfigSection
+    if section~=nil then validateName(section,'[Mod] ConfigSection') end
+    for _,item in ipairs(items) do
+        if item.section==nil then
+            if section~=nil then item.section=section
+            elseif item.file==nil and mod.Id~=nil and mod.Id~='' then item.section=mod.Id end
+        end
+        if item.file==nil then item.file='config.ini' end
+    end
+    return items
+end
+
 function M.overlay(defaults,existing)
     local merged={}
     for key,value in pairs(defaults) do merged[key]=value end
@@ -224,7 +245,8 @@ end
 function M.install(choices,fs)
     if choices.mcConfigVersion then return false end
     fs=fs or M.fs
-    local open=choices.open
+    local open,parse=choices.open,choices.parse
+    if parse then choices.parse=function(content) return M.defaults(content,parse(content)) end end
     local planning=false
     choices.open=function(provider)
         if planning or provider.testOnly or not (provider.choices and provider.choices[1]) then

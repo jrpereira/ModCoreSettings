@@ -20,6 +20,9 @@
   Off italic and dimmed; Sound sits 20 pixels further right, and Focus, left of it, blurs
   the background picture while on.
 - A page link's underline sits just under its letters.
+- A setting may leave out `ConfigFile`, `ConfigSection` and `ConfigKey`: it is stored in
+  the page's `config.ini`, in the section named by `[Mod] ConfigSection` (else, when it
+  also leaves out `ConfigFile`, by `[Mod] Id`), under its own `Id`. Settings that state them are stored as before.
 - A config file that repeats a section opens: the repeats count as one section, and
   missing keys are added at the end of its last occurrence.
 - The mod list opens faster: building it lists the game folder once for all list files,

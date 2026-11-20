@@ -43,6 +43,31 @@ existing values and unrelated content, and reports invalid data. Parent director
 must already exist. Your gameplay code still needs startup defaults because it
 can run before the player opens this page.
 
+### Where values are stored
+
+`ConfigFile`, `ConfigSection` and `ConfigKey` are optional. A row that leaves one out
+takes it from its page:
+
+| Key | When left out |
+|---|---|
+| `ConfigFile` | `config.ini` in the page's folder (the folder of its `mod_settings.ini`, or a contribution's `configDirectory`) |
+| `ConfigSection` | the page's `[Mod] ConfigSection`; without one, the page's `[Mod] Id` if the row also leaves out `ConfigFile` |
+| `ConfigKey` | the row's `Id` |
+
+So the example above could leave out all three and declare its section once:
+
+```ini
+[Mod]
+Id=ExampleMod
+Name=Example Mod
+ConfigSection=General
+```
+
+A row that states `ConfigFile` but no section, on a page without
+`[Mod] ConfigSection`, keeps DMM's own rule: its key is found in any section, and
+added outside every section when missing. All of a page's stored rows must still
+resolve to one file.
+
 ## React to Apply
 
 Copy `Scripts/vendor/settings_api.lua` unchanged into your mod's `Scripts/vendor`
