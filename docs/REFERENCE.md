@@ -93,8 +93,15 @@ menu={
 - `storage`: values are saved under `section` in `file`, relative to the page's
   `configDirectory`. Without it, DMM's default storage applies. DMM stores numbers
   only, so a page with `storage` that holds a range, keybind or keyed enum row is stored by
-  ModCoreSettings instead: every stored row under `section`, a missing or invalid
+  ModCoreSettings instead: every stored row at its section and key, a missing or invalid
   value keeping its default, missing keys added on Apply, every other byte kept.
+- A stored field's `storage={section=,key=}` (both optional, letters, digits and
+  `_ . : -`) stores it under its own section and key in the menu's `file`:
+  `storage={section='Preymonition.Omens',key='Enabled'}`. Without them the field uses
+  the menu's `section` and its own `id`. It needs the menu's `storage`, and only stored
+  fields take it (not `action`, `link`, `text` or `table` rows). Two fields of a page
+  at the same section and key reject the page. In a slot, a row keeps its source
+  page's file, section and key.
 - Groups keep their order, and fields theirs within their group; only groups with
   fields are shown. A group's heading is its `label`, else its `id`;
   `style='none'` hides it (`style='category'`, the default, shows it).

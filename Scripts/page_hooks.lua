@@ -76,13 +76,18 @@ function M.manifest(hooks,context,compile)
 end
 
 -- Storage hooks for a menu-data page whose storage DMM cannot keep: every stored field's
--- value under menu.storage.section in menu.storage.file, relative to the page's
+-- value under its section and key (menu_data.address) in menu.storage.file, relative to the page's
 -- configDirectory. A range's value and a keyed picker's key are text; every other value is a
 -- number. A missing file or key keeps the default; Apply adds missing keys and keeps every
 -- other byte.
 -- files (optional) is {read=,write=}, safe_file's by default.
 function M.stored(menu,files)
     local Ini=require('mc_ini')
+    -- As menu_data.address: the field's own section and key, else the menu's and its id.
+    local function Address(within,field)
+        local own=field.storage or {}
+        return own.section or within.section,own.key or field.id
+    end
     files=files or require('safe_file')
     local storage=menu.storage
     local fields={}
@@ -102,12 +107,11 @@ function M.stored(menu,files)
         load=function(context)
             local content=files.read(path(context))
             if not content then return {} end
-            local found,values={},{}
-            for _,entry in ipairs(Ini.entries(Ini.parse(content),storage.section)) do
-                if not found[entry.key] then found[entry.key]=entry.value end
-            end
+            local doc,values=Ini.parse(content),{}
             for _,field in ipairs(fields) do
-                local value=found[field.id]
+                local section,key=Address(storage,field)
+                local entry=Ini.entries(doc,section,key)[1]
+                local value=entry and entry.value
                 if value~=nil then values[field.id]=field.type=='range' and value or tonumber(value) or value end
             end
             return values
@@ -117,7 +121,10 @@ function M.stored(menu,files)
             local original=files.read(file) or ''
             local content=original
             for _,field in ipairs(fields) do
-                if values[field.id]~=nil then content=Ini.set(content,storage.section,field.id,text(values[field.id])) end
+                if values[field.id]~=nil then
+                    local section,key=Address(storage,field)
+                    content=Ini.set(content,section,key,text(values[field.id]))
+                end
             end
             if content~=original then files.write(file,content) end
             return values

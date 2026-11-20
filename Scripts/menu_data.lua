@@ -7,6 +7,9 @@
 --      groups={<subgroup>,...}},...},
 --  preview={background=<picture path>},               -- optional: a live preview (preview_panel)
 --  fields={{id=,group=,label=,description=,type=,values=,default=,widget=,style=,silent=true,
+--      storage={section=,key=},                       -- optional: where this field is stored in
+--                                                      -- the menu's storage file (default: the
+--                                                      -- menu's section, the field's id)
 --      conditions=,action=true,link=,slot=,slotLabel=true,slotGroups=true,tabsWidth=,wrap=true,
 --      table={entries={{code=,text=},...},columns=}},...}}
 --
@@ -56,6 +59,13 @@ local ChoiceSound=require('mcs_choice_sound')
 local Contributions=require('menu_contributions')
 local Range=require('range_editor')
 local M={version=1}
+
+-- Where a stored field's value lives in the page's storage file: its own storage.section
+-- and storage.key, else the menu's section and the field's id.
+function M.address(storage,field)
+    local own=field.storage or {}
+    return own.section or storage.section,own.key or field.id
+end
 
 local MAX_FIELDS,MAX_GROUPS,MAX_CHOICES,MAX_TABLE=256,256,64,256
 
@@ -157,12 +167,12 @@ function M.manifest(menu,options)
         assert(number(value,where)%1==0,where..' must be whole')
         return value
     end
-    local fields,byField,titles,slots={},{},0,{}
+    local fields,byField,titles,slots,stored={},{},0,{},{}
     for n,field in ipairs(list(menu.fields or {},'menu fields',MAX_FIELDS)) do
         local where='field '..n
         allowed(field,{id=true,group=true,label=true,description=true,type=true,values=true,default=true,
             widget=true,style=true,silent=true,conditions=true,action=true,link=true,slot=true,slotLabel=true,
-            slotGroups=true,tabsWidth=true,wrap=true,table=true},where)
+            slotGroups=true,tabsWidth=true,wrap=true,table=true,storage=true},where)
         identifier(field.id,where..' id')
         assert(not byField[field.id],'duplicate field '..field.id)
         where=field.id
@@ -188,6 +198,19 @@ function M.manifest(menu,options)
         end
         local shown=widget=='text' or widget=='table'
         local record={field=field,kind=kind,widget=widget,shown=shown}
+        if field.storage~=nil then
+            assert(storage~=nil,where..': field storage needs the menu\'s storage')
+            assert(not (field.action or field.link or shown),where..': only stored fields take storage')
+            allowed(field.storage,{section=true,key=true},where..' storage')
+            if field.storage.section~=nil then identifier(field.storage.section,where..' storage section') end
+            if field.storage.key~=nil then identifier(field.storage.key,where..' storage key') end
+        end
+        if storage and not (field.action or field.link or shown) then
+            local section,key=M.address(storage,field)
+            local target=section..'\0'..key
+            assert(not stored[target],where..': stores at ['..section..'] '..key..' as '..tostring(stored[target])..' does')
+            stored[target]=field.id
+        end
         -- Each choice's value or key -> the number DMM sees: the value itself, or for a keyed
         -- enum the choice's position.
         local values={}
@@ -499,7 +522,8 @@ function M.manifest(menu,options)
         add('mcSlotGroups',field.slotGroups and 1 or nil)
         add('mcSilent',field.silent and 1 or nil)
         if storage and not (field.action or field.link or record.shown) then
-            add('ConfigFile',storage.file);add('ConfigSection',storage.section);add('ConfigKey',field.id)
+            local section,key=M.address(storage,field)
+            add('ConfigFile',storage.file);add('ConfigSection',section);add('ConfigKey',key)
         end
         section('Setting.'..field.id,keys)
     end
