@@ -37,5 +37,18 @@ local folder=dir..'/safe_file_test_dir/nested'
 Safe.mkdir(folder);Safe.mkdir(folder)
 Safe.put(folder..'/x','x');assert(Safe.read(folder..'/x')=='x','mkdir creates nested folders')
 os.remove(folder..'/x');os.remove(folder);os.remove(dir..'/safe_file_test_dir')
+
+-- The shell may report a failure for a folder it created: the probe decides.
+local execute=os.execute
+local reported=dir..'/safe_file_test_reported'
+os.execute=function(command) execute(command);return nil,'exit',1 end
+local made=pcall(Safe.mkdir,reported)
+os.execute=execute
+assert(made,'mkdir trusts the folder, not the shell result')
+os.remove(reported)
+os.execute=function() return true,'exit',0 end
+local claimed=pcall(Safe.mkdir,dir..'/safe_file_test_missing')
+os.execute=execute
+assert(not claimed,'mkdir fails when the folder does not accept files')
 clear()
 print('PASS safe_file')
