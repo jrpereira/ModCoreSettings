@@ -51,7 +51,7 @@ return {
                     description='Only while the selected setting is about sound, such as a sound or its volume.'},
                 {key='on',label='On',description='Always.'},
                 {key='off',label='Off',description='Never.'}}},
-        {id='PreviewBackground',group='Previews',label='Background in previews',default='on',
+        {id='PreviewBackground',group='Previews',label='Background in previews',default='dimmed',
             description='How a page\'s live preview shows its background picture, so what is drawn over it stands out. The Background button under the preview cycles the same choices.',
             values={{key='on',label='On',description='The picture as it is.'},
                 {key='blurred',label='Blurred',description='The picture blurred.'},

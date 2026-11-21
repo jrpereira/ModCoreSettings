@@ -16,9 +16,9 @@
 - A setting's title above its description is white, as the mod list names its mods.
 - A picker choice may have a description: the side panel shows it after the setting's own
   while that choice is the value.
-- A live preview's buttons read '<name>: <value>', the name dimmed and any state but Off bright,
+- A live preview's buttons read '<name>: <value>', 2 points smaller than other buttons, the name dimmed and any state but Off bright,
   Off italic and dimmed; Sound sits 20 pixels further right, and Background, left of it,
-  is On (the picture as it is, the default), Blurred, Dimmed (the picture 30% opaque) or
+  is On (the picture as it is), Blurred, Dimmed (the picture 30% opaque, the default) or
   Off (a dim light blue screen instead of the picture).
 - The ModCore Settings page's Previews section: Play sound in previews (Auto, On or Off)
   and Background in previews (On, Blurred, Dimmed or Off) are the live preview's buttons,

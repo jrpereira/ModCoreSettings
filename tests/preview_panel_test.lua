@@ -97,7 +97,7 @@ assert(scroll.Slot.Padding.Bottom==324+68+16,'the description stops 16 above the
 local frame=preview.content
 local fill,background,blur,scale=frame.children[1],frame.children[2],frame.children[3],frame.children[4]
 assert(blur.kind=='BackgroundBlur' and blur.blur==12 and blur.visible==1,'a blur over the picture, off by default')
-assert(background.texture==texture and background.visible==4 and background.opacity==1,'the background picture fills it')
+assert(background.texture==texture and background.visible==4 and background.opacity==0.3,'the background picture fills it, dimmed by default')
 assert(fill.kind=='Image' and fill.visible==1 and fill.ColorAndOpacity.B>fill.ColorAndOpacity.R
     and fill.ColorAndOpacity.B<0.5,'a dim light blue screen, for the background off')
 local screen=scale.content
@@ -139,23 +139,26 @@ click()
 assert(vars[Preview.SOUND]=='on' and soundValue.text=='On' and bright(soundValue),'a click turns it on')
 click();assert(vars[Preview.SOUND]=='off' and soundValue.text=='Off' and dim(soundValue),'then off: italic, 70%')
 click();assert(vars[Preview.SOUND]=='auto' and bright(soundValue),'then back to auto')
--- Background: on by default, the picture as it is; blurred blurs it; dimmed draws it 30%
--- opaque; off shows a dim light blue screen instead.
+-- Background: dimmed by default, the picture 30% opaque; off shows a dim light blue screen
+-- instead; on is the picture as it is; blurred blurs it.
 local _,backgroundPrefix,backgroundValue=parts(backgroundButton)
-assert(backgroundPrefix.text=='Background:' and backgroundValue.text=='On' and bright(backgroundValue),'Background: On')
+assert(backgroundPrefix.text=='Background:' and backgroundValue.text=='Dimmed' and bright(backgroundValue)
+    and background.opacity==0.3 and fill.visible==1,'Background: Dimmed by default')
 local commandsBefore=#commands
-click(backgroundButton)
-assert(backgroundValue.text=='Blurred' and bright(backgroundValue) and blur.visible==4 and background.visible==4
-    and background.opacity==1 and fill.visible==1,'Background: Blurred blurs the picture')
-assert(#commands==commandsBefore,'the background is the panel\'s own, the provider is not told')
-click(backgroundButton)
-assert(backgroundValue.text=='Dimmed' and bright(backgroundValue) and blur.visible==1 and background.visible==4
-    and background.opacity==0.3 and fill.visible==1,'Background: Dimmed draws the picture 30% opaque')
 click(backgroundButton)
 assert(backgroundValue.text=='Off' and dim(backgroundValue) and blur.visible==1 and background.visible==1
     and fill.visible==4,'Background: Off, a dim light blue screen')
+assert(#commands==commandsBefore,'the background is the panel\'s own, the provider is not told')
 click(backgroundButton)
-assert(backgroundValue.text=='On' and background.visible==4 and background.opacity==1 and fill.visible==1,'and on again')
+assert(backgroundValue.text=='On' and background.visible==4 and background.opacity==1 and fill.visible==1,'Background: On')
+click(backgroundButton)
+assert(backgroundValue.text=='Blurred' and bright(backgroundValue) and blur.visible==4 and background.visible==4
+    and background.opacity==1 and fill.visible==1,'Background: Blurred blurs the picture')
+click(backgroundButton)
+assert(backgroundValue.text=='Dimmed' and bright(backgroundValue) and blur.visible==1 and background.visible==4
+    and background.opacity==0.3 and fill.visible==1,'and dimmed again')
+click(backgroundButton);click(backgroundButton)
+assert(backgroundValue.text=='On','back to On for the checks below')
 -- The selected setting is shared, for auto.
 page.controls.current=2
 page.controls:tick()
@@ -203,7 +206,7 @@ assert(#reports==0,table.concat(reports,'; '))
 local saved=Preview.saved('[Modules]\nPreviewSound = off\nPreviewBackground=dimmed\n')
 assert(saved.sound=='off' and saved.backdrop=='dimmed','the saved states')
 saved=Preview.saved('[Modules]\nPreviewSound=loud\n')
-assert(saved.sound=='auto' and saved.backdrop=='on','unset or unknown: the defaults')
+assert(saved.sound=='auto' and saved.backdrop=='dimmed','unset or unknown: the defaults')
 do
     local config='[Modules]\nSortBy=1\nPreviewBackground=blurred\n'
     local pages={build=function(tree)

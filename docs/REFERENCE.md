@@ -415,7 +415,7 @@ the bottom of the side panel holds a 16:9 preview (576 by 324, 68 above the pane
 bottom and 40 in from its left, where the header and description text start; the
 description scrolls above it): the background picture, and over it an Overlay host 1920 by
 1080, scaled to fit. Without a picture, or with one that cannot be read, nothing shows
-behind the host. The background and sound buttons sit under the preview's right end. Background, the panel's own and not shared, is On (the default: the picture as it is), Blurred, Dimmed (the picture 30% opaque) or Off (a dim light blue screen instead of the picture). Both buttons are the ModCore Settings page's Previews settings, Play sound in previews and Background in previews ([Modules] PreviewSound and PreviewBackground in config.ini): a page starts from the saved states and a click saves the new one. ModCoreSettings
+behind the host. The background and sound buttons sit under the preview's right end. Background, the panel's own and not shared, is On (the picture as it is), Blurred, Dimmed (the default: the picture 30% opaque) or Off (a dim light blue screen instead of the picture). Both buttons are the ModCore Settings page's Previews settings, Play sound in previews and Background in previews ([Modules] PreviewSound and PreviewBackground in config.ini): a page starts from the saved states and a click saves the new one. ModCoreSettings
 shares the preview with the page's provider:
 
 | Shared variable | Value |

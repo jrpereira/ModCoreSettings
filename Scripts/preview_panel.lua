@@ -30,7 +30,7 @@ M.BACKGROUNDS={'on','blurred','dimmed','off'}
 -- PreviewBackground in config.ini: a page build starts from the saved states, and a click
 -- saves the new one.
 M.KEYS={sound='PreviewSound',backdrop='PreviewBackground'}
-M.DEFAULTS={sound='auto',backdrop='on'}
+M.DEFAULTS={sound='auto',backdrop='dimmed'}
 local STATES={sound=M.SOUNDS,backdrop=M.BACKGROUNDS}
 local VALUE_LABELS={auto='Auto',on='On',off='Off',blurred='Blurred',dimmed='Dimmed'}
 -- The preview in DMM's 1280-wide page: 16:9, as wide as the description inside the side
@@ -38,6 +38,8 @@ local VALUE_LABELS={auto='Auto',on='On',off='Off',blurred='Blurred',dimmed='Dimm
 -- text do, PREVIEW_LEFT in; its bottom PREVIEW_BOTTOM above the panel's; the description
 -- keeps PREVIEW_GAP above it.
 local PREVIEW_WIDTH,PREVIEW_HEIGHT,PREVIEW_BOTTOM,PREVIEW_GAP,PREVIEW_LEFT=576,324,68,16,40
+-- The buttons' text is this many points smaller than DMM's button font.
+local BUTTON_SHRINK=2
 -- Under the preview's right end, SOUND_GAP below it: the sound button, SOUND_SHIFT past
 -- the preview's right edge, and the background button left of it. Each sits in a box of fixed
 -- size, its text left-aligned, so the value changing never moves it. A button reads
@@ -171,13 +173,16 @@ function M.wrap(page,providers,api,options)
                 {name='Sound',key=M.KEYS.sound,states=M.SOUNDS,kept=sound,width=SOUND_WIDTH,left=soundLeft}}) do
                 local button,label=api.button(options.tree,'')
                 button.IsFocusable=false
-                -- '<name>:' and the value, two texts in the button's own font, left-aligned.
+                -- '<name>:' and the value, two texts in the button's own font BUTTON_SHRINK points
+                -- smaller, left-aligned.
                 local line=new('HorizontalBox')
                 local lineSlot=api.need(button:SetContent(line),'MCS preview button text')
                 lineSlot:SetHorizontalAlignment(1);lineSlot:SetVerticalAlignment(2)
                 local prefix,value=new('TextBlock'),new('TextBlock')
+                local font=label.Font
+                font.Size=(tonumber(font.Size) or 0)-BUTTON_SHRINK
                 for _,text in ipairs({prefix,value}) do
-                    text:SetFont(label.Font)
+                    text:SetFont(font)
                     if api.Theme then pcall(api.Theme.textColor,text,'body') end
                 end
                 prefix:SetText(FText and FText(spec.name..':') or spec.name..':')
