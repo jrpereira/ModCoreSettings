@@ -112,7 +112,7 @@ assert(attached and attached.modules.controls==controls and attached.modules.nat
     'the menu-closing event is attached on DMM\'s modules before any other wrapper')
 local order={'dmm_events','mc_ini','mcs_manifest','safe_file','mcs_choice_sound','navigation','mapped_presets','menu_contributions','presentation','mod_requirements','browser_groups','module_categories','mcs_taxonomy','mcs_module_json',
  'init_config','menu_pages','page_links','menu_slots','page_hooks','field_types','keybind_editor','range_editor','editor_input','editor_hint','standard_keys','standard_controls',
- 'settings_notify','sort_button','compact_style','menu_data','preview_panel','build_guard','index_refresh'}
+ 'settings_notify','sort_button','compact_style','menu_data','preview_panel','build_guard','index_refresh','config_reload'}
 assert(#loaded==#order)
 for n,name in ipairs(order) do assert(loaded[n]:match(name..'%.lua$'),'load '..n) end
 -- Copied files load from Scripts/vendor; the extension's own modules from Scripts.

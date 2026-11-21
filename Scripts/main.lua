@@ -49,4 +49,36 @@ local published,publishError=pcall(function()
         menu=require('mcs_page')}}})
 end)
 if not published then log('SETTINGS_PAGE_UNAVAILABLE',tostring(publishError)) end
+-- Config reload: MC_ConfigReload_v1 from any state is fanned out here to every module that
+-- subscribed (settings_api onReload). A trigger at the main menu waits for a player.
+local reloading,reloadError=pcall(function()
+    local Reload=require('config_reload')
+    local ref=assert(rawget(_G,'ModRef'),'ModRef unavailable')
+    local controller
+    local function viewport()
+        if not (controller and controller:IsValid()) then controller=FindFirstOf('PlayerController') end
+        local pc=controller and controller:IsValid() and controller or nil
+        local client=pc and pc.Player and pc.Player:IsValid() and pc.Player.ViewportClient
+        return client and client:IsValid() and client or nil,pc
+    end
+    local hub=Reload.hub({shared=ref,report=log,
+        ready=function() return viewport()~=nil end,
+        exec=function(command)
+            local client,pc=viewport()
+            return client~=nil and client:ProcessConsoleExec(command,nil,pc)==true
+        end})
+    Reload.listen(hub,RegisterConsoleCommandHandler,ref,log)
+    -- A trigger kept at the main menu goes out once a player's pawn is set up.
+    pcall(RegisterHook,'/Script/Engine.PlayerController:ClientRestart',function()
+        local ok,why=pcall(hub.flush,hub)
+        if not ok then log('RELOAD_FAILED',tostring(why)) end
+    end)
+    -- The game window regaining focus: the Event Bridge's event, when it is installed.
+    local subscribed,why=pcall(require('config_reload_focus').subscribe,function()
+        local ok,err=pcall(hub.trigger,hub,'focus')
+        if not ok then log('RELOAD_FAILED',tostring(err)) end
+    end)
+    if not subscribed then log('RELOAD_FOCUS_UNAVAILABLE',tostring(why)) end
+end)
+if not reloading then log('RELOAD_UNAVAILABLE',tostring(reloadError)) end
 Bootstrap.run(log,initialize)

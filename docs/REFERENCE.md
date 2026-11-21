@@ -6,7 +6,7 @@ means an INI string; replace example paths with absolute paths on the game host.
 
 - [Generated pages](#menu-pages), [menu data](#menu-data) and [slot rows](#slot-rows)
 - [Page hooks](#page-hooks) and [page links](#page-links)
-- [Apply notifications](#apply-notifications)
+- [Apply notifications](#apply-notifications) and [config reload](#config-reload)
 - [Presentation metadata](#presentation-metadata)
 - [Missing defaults](#missing-defaults)
 - [Mapped presets](#mapped-presets)
@@ -456,6 +456,41 @@ a range's `'low|high'`, a keybind. `changes` contains `{old=...,new=...}` only f
 changed IDs. Treat the event and its nested tables as read-only. Callback failure cannot turn a completed save
 into an Apply failure. Calling the returned function stops delivery to that
 callback.
+
+## Config reload
+
+A config file edited by hand while the game runs is reloaded on one trigger, and no module
+polls for it. A module subscribes with the vendored `settings_api` (version 3):
+
+```lua
+local Settings = require('settings_api')
+local stop = Settings.onReload('ExampleMod', function(event)
+    -- event.revision, event.reason ('button', 'focus' or a module id), event.time (unix)
+    -- Reload this module's own files.
+end)
+-- stop() unsubscribes. Settings.reloadReady() tells whether ModCoreSettings handles reloads;
+-- without it, a module reloads only itself.
+```
+
+The id is any text of 1 to 128 bytes, dots included; subscribing again replaces the
+callback. Reloads are triggered by the Mod Index's **Reload Config** button, shown at the
+right of its title with "Last loaded: HH:MM:SS" before it, and by the game window
+regaining focus when the UE4SS Lua Event Bridge (1.4.0 or later) is installed. Any Lua
+state may trigger one with the console command `MC_ConfigReload_v1 <reason> [<source id>]`:
+the subscriber named as source already reloaded and is skipped.
+
+ModCoreSettings handles the trigger in its own state and runs each subscriber's command
+once. A button press always reloads; an automatic trigger within a second of the last
+reload is merged into it. At the main menu a trigger waits until a player is set up, and
+several waiting triggers become one reload. A subscriber whose command fails is logged once
+as `RELOAD_FAILED`; the others still reload.
+
+| Shared variable | Value |
+| --- | --- |
+| `MC_ConfigReload_v1.ready` | `1` while ModCoreSettings handles the trigger |
+| `MC_ConfigReload_v1.last` | unix time of the last reload, else of ModCoreSettings' start |
+| `MC_ConfigReload_v1.index` | the subscribers' hex ids, space-separated |
+| `MC_ConfigReload_v1_<hex id>.owner`, `.data` | set while subscribed; `<revision>\n<reason>\n<unix time>` |
 
 ## Presentation metadata
 

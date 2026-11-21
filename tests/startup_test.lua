@@ -11,8 +11,10 @@ print=function(value) captured[#captured+1]=value end
 package.loaded.dmm_bootstrap={run=function(log) assert(scans==1,'scan precedes DMM bootstrap');log('DMM_REQUIRED','missing DMM') end}
 dofile('Scripts/main.lua')
 print=originalPrint
-assert(#captured==2 and captured[1]:find('SETTINGS_PAGE_UNAVAILABLE',1,true)
-    and captured[2]:find('DMM_REQUIRED',1,true),'without a mod folder the page is not published')
+-- Without ModRef (outside the game) config reload is unavailable and says so.
+assert(#captured==3 and captured[1]:find('SETTINGS_PAGE_UNAVAILABLE',1,true)
+    and captured[2]:find('RELOAD_UNAVAILABLE',1,true)
+    and captured[3]:find('DMM_REQUIRED',1,true),'without a mod folder the page is not published')
 assert(not installed,'DMM readiness must gate MCS initialization')
 print('PASS startup explains missing DMM and remains inactive')
 package.loaded.dmm_bootstrap={run=function(_,start) assert(scans==2,'one scan per startup');installed=start() end}
@@ -41,7 +43,10 @@ package.loaded.menu_contributions={publisher=function(shared,options)
     assert(shared==ModRef and options.id=='ModCoreSettings' and options.directory=='C:/Mods/1_ModCore_Settings/cache')
     return {publish=function(_,contribution) published=contribution end}
 end}
-ModRef={}
+local sharedVars,commands={},{}
+ModRef={GetSharedVariable=function(_,k) return sharedVars[k] end,SetSharedVariable=function(_,k,v) sharedVars[k]=v end}
+RegisterConsoleCommandHandler=function(name,callback) commands[name]=callback;return true end
+RegisterHook=function() end
 captured={}
 print=function(value) captured[#captured+1]=value end
 -- The version comes from the VERSION file at the mod root, read here from the checkout.
@@ -57,4 +62,6 @@ assert(made=='C:/Mods/1_ModCore_Settings/cache' and #published.pages==1 and page
     and page.attach=='1_ModCore_Settings' and page.configDirectory=='C:/Mods/1_ModCore_Settings'
     and page.menu==require('mcs_page') and page.version==version and #captured==0,
     'MCS publishes its own page as menu data attached to its folder')
+assert(commands.MC_ConfigReload_v1 and sharedVars['MC_ConfigReload_v1.ready']=='1'
+    and tonumber(sharedVars['MC_ConfigReload_v1.last']),'MCS handles config reloads in its own state')
 print('PASS MCS publishes its own page')

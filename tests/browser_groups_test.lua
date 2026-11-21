@@ -393,6 +393,32 @@ do
     pressedNow.controls=true;assert(pageWithTitle:tickFilter(released)==false)
     pressedNow.controls=false;assert(pageWithTitle:tickFilter(released)==true,'a click is handled')
     assert(pageWithTitle.opened[1]=='ModCoreControls','the link opens its page')
+    -- Reload Config, after 'Last loaded: …', while ModCore Settings handles reloads.
+    local texts,fired,last={},0,'10:00:00'
+    linkApi.caption=function(_,text) local c=node('caption');c.text=text;return c end
+    linkApi.setText=function(widget,text) widget.text=text;texts[#texts+1]=text end
+    local reloadTitle=node('filterButton')
+    node('header'):AddChild(reloadTitle)
+    local reloadBase=browserPages(true)
+    local reloadBuild=reloadBase.build
+    reloadBase.build=function(...)
+        local made=reloadBuild(...)
+        made.filterButton=reloadTitle
+        return made
+    end
+    Groups.install(reloadBase,nil,nil,nil,function(folder) return {titleLink=titleLinks[folder]} end,
+        function() return {reload={ready=function() return true end,last=function() return last end,
+            fire=function() fired=fired+1;last='10:05:00' end}} end)
+    local reloading=reloadBase.build({},items,nil,linkApi)
+    local reloadLine=reloadTitle:GetParent().children[2]
+    local caption,button=reloadLine.children[3],reloadLine.children[4]
+    assert(caption.text=='Last loaded: 10:00:00' and button.text=='Reload Config','the button follows the page links')
+    pressedNow['Reload Config']=true;reloading:tickFilter(released)
+    pressedNow['Reload Config']=false
+    assert(reloading:tickFilter(released)==true and fired==1 and caption.text=='Last loaded: 10:05:00',
+        'a click reloads and shows the new time')
+    last='10:09:00';reloading:tickFilter(released)
+    assert(caption.text=='Last loaded: 10:09:00','a reload from elsewhere shows too')
 end
 local rowA,indexA=rowOf(browsing,'A')
 local rowB,indexB=rowOf(browsing,'B')

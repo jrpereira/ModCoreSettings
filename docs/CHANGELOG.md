@@ -24,6 +24,9 @@
   and Background in previews (On, Blurred, Dimmed or Off) are the live preview's buttons,
   saved in config.ini; a click on a button saves it too.
 - A page link's underline sits just under its letters.
+- Config reload: the Mod Index's Reload Config button, with the time of the last reload
+  beside it, and returning to the game window (with the UE4SS Lua Event Bridge 1.4.0 or
+  later) reload every module that subscribed through `settings_api` 3's `onReload`.
 - A menu-data field may store under its own section, key and file,
   `storage={section=,key=,file=}`; a page whose rows use several files is stored by
   ModCoreSettings, and two fields at one file, section and key reject the page.

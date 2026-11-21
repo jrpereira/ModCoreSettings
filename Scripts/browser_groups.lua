@@ -1016,6 +1016,39 @@ function M.install(pages, report, parse, folderVersion, folderManifest, grouping
                         slot:SetVerticalAlignment(2)
                         links[#links + 1] = {widget=widget, id=link[2], pressed=false, pointer=false}
                     end
+                    -- Reload Config, with 'Last loaded: HH:MM:SS' before it, while ModCore
+                    -- Settings handles reloads (options.reload, config_reload.lua).
+                    local reload = options.reload
+                    if reload and reload.ready() then
+                        local caption = api.caption(tree, '')
+                        if api.Theme and api.theme then
+                            api.Theme.font(caption, api.theme, LINK_SIZE)
+                            api.Theme.textColor(caption, 'muted')
+                        end
+                        local captionSlot = assert(line:AddChild(caption), 'reload caption')
+                        captionSlot:SetPadding({Left=#links > 0 and LINK_GAP or 0, Top=0, Right=0, Bottom=0})
+                        captionSlot:SetVerticalAlignment(2)
+                        local widget, label = api.button(tree, 'Reload Config')
+                        widget.IsFocusable = false
+                        if api.Theme and api.theme then
+                            api.Theme.font(label, api.theme, LINK_SIZE)
+                            api.Theme.textColor(label, 'muted')
+                        end
+                        label.Slot:SetPadding({Left=6, Top=2, Right=6, Bottom=2})
+                        local slot = assert(line:AddChild(widget), 'reload button')
+                        slot:SetPadding({Left=6, Top=0, Right=0, Bottom=0})
+                        slot:SetVerticalAlignment(2)
+                        local entry = {widget=widget, reload=true, caption=caption, pressed=false, pointer=false}
+                        -- Checked each tick, set only when the time changes (a focus reload too).
+                        function entry.refresh()
+                            local last = reload.last()
+                            if last == entry.shown then return end
+                            entry.shown = last
+                            if api.setText then api.setText(caption, last and 'Last loaded: ' .. last or '') end
+                        end
+                        entry.refresh()
+                        links[#links + 1] = entry
+                    end
                     if #links == 0 then return end
                     local header = assert(page.filterButton:GetParent(), 'browser title box')
                     local stack = api.construct('/Script/UMG.Overlay', tree)
@@ -1048,6 +1081,7 @@ function M.install(pages, report, parse, folderVersion, folderManifest, grouping
             end
             function page:tickFilter(released)
                 for _, link in ipairs(links) do
+                    if link.reload then pcall(link.refresh) end
                     local hovered = link.widget:IsHovered() == true
                     if hovered ~= link.hovered and api.highlight then
                         link.hovered = hovered
@@ -1055,7 +1089,12 @@ function M.install(pages, report, parse, folderVersion, folderManifest, grouping
                     end
                     local activate
                     activate, link.pressed, link.pointer = released(link.widget, link.pressed, link.pointer, hovered)
-                    if activate then
+                    if activate and link.reload then
+                        local ok, err = pcall(options.reload.fire)
+                        if not ok then report('BROWSER_GROUPS_FAILED', err) end
+                        pcall(link.refresh)
+                        return true
+                    elseif activate then
                         local ok, err = pcall(open, self, link.id)
                         if not ok then report('BROWSER_GROUPS_FAILED', err) end
                         return true

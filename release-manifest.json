@@ -39,6 +39,8 @@
     "Scripts/vendor/menu_from.lua": "Scripts/vendor/menu_from.lua",
     "Scripts/vendor/standard_keys.lua": "Scripts/vendor/standard_keys.lua",
     "Scripts/menu_pages.lua": "Scripts/menu_pages.lua",
+    "Scripts/config_reload.lua": "Scripts/config_reload.lua",
+    "Scripts/config_reload_focus.lua": "Scripts/config_reload_focus.lua",
     "Scripts/menu_data.lua": "Scripts/menu_data.lua",
     "Scripts/menu_slots.lua": "Scripts/menu_slots.lua",
     "Scripts/mcs_manifest.lua": "Scripts/mcs_manifest.lua",

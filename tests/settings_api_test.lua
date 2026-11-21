@@ -11,7 +11,7 @@ RegisterConsoleCommandHandler=function(command,callback)
  handlers[command]=callback;return true
 end
 local api=require('settings_api')
-assert(api.version==2)
+assert(api.version==3)
 local rejectedCommand='MC_SettingsApplied_v2_'..('Rejected'):gsub('.',function(c) return string.format('%02x',c:byte()) end)
 rejected=rejectedCommand
 assert(not pcall(api.subscribe,'Rejected',function() end))
