@@ -233,4 +233,39 @@ do
     assert(built.detailScroll:GetParent().children[3].content.content.children[2].text=='Off',
         'the next build starts from the saved state, set on the MCS page')
 end
+-- Closing the menu (hostClosing) closes the open preview, and a problem that repeats on every
+-- tick is logged once.
+do
+    local handlers={}
+    local bus={on=function(_,name,callback) handlers[name]=callback end}
+    local logged={}
+    local pages={build=function()
+        local sidePanel,sideScroll=widget('SizeBox'),widget('ScrollBox');sidePanel:SetContent(sideScroll)
+        local built={detailScroll=sideScroll,controls={model={items={{id='A'}},pending={}}}}
+        function built.controls:show() end
+        function built.controls:tick() end
+        return built
+    end}
+    local states={}
+    local watched={SetSharedVariable=function(_,k,v) if k==Preview.STATE then states[#states+1]=v end end}
+    assert(Preview.install(pages,{shared=watched,events=bus,report=function(e,d) logged[#logged+1]=e..' '..d end}))
+    local built=pages.build({},{{id='P',mcPreview={}}},nil,api)
+    built.controls:show(1)
+    assert(states[#states]:find(' open P$'),states[#states])
+    handlers.hostClosing({})
+    assert(states[#states]:find(' closed P$'),'closing the menu closes the preview: '..tostring(states[#states]))
+    handlers.hostClosing({})
+    assert(#states==2,'a second close does nothing')
+    built.controls:show(1)
+    -- A model whose values cannot be encoded fails on every tick.
+    built.controls.model.items[1].mcKeys={'a'};built.controls.model.pending[1]=5
+    built.controls.model.items[1].values=nil
+    local encode=Preview.encode
+    Preview.encode=function() error('broken model') end
+    for _=1,5 do built.controls:tick() end
+    Preview.encode=encode
+    local count=0
+    for _,line in ipairs(logged) do if line:find('broken model',1,true) then count=count+1 end end
+    assert(count==1,'a repeating problem is logged once, not '..count)
+end
 print('PASS preview panel: a 16:9 preview under the description, its host and values shared with the provider')

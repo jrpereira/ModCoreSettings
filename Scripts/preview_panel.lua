@@ -97,6 +97,7 @@ function M.encode(model)
 end
 
 -- options: shared (ModRef), texture(path) -> UTexture2D or nil, report(event,detail),
+-- events (DMM's lifecycle bus, for install: hostClosing closes the preview),
 -- exec(command) runs a console command (through the player's viewport by default),
 -- sound and backdrop {state=} kept between page builds, save(key,state) stores a click.
 function M.wrap(page,providers,api,options)
@@ -359,6 +360,19 @@ function M.install(pages,options)
     options=options or {}
     local sound,backdrop={state=M.DEFAULTS.sound},{state=M.DEFAULTS.backdrop}
     local read,write=options.read,options.write
+    -- Each distinct problem is logged once a session: a failing tick would repeat it.
+    local report,reported=options.report,{}
+    local function once(event,detail)
+        local key=event..'\0'..tostring(detail)
+        if report and not reported[key] then reported[key]=true;report(event,detail) end
+    end
+    -- Closing the menu (DMM's closeHost) closes the open preview; DMM never hides the page.
+    local latest
+    if options.events then
+        options.events:on('hostClosing',function()
+            if latest and latest.mcPreview then latest.mcPreview.close() end
+        end)
+    end
     pages.build=function(tree,providers,status,api)
         local page=build(tree,providers,status,api)
         if read then
@@ -371,6 +385,7 @@ function M.install(pages,options)
         local own={}
         for key,value in pairs(options) do own[key]=value end
         own.tree=tree
+        own.report=once
         own.sound=sound
         own.backdrop=backdrop
         if read and write then
@@ -380,9 +395,10 @@ function M.install(pages,options)
         end
         local ok,result=pcall(M.wrap,page,providers,api,own)
         if not ok then
-            if own.report then own.report('PREVIEW_FAILED',tostring(result)) end
+            once('PREVIEW_FAILED',tostring(result))
             return page
         end
+        latest=result
         return result
     end
     pages.mcPreviewVersion=M.version

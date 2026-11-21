@@ -203,27 +203,37 @@ extension={
         pages.build=function(...) building,gameTree=true,nil;return forget(listed(...)) end
         -- A page's live preview, filled by its provider (ModCore Templates for template pages).
         local textures={}
-        previewPanel.install(pages,{shared=ModRef,report=report,
+        -- FindFirstOf walks the object array: the controller is kept while it stays valid.
+        local controller
+        local function playerController()
+            if not (controller and controller:IsValid()) then controller=FindFirstOf('PlayerController') end
+            return controller and controller:IsValid() and controller or nil
+        end
+        previewPanel.install(pages,{shared=ModRef,report=report,events=bus,
             -- The buttons' states are the MCS page's Previews settings.
             read=function() return io_.read(directory..'../config.ini') end,
             write=function(text) return io_.write(directory..'../config.ini',text) end,
             texture=function(path)
                 local cached=textures[path]
+                -- A picture that failed to import is not tried again this session.
+                if cached==false then return nil end
                 if cached and cached:IsValid() then return cached end
                 local library=StaticFindObject('/Script/Engine.Default__KismetRenderingLibrary')
-                local context=FindFirstOf('PlayerController')
-                if not (library and library:IsValid() and context and context:IsValid()) then return nil end
+                local context=playerController()
+                -- Without a player (the main menu) nothing was tried; a later open retries.
+                if not (library and library:IsValid() and context) then return nil end
                 for _,candidate in ipairs({path,'ue4ss/'..path}) do
                     local ok,texture=pcall(function() return library:ImportFileAsTexture2D(context,candidate) end)
                     if ok and texture and texture:IsValid() then textures[path]=texture;return texture end
                 end
+                textures[path]=false
                 report('PREVIEW_FAILED','background unreadable: '..path)
                 return nil
             end,
             exec=function(command)
-                local controller=FindFirstOf('PlayerController')
-                local viewport=controller and controller:IsValid() and controller.Player and controller.Player.ViewportClient
-                if viewport then viewport:ProcessConsoleExec(command,nil,controller) end
+                local pc=playerController()
+                local viewport=pc and pc.Player and pc.Player.ViewportClient
+                if viewport then viewport:ProcessConsoleExec(command,nil,pc) end
             end})
         -- Around every wrapper but the index refresh, so a rebuild after Apply is guarded too:
         -- the first error makes DMM build its own page for the rest of the session.
