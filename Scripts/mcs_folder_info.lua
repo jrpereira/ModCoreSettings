@@ -17,7 +17,7 @@ local M={schema=2}
 -- .old and .new are safe_file's copies made while it replaces a file.
 local function generated(name)
     local lower=name:lower()
-    return lower=='log_level.txt' or lower:match('%.log$') or lower:match('%.tmp$') or lower:match('%.bak$')
+    return lower:match('%.log$') or lower:match('%.tmp$') or lower:match('%.bak$')
         or lower:match('%.old$') or lower:match('%.new$')
         or (lower:match('%.ini$') and lower~='mod_settings.ini')
 end

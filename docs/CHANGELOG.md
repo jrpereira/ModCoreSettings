@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Logging goes through the UE4SS Lua Log Bridge when it is installed: levels per mod
+  and category from the bridge's settings, changeable in game. Without it, WARN and
+  above go to UE4SS.log as before. `log_level.txt` is no longer read; the vendored
+  `mc_log.lua` (version 2) ignores its `path` option, and its calls are unchanged.
+
 ## v1.9.1
 
 - Options -> Use Compact Style (Off, Index or Everywhere; Off by default): in a loaded game

@@ -11,9 +11,9 @@ local VERSION=(function()
     return value
 end)()
 local Bootstrap=require('dmm_bootstrap')
--- The level comes from log_level.txt in the mod folder; WARN without it.
 local root=source:match('^(.*)[/\\]Scripts[/\\][^/\\]+$')
-local logger=require('mc_log').new({name='ModCoreSettings',path=root and root..'/log_level.txt'})
+-- Levels come from the UE4SS Lua Log Bridge when installed; WARN and above without it.
+local logger=require('mc_log').new({name='ModCoreSettings'})
 local log=require('log_events').reporter(logger)
 local initialized=false
 local function initialize()

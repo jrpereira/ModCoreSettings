@@ -105,8 +105,9 @@ lists tool pages.
 
 ## Logging
 
-Logs appear in `UE4SS.log`. The default level is WARN. For more detail, put
-`debug` in `Mods/1_ModCore_Settings/log_level.txt` and restart.
+Logs appear in `UE4SS.log` at WARN and above. With the UE4SS Lua Log Bridge installed,
+levels are set per mod and category in the bridge's `config.ini` (`[Levels]
+ModCoreSettings=DEBUG`), and the global level on its Logs page.
 
 ## Documentation
 

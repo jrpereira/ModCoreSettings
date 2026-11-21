@@ -13,12 +13,9 @@ local function module(name)
     return value
 end
 
--- Events are written at their level; log_level.txt in the mod folder sets it (WARN without it).
-local report=(function()
-    local root=directory:match('^(.*)[/\\]Scripts[/\\]$')
-    local logger=module('vendor/mc_log').new({name='ModCoreSettings',path=root and root..'/log_level.txt'})
-    return module('log_events').reporter(logger)
-end)()
+-- Events are written at their level, set through the UE4SS Lua Log Bridge when installed
+-- (WARN and above without it).
+local report=module('log_events').reporter(module('vendor/mc_log').new({name='ModCoreSettings'}))
 
 -- Whether a player is in the world: a player controller possessing a pawn. The main menu
 -- has none. DMM asks on every visibility check of a gated page; FindFirstOf searches the
