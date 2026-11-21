@@ -66,6 +66,28 @@ assert(page.controls:tick()==true)
 assert(table.concat(calls,',')=='show,tick,tick,browser,detail 2','links open through the browser')
 assert(page.controls:tick()==false,'a link fires once')
 
+-- A page that fails to open never reaches DMM's tick: the status says so and it is reported.
+do
+    local providers={{id='Source',choices={{id='Link',mcNavigation=true,mcLinkPage='Target'}}},
+        {id='Target',choices={{id='X'}}}}
+    local failing={rows={{providerIndex=1},{providerIndex=2}},controlStatus={}}
+    local linkModel={}
+    function linkModel:set() end
+    function linkModel:dirty() return false end
+    failing.controls={show=function(self) self.model=linkModel end,tick=function() return false end}
+    function failing:showDetail() error('detail broke') end
+    local statuses,reports={},{}
+    Links.wrap(failing,providers,{setText=function(_,copy) statuses[#statuses+1]=copy end},nil,
+        function(event,detail) reports[#reports+1]=event..' '..detail end)
+    failing.controls:show(1)
+    linkModel.mcActivateLink=true
+    linkModel:set(1,0)
+    local ok,result=pcall(failing.controls.tick,failing.controls)
+    assert(ok and result==true,'the failure stays in the wrapper: '..tostring(result))
+    assert(statuses[#statuses]=='Target page is unavailable.' and reports[1]
+        and reports[1]:find('PAGE_LINK_FAILED Target',1,true),tostring(reports[1]))
+end
+
 page,model,calls,texts=setup(true)
 page.controls:show(1)
 model.mcActivateLink=true

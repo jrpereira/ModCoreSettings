@@ -196,7 +196,7 @@ extension={
         end
         menuPages.install(pages,function(content) return choices.parse(content) end,
             menuPages.reader(contributions,ModRef,read,report),report,slots,read,hooked,compile,stored)
-        pageLinks.install(pages,slots)
+        pageLinks.install(pages,slots,report)
         -- Each build lists the game folder afresh, and drops the listing when it ends.
         local listed=pages.build
         local function forget(...) building,gameTree=false,nil;return ... end

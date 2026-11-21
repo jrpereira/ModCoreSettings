@@ -4,7 +4,8 @@ local M={version=1}
 local showSlot
 
 -- slots (optional): the menu_slots controller, which resolves slot addresses.
-function M.wrap(page,providers,api,slots)
+-- report(event,detail) (optional) hears a link that failed to open.
+function M.wrap(page,providers,api,slots,report)
     if type(page)~='table' or type(page.controls)~='table' then return page end
     local controls,pending=page.controls,nil
     local show,tick=controls.show,controls.tick
@@ -32,6 +33,8 @@ function M.wrap(page,providers,api,slots)
     local function status(message)
         if api.setText and page.controlStatus then api.setText(page.controlStatus,message) end
     end
+    -- Opens target's page; false when no listed page has it.
+    local navigate
     function controls:tick(...)
         local result=tick(self,...)
         local target=pending
@@ -41,6 +44,13 @@ function M.wrap(page,providers,api,slots)
             status('Apply or discard changes before leaving this page.')
             return true
         end
+        -- This wrapper runs outside build_guard: a failure must never reach DMM's tick.
+        local ok,opened=pcall(navigate,target)
+        if not ok and report then report('PAGE_LINK_FAILED',target..': '..tostring(opened)) end
+        if not (ok and opened) then status(target..' page is unavailable.') end
+        return true
+    end
+    navigate=function(target)
         local host,slot
         if slots then host,slot=slots.address(target) end
         for index,provider in ipairs(providers) do
@@ -69,15 +79,14 @@ function M.wrap(page,providers,api,slots)
                         page.rows={row}
                         local ok,err=pcall(page.showDetail,page,1)
                         page.rows=listed
-                        assert(ok,err)
+                        if not ok then error(err,0) end
                         if slot then showSlot(page,slot) end
                         return true
                     end
                 end
             end
         end
-        status(target..' page is unavailable.')
-        return true
+        return false
     end
     if type(page.showDetail)=='function' then M.slotLinks(page,providers) end
     return page
@@ -133,12 +142,12 @@ function showSlot(page,slot)
     end
 end
 
-function M.install(pages,slots)
+function M.install(pages,slots,report)
     assert(type(pages)=='table' and type(pages.build)=='function','DMM pages API unavailable')
     if pages.mcPageLinksVersion then return false end
     local build=pages.build
     pages.build=function(tree,providers,status,api)
-        return M.wrap(build(tree,providers,status,api),providers,api,slots)
+        return M.wrap(build(tree,providers,status,api),providers,api,slots,report)
     end
     pages.mcPageLinksVersion=M.version
     return true
