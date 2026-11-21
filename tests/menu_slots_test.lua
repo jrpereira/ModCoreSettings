@@ -496,6 +496,16 @@ mcReadOnly=1
     assert(Slots.load(page,{listed={{contributor='Lister',source=list,settings={'One','Two'}}}},read,spy,report),logs[1])
     assert(text:find('[Category.mcSlot.listed.1]\nmcLabel=Listed\nmcLevel=3\nVisibleWhen=Page',1,true),text)
     assert(page.choices[2].label=='One','the first row keeps its label')
+    -- A row standing in for its group's heading keeps mcCategory under mcSlotGroups.
+    local heading=listing:gsub('Group=First\n','Group=First\nmcCategory=1\n',1)
+    files['/tabs/mod_settings.ini']=tabs
+    page=provider('Tabs','/tabs/mod_settings.ini',tabs)
+    Slots.parse(tabs,page.choices)
+    list=provider('Lister','/list/mod_settings.ini',heading,true)
+    logs={}
+    assert(Slots.load(page,{listed={{contributor='Lister',source=list,settings={'One','Two'}}}},read,spy,report),logs[1])
+    assert(text:find('Label=One\n[^%[]*mcCategory=1\nGroup=mcSlot.listed.1',1,false),text)
+    assert(not text:find('Label=Two\n[^%[]*mcCategory',1,false),'only the row that declares it')
 end
 -- Subgroups keep their category under its slot name, and its drawn heading's label.
 do

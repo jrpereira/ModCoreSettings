@@ -6,7 +6,8 @@ local M={version=1}
 local Manifest=require('mcs_manifest')
 local groupOf=Manifest.groupOf
 -- Inserted rows render as plain DMM controls; source presentation keys are not copied,
--- except a label rule naming an earlier inserted row and a picker's choice notes and sounds.
+-- except a label rule naming an earlier inserted row, a picker's choice notes and sounds,
+-- and, under mcSlotGroups, a row's mcCategory.
 local COPIED={'Id','Type','Label','Description','PresetValues','PresetLabels','Presets','Default',
     'Minimum','Maximum','Step','Decimals','Prefix','Suffix','mcChoiceNotes','mcChoiceSounds','mcChoiceDescriptions','mcReadOnly'}
 
@@ -82,6 +83,9 @@ local function insertion(source,id,slot,number,earlier,first,grouping)
     end
     if named and fields.mcLevel then out[#out+1]='mcLevel='..fields.mcLevel end
     if named and fields.mcCategory then out[#out+1]='mcCategory='..fields.mcCategory end
+    -- Rows that keep their groups (mcSlotGroups) keep a row standing in for its group's
+    -- heading (mcCategory), as a template picker heading its templates' rows.
+    if grouping and found.mcCategory then out[#out+1]='mcCategory='..found.mcCategory end
     -- The host names the first row under mcSlotLabel=1, so it keeps no label rule.
     if not named and (found.mcLabelWhen or found.mcLabels) then
         assert(found.mcLabelWhen and found.mcLabels and earlier[found.mcLabelWhen],

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- A slot whose rows keep their groups (`slotGroups`) also keeps a row that stands in for
+  its group's heading (`mcCategory`), so a contributed picker can head the rows after it.
+
 - Logging goes through the UE4SS Lua Log Bridge when it is installed: levels per mod
   and category from the bridge's settings, changeable in game. Without it, WARN and
   above go to UE4SS.log as before. `log_level.txt` is no longer read; the vendored

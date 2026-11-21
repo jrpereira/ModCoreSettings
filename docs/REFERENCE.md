@@ -285,7 +285,9 @@ Each source group becomes a group of the host, `mcSlot.<slot>.<n>`, headed like 
 group: DMM starts a heading wherever the group changes. One source page's entries share
 its groups. The group keeps its source Category's `mcLabel` (else its name), `mcHeading`,
 `mcLevel`, `mcHelp` and `mcSilent`, and takes the slot group's `VisibleWhen` rule; a
-source group with its own `VisibleWhen` or `mcLabelWhen` skips that entry. A slot group
+source group with its own `VisibleWhen` or `mcLabelWhen` skips that entry. A row keeps
+its `mcCategory`, so a row that stands in for its source group's heading (a group with
+`mcHeading=0`) heads it in the slot too. A slot group
 left without settings of its own is dropped. Host rows after the slot in the slot's group
 would be headed again after the inserted groups, so give such a slot a group of its own.
 
