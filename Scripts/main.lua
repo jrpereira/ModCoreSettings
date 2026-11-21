@@ -50,29 +50,22 @@ local published,publishError=pcall(function()
 end)
 if not published then log('SETTINGS_PAGE_UNAVAILABLE',tostring(publishError)) end
 -- Config reload: MC_ConfigReload_v1 from any state is fanned out here to every module that
--- subscribed (settings_api onReload). A trigger at the main menu waits for a player.
+-- subscribed (settings_api onReload), through the game's viewport: no player is needed.
 local reloading,reloadError=pcall(function()
     local Reload=require('config_reload')
     local ref=assert(rawget(_G,'ModRef'),'ModRef unavailable')
-    local controller
+    local client
     local function viewport()
-        if not (controller and controller:IsValid()) then controller=FindFirstOf('PlayerController') end
-        local pc=controller and controller:IsValid() and controller or nil
-        local client=pc and pc.Player and pc.Player:IsValid() and pc.Player.ViewportClient
-        return client and client:IsValid() and client or nil,pc
+        if not (client and client:IsValid()) then client=FindFirstOf('GameViewportClient') end
+        return client and client:IsValid() and client or nil
     end
     local hub=Reload.hub({shared=ref,report=log,
         ready=function() return viewport()~=nil end,
         exec=function(command)
-            local client,pc=viewport()
-            return client~=nil and client:ProcessConsoleExec(command,nil,pc)==true
+            local target=viewport()
+            return target~=nil and target:ProcessConsoleExec(command,nil,nil)==true
         end})
     Reload.listen(hub,RegisterConsoleCommandHandler,ref,log)
-    -- A trigger kept at the main menu goes out once a player's pawn is set up.
-    pcall(RegisterHook,'/Script/Engine.PlayerController:ClientRestart',function()
-        local ok,why=pcall(hub.flush,hub)
-        if not ok then log('RELOAD_FAILED',tostring(why)) end
-    end)
     -- The game window regaining focus: the Event Bridge's event, when it is installed.
     local subscribed,why=pcall(require('config_reload_focus').subscribe,function()
         local ok,err=pcall(hub.trigger,hub,'focus')

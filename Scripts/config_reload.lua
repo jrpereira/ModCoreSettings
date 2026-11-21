@@ -11,8 +11,9 @@
 --   MC_ConfigReload_v1.ready        '1' once the trigger is handled here
 --   MC_ConfigReload_v1.last         unix time of the last fan-out (else this module's start)
 -- A button press is always fanned out. An automatic trigger (focus, a module) within MERGE
--- seconds of the last fan-out is merged into it and dropped. Without a player (the main menu)
--- a trigger is kept, several kept ones become one, and it is fanned out once a player exists.
+-- seconds of the last fan-out is merged into it and dropped. Commands go through the game's
+-- viewport, so no player is needed (the main menu reloads too); before the viewport exists
+-- (very early startup) a trigger is dropped and logged once.
 local M={TRIGGER='MC_ConfigReload_v1',MERGE=1}
 M.INDEX,M.READY,M.LAST=M.TRIGGER..'.index',M.TRIGGER..'.ready',M.TRIGGER..'.last'
 
@@ -34,12 +35,12 @@ function M.subscribers(text)
     return out
 end
 
--- options: shared (ModRef), exec(command) -> true when run (false or error: no player yet),
--- ready() -> whether a player can receive commands, now() -> unix time, report(event,detail).
+-- options: shared (ModRef), exec(command) -> true when handled, ready() -> whether the game's
+-- viewport exists, now() -> unix time, report(event,detail).
 function M.hub(options)
     local shared,report=options.shared,options.report or function() end
     local now=options.now or os.time
-    local hub={revision=0,pending=nil}
+    local hub={revision=0}
     local reported={}
     local function once(event,detail)
         local key=event..'\0'..detail
@@ -47,16 +48,21 @@ function M.hub(options)
     end
     if shared:GetSharedVariable(M.LAST)==nil then shared:SetSharedVariable(M.LAST,tostring(now())) end
     local lastFanOut
-    -- Fans the kept trigger out, when a player can receive it.
-    function hub:flush()
-        local pending=self.pending
-        if not pending then return false end
-        if options.ready and not options.ready() then return false end
-        self.pending=nil
+    -- reason: 'button' (never merged), 'focus' or a module id. source (optional): a
+    -- subscriber that already reloaded. Returns 'merged', 'dropped' or 'sent'.
+    function hub:trigger(reason,source)
+        assert(type(reason)=='string' and reason:match('^[%w_.:-]+$') and #reason<=128,'invalid reload reason')
+        local skip=source~=nil and hex(source) or nil
+        if reason~='button' and lastFanOut and now()-lastFanOut<M.MERGE then return 'merged' end
+        -- Only before the game's window exists (very early startup): modules have just read
+        -- their files, so nothing is lost.
+        if options.ready and not options.ready() then
+            once('RELOAD_DROPPED','no game viewport yet')
+            return 'dropped'
+        end
         self.revision=self.revision+1
         local time=now()
-        local data=self.revision..'\n'..pending.reason..'\n'..time
-        local skip=pending.source and hex(pending.source)
+        local data=self.revision..'\n'..reason..'\n'..time
         for _,id in ipairs(M.subscribers(shared:GetSharedVariable(M.INDEX))) do
             local command=M.TRIGGER..'_'..id
             if id~=skip and shared:GetSharedVariable(command..'.owner') then
@@ -67,25 +73,7 @@ function M.hub(options)
         end
         lastFanOut=time
         shared:SetSharedVariable(M.LAST,tostring(time))
-        return true
-    end
-    -- reason: 'button' (never merged), 'focus' or a module id. source (optional): a
-    -- subscriber that already reloaded. Returns 'merged', 'kept' or 'sent'.
-    function hub:trigger(reason,source)
-        assert(type(reason)=='string' and reason:match('^[%w_.:-]+$') and #reason<=128,'invalid reload reason')
-        if source~=nil then hex(source) end
-        local manual=reason=='button'
-        if not manual and not self.pending and lastFanOut and now()-lastFanOut<M.MERGE then return 'merged' end
-        -- Kept triggers become one: a press wins over an automatic reason, and a source is
-        -- skipped only when every kept trigger came from it.
-        local pending=self.pending
-        if pending then
-            if manual or pending.reason~='button' then pending.reason=reason end
-            if pending.source~=source then pending.source=nil end
-        else
-            self.pending={reason=reason,source=source}
-        end
-        return self:flush() and 'sent' or 'kept'
+        return 'sent'
     end
     return hub
 end

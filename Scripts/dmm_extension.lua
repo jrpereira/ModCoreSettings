@@ -156,10 +156,9 @@ extension={
             ready=function() return ModRef:GetSharedVariable(Reload.READY)=='1' end,
             last=function() return Reload.lastLoaded(ModRef) end,
             fire=function()
-                local pc=FindFirstOf('PlayerController')
-                local viewport=pc and pc:IsValid() and pc.Player and pc.Player.ViewportClient
-                assert(viewport,'no player to reload for')
-                viewport:ProcessConsoleExec(Reload.TRIGGER..' button',nil,pc)
+                local viewport=FindFirstOf('GameViewportClient')
+                assert(viewport and viewport:IsValid(),'game viewport unavailable')
+                viewport:ProcessConsoleExec(Reload.TRIGGER..' button',nil,nil)
             end}
         local grouping=moduleCategories.reader(directory..'../cache/modules_register.json',directory..'../config.ini',nil,
             {taxonomy=taxonomy,json=indexJson,report=report,seenPath=directory..'../cache/folder_info.json'})

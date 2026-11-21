@@ -481,9 +481,11 @@ the subscriber named as source already reloaded and is skipped.
 
 ModCoreSettings handles the trigger in its own state and runs each subscriber's command
 once. A button press always reloads; an automatic trigger within a second of the last
-reload is merged into it. At the main menu a trigger waits until a player is set up, and
-several waiting triggers become one reload. A subscriber whose command fails is logged once
-as `RELOAD_FAILED`; the others still reload.
+reload is merged into it. Commands go through the game's viewport, so no player is needed:
+the main menu reloads as a loaded game does. Before the viewport exists (very early startup,
+when modules have just read their files) a trigger is dropped and logged once as
+`RELOAD_DROPPED`. A subscriber whose command fails is logged once as `RELOAD_FAILED`; the
+others still reload.
 
 | Shared variable | Value |
 | --- | --- |

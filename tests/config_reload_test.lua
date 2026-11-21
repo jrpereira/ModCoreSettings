@@ -1,12 +1,12 @@
 package.path='Scripts/?.lua;Scripts/vendor/?.lua;'..package.path
 -- Config reload: one trigger fans out to every subscriber; button presses are never merged,
--- automatic triggers within a second are; at the main menu a trigger waits for a player.
+-- automatic triggers within a second are; no player is needed, only the game's viewport.
 local Reload=require('config_reload')
 local vars,ran={},{}
 local shared={GetSharedVariable=function(_,k) return vars[k] end,SetSharedVariable=function(_,k,v) vars[k]=v end}
-local clock,player=1000,false
+local clock,viewport=1000,false
 local reports={}
-local hub=Reload.hub({shared=shared,now=function() return clock end,ready=function() return player end,
+local hub=Reload.hub({shared=shared,now=function() return clock end,ready=function() return viewport end,
     exec=function(command) ran[#ran+1]=command..' '..vars[command..'.data'];return true end,
     report=function(e,d) reports[#reports+1]=e..' '..d end})
 assert(vars[Reload.LAST]=='1000','the start counts as the last load')
@@ -27,11 +27,14 @@ local function deliver()
     ran={}
 end
 
--- No player yet: kept, and several kept triggers become one.
-assert(hub:trigger('focus')=='kept' and hub:trigger('button')=='kept' and #ran==0)
-player=true
-assert(hub:flush() and #ran==2);deliver()
-assert(got[1]=='logs button 1' and got[2]=='controls button','one fan-out, a press winning over focus')
+-- Before the game's viewport exists (very early startup) a trigger is dropped, logged once.
+assert(hub:trigger('focus')=='dropped' and hub:trigger('button')=='dropped' and #ran==0)
+assert(#reports==1 and reports[1]:find('RELOAD_DROPPED',1,true),reports[1])
+reports={}
+-- With it, at the main menu or in game, every subscriber reloads.
+viewport=true
+assert(hub:trigger('button')=='sent' and #ran==2);deliver()
+assert(got[1]=='logs button 1' and got[2]=='controls button','one fan-out to each subscriber')
 -- Automatic triggers within a second of the last fan-out merge; presses never do.
 clock=1000.5
 assert(hub:trigger('focus')=='merged' and #ran==0)
@@ -72,4 +75,4 @@ registered({away_ms=5000})
 assert(focused==1 and onThread,'a regain runs the trigger on the game thread')
 globals.UE4SSLuaEventBridge.onFocusRegained=function() return nil,'limit' end
 assert(not pcall(Focus.subscribe,function() end,globals),'a refusal is an error the caller logs')
-print('PASS config reload fans out once per trigger, merges automatic ones and waits for a player')
+print('PASS config reload fans out once per trigger and merges automatic ones, with or without a player')
