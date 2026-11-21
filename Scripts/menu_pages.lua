@@ -69,9 +69,18 @@ local function generated(contribution,page,parse,hooked,compile,stored)
     -- types (a range or keybind) or a keyed picker has its storage kept by ModCoreSettings.
     -- So does a hooks page whose menu() declares storage and that has no load() of its own;
     -- its action() is kept.
+    -- So does one whose rows are stored in more than one file: DMM keeps one per page.
+    local files,split={},false
+    for _,choice in ipairs(choices) do
+        if choice.file and not (choice.mcNavigation or choice.mcReadOnly) then
+            local file=choice.file:gsub('\\','/'):lower()
+            files[file]=true
+            if next(files,next(files)) then split=true end
+        end
+    end
     if menu and menu.storage and stored and not (hooks and hooks.load) then
         for _,choice in ipairs(choices) do
-            if choice.kind=='extension' or choice.mcKeys then
+            if split or choice.kind=='extension' or choice.mcKeys then
                 local own=hooks
                 hooks,context=stored({id=page.id,configDirectory=page.configDirectory,menu=menu})
                 if own and own.action then

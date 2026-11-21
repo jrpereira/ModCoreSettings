@@ -76,17 +76,17 @@ function M.manifest(hooks,context,compile)
 end
 
 -- Storage hooks for a menu-data page whose storage DMM cannot keep: every stored field's
--- value under its section and key (menu_data.address) in menu.storage.file, relative to the page's
+-- value at its section, key and file (menu_data.address), each file relative to the page's
 -- configDirectory. A range's value and a keyed picker's key are text; every other value is a
 -- number. A missing file or key keeps the default; Apply adds missing keys and keeps every
--- other byte.
+-- other byte of each file.
 -- files (optional) is {read=,write=}, safe_file's by default.
 function M.stored(menu,files)
     local Ini=require('mc_ini')
-    -- As menu_data.address: the field's own section and key, else the menu's and its id.
+    -- As menu_data.address: the field's own section, key and file, else the menu's and its id.
     local function Address(within,field)
         local own=field.storage or {}
-        return own.section or within.section,own.key or field.id
+        return own.section or within.section,own.key or field.id,own.file or within.file
     end
     files=files or require('safe_file')
     local storage=menu.storage
@@ -95,9 +95,9 @@ function M.stored(menu,files)
         local shown=field.widget=='text' or field.widget=='table'
         if not (field.action or field.link or shown) then fields[#fields+1]=field end
     end
-    local function path(context)
+    local function path(context,file)
         assert(type(context.directory)=='string' and context.directory~='','storage needs a configDirectory')
-        return context.directory:gsub('[/\\]+$','')..'/'..storage.file
+        return context.directory:gsub('[/\\]+$','')..'/'..file
     end
     local function text(value)
         if type(value)=='string' then return value end
@@ -105,28 +105,36 @@ function M.stored(menu,files)
     end
     return {contract=M.contract,
         load=function(context)
-            local content=files.read(path(context))
-            if not content then return {} end
-            local doc,values=Ini.parse(content),{}
+            local docs,values={},{}
             for _,field in ipairs(fields) do
-                local section,key=Address(storage,field)
-                local entry=Ini.entries(doc,section,key)[1]
-                local value=entry and entry.value
+                local section,key,file=Address(storage,field)
+                local target=path(context,file)
+                if docs[target]==nil then
+                    local content=files.read(target)
+                    docs[target]=content and Ini.parse(content) or false
+                end
+                local entry=docs[target] and Ini.entries(docs[target],section,key)[1] or nil
+                local value=entry and entry.value or nil
                 if value~=nil then values[field.id]=field.type=='range' and value or tonumber(value) or value end
             end
             return values
         end,
         apply=function(context,values)
-            local file=path(context)
-            local original=files.read(file) or ''
-            local content=original
+            local originals,contents,order={},{},{}
             for _,field in ipairs(fields) do
                 if values[field.id]~=nil then
-                    local section,key=Address(storage,field)
-                    content=Ini.set(content,section,key,text(values[field.id]))
+                    local section,key,file=Address(storage,field)
+                    local target=path(context,file)
+                    if originals[target]==nil then
+                        originals[target]=files.read(target) or '';contents[target]=originals[target]
+                        order[#order+1]=target
+                    end
+                    contents[target]=Ini.set(contents[target],section,key,text(values[field.id]))
                 end
             end
-            if content~=original then files.write(file,content) end
+            for _,target in ipairs(order) do
+                if contents[target]~=originals[target] then files.write(target,contents[target]) end
+            end
             return values
         end}
 end

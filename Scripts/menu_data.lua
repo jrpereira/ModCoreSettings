@@ -7,9 +7,9 @@
 --      groups={<subgroup>,...}},...},
 --  preview={background=<picture path>},               -- optional: a live preview (preview_panel)
 --  fields={{id=,group=,label=,description=,type=,values=,default=,widget=,style=,silent=true,
---      storage={section=,key=},                       -- optional: where this field is stored in
---                                                      -- the menu's storage file (default: the
---                                                      -- menu's section, the field's id)
+--      storage={section=,key=,file=},                 -- optional: where this field is stored
+--                                                      -- (default: the menu's section, the
+--                                                      -- field's id, the menu's file)
 --      conditions=,action=true,link=,slot=,slotLabel=true,slotGroups=true,tabsWidth=,wrap=true,
 --      table={entries={{code=,text=},...},columns=}},...}}
 --
@@ -60,11 +60,17 @@ local Contributions=require('menu_contributions')
 local Range=require('range_editor')
 local M={version=1}
 
--- Where a stored field's value lives in the page's storage file: its own storage.section
--- and storage.key, else the menu's section and the field's id.
+-- Where a stored field's value lives: its own storage.section, storage.key and storage.file,
+-- else the menu's section, the field's id and the menu's file.
 function M.address(storage,field)
     local own=field.storage or {}
-    return own.section or storage.section,own.key or field.id
+    return own.section or storage.section,own.key or field.id,own.file or storage.file
+end
+local function relativeFile(value,where)
+    assert(type(value)=='string' and value~='' and #value<=1024 and not value:find('[%c|;%[%]]')
+        and not value:match('^[/\\]') and not value:match('^%a:') and not value:find('%.%.'),
+        where..' must be relative to configDirectory')
+    return value
 end
 
 local MAX_FIELDS,MAX_GROUPS,MAX_CHOICES,MAX_TABLE=256,256,64,256
@@ -201,14 +207,17 @@ function M.manifest(menu,options)
         if field.storage~=nil then
             assert(storage~=nil,where..': field storage needs the menu\'s storage')
             assert(not (field.action or field.link or shown),where..': only stored fields take storage')
-            allowed(field.storage,{section=true,key=true},where..' storage')
+            allowed(field.storage,{section=true,key=true,file=true},where..' storage')
             if field.storage.section~=nil then identifier(field.storage.section,where..' storage section') end
             if field.storage.key~=nil then identifier(field.storage.key,where..' storage key') end
+            if field.storage.file~=nil then relativeFile(field.storage.file,where..' storage file') end
         end
         if storage and not (field.action or field.link or shown) then
-            local section,key=M.address(storage,field)
-            local target=section..'\0'..key
-            assert(not stored[target],where..': stores at ['..section..'] '..key..' as '..tostring(stored[target])..' does')
+            local section,key,file=M.address(storage,field)
+            -- Windows paths: one file under two spellings is one file.
+            local target=file:gsub('\\','/'):lower()..'\0'..section..'\0'..key
+            assert(not stored[target],where..': stores at '..file..' ['..section..'] '..key..' as '
+                ..tostring(stored[target])..' does')
             stored[target]=field.id
         end
         -- Each choice's value or key -> the number DMM sees: the value itself, or for a keyed
@@ -522,8 +531,8 @@ function M.manifest(menu,options)
         add('mcSlotGroups',field.slotGroups and 1 or nil)
         add('mcSilent',field.silent and 1 or nil)
         if storage and not (field.action or field.link or record.shown) then
-            local section,key=M.address(storage,field)
-            add('ConfigFile',storage.file);add('ConfigSection',section);add('ConfigKey',key)
+            local section,key,file=M.address(storage,field)
+            add('ConfigFile',file);add('ConfigSection',section);add('ConfigKey',key)
         end
         section('Setting.'..field.id,keys)
     end

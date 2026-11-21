@@ -34,8 +34,8 @@ assert(Data.address({section='S'},{id='F'})=='S' and select(2,Data.address({sect
 
 -- Two fields at one section and key, field storage without the menu's, and storage on a
 -- field that is never stored are rejected.
-fails(function() Data.manifest(menu({enum('A',{key='Same'}),enum('B',{key='Same'})})) end,'stores at [npc.attacks] Same as A does')
-fails(function() Data.manifest(menu({enum('A'),enum('B',{key='A'})})) end,'stores at [npc.attacks] A as A does')
+fails(function() Data.manifest(menu({enum('A',{key='Same'}),enum('B',{key='Same'})})) end,'stores at config.ini [npc.attacks] Same as A does')
+fails(function() Data.manifest(menu({enum('A'),enum('B',{key='A'})})) end,'stores at config.ini [npc.attacks] A as A does')
 assert(Data.manifest(menu({enum('A',{section='X',key='K'}),enum('B',{section='Y',key='K'})})),'other sections do not collide')
 fails(function() Data.manifest(menu({enum('A',{key='K'})},false)) end,"field storage needs the menu's storage")
 local button=enum('Go',{key='K'});button.action=true
@@ -60,6 +60,35 @@ assert(loaded.MCT_Span=='20|60' and loaded.Mode==nil and loaded.Level==nil,'each
 hooks.apply(context,{MCT_Span='30|70',Mode='high',Level=7})
 assert(disk['/mods/p/config.ini']=='; kept\n[Preymonition.Omens]\nSpan=30|70\nOther=1\nMode=high\n[npc.attacks]\nSpan=bad\nLevel=7\n',
     disk['/mods/p/config.ini'])
+
+-- A field may name its own file too, relative to configDirectory: rows in two files.
+local twoFiles=menu({enum('PEnabled',{file='9_P/config.ini',section='P.Omens',key='Enabled'}),
+    enum('FEnabled',{file='9_F/config.ini',section='F.Bites',key='Enabled'}),enum('Shared')})
+local split=Data.manifest(twoFiles)
+assert(setting(split,'PEnabled'):find('ConfigFile=9_P/config.ini',1,true) and setting(split,'Shared'):find('ConfigFile=config.ini',1,true))
+assert(Data.manifest(menu({enum('A',{file='a.ini',key='K'}),enum('B',{file='b.ini',key='K'})})),'other files do not collide')
+fails(function() Data.manifest(menu({enum('A',{file='X/a.ini',key='K'}),enum('B',{file='x\\A.INI',key='K'})})) end,'as A does')
+for _,bad in ipairs({'../a.ini','/a.ini','C:/a.ini'}) do
+    fails(function() Data.manifest(menu({enum('A',{file=bad})})) end,'storage file must be relative')
+end
+local mods={['/Mods/9_P/config.ini']='[P.Omens]\nEnabled=1\n'}
+local twoStore=Hooks.stored(twoFiles,{read=function(path) return mods[path] end,write=function(path,text) mods[path]=text end})
+local got=twoStore.load({directory='/Mods/'})
+assert(got.PEnabled==1 and got.FEnabled==nil and got.Shared==nil)
+twoStore.apply({directory='/Mods'},{PEnabled=0,FEnabled=1,Shared=1})
+assert(mods['/Mods/9_P/config.ini']=='[P.Omens]\nEnabled=0\n' and mods['/Mods/9_F/config.ini']:find('%[F%.Bites%]\nEnabled=1')
+    and mods['/Mods/config.ini']:find('%[npc%.attacks%]\nShared=1'),'each row lands in its own file')
+-- A page whose rows use two files is stored by MCS: DMM keeps one file per page.
+local Pages=require('menu_pages')
+local built={}
+Pages.apply(built,{{id='T',pages={{id='T',name='T',configDirectory='/Mods',menu=twoFiles}}}},
+    function(content)
+        local out={}
+        for id,file in content:gmatch('%[Setting%.([^%]]+)%].-ConfigFile=([^\n]+)') do out[#out+1]={id=id,kind='picker',file=file} end
+        return out
+    end,{},function(e,d) error(e..' '..d) end,nil,nil,function(data) return Data.manifest(data) end,
+    function(page) return {contract=1,load=function() return {} end,apply=function(_,v) return v end},{page=page.id} end)
+assert(built[1].mcHooks and built[1].mcHooks.load,'a page split over files gets MCS storage')
 
 -- Through DMM: numbers stored by DMM land at their fields' addresses, missing keys are added
 -- under their sections, and a stored value is read back from its own section only.

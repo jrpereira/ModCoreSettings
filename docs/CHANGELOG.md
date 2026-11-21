@@ -24,8 +24,9 @@
   and Background in previews (On, Blurred, Dimmed or Off) are the live preview's buttons,
   saved in config.ini; a click on a button saves it too.
 - A page link's underline sits just under its letters.
-- A menu-data field may store under its own section and key in its page's storage file,
-  `storage={section=,key=}`; two fields at one section and key reject the page.
+- A menu-data field may store under its own section, key and file,
+  `storage={section=,key=,file=}`; a page whose rows use several files is stored by
+  ModCoreSettings, and two fields at one file, section and key reject the page.
 - A setting may leave out `ConfigFile`, `ConfigSection` and `ConfigKey`: it is stored in
   the page's `config.ini`, in the section named by `[Mod] ConfigSection` (else, when it
   also leaves out `ConfigFile`, by `[Mod] Id`), under its own `Id`. Settings that state them are stored as before.
