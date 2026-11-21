@@ -68,6 +68,19 @@ A row that states `ConfigFile` but no section, on a page without
 added outside every section when missing. All of a page's stored rows must still
 resolve to one file.
 
+### Two ways to build a page
+
+A page has one source, and its owner chooses it:
+
+- **`mod_settings.ini`** in the mod folder, as above, for settings the mod always
+  has. MCS keys DMM ignores add MCS's types and presentation: `Type=range` and
+  `Type=keybind`, nested groups (`mcWithin`), slots (`mcSlot`) and the rest of the
+  [presentation metadata](REFERENCE.md#presentation-metadata).
+- **Generated in Lua**, for pages built at run time from loaded data (templates, live
+  device reads, lists of mods): publish [menu data](REFERENCE.md#menu-data) through
+  `menu_contributions.lua`, with [page hooks](REFERENCE.md#page-hooks) when the page
+  is rebuilt on every menu build or keeps its own storage.
+
 ## React to Apply
 
 Copy `Scripts/vendor/settings_api.lua` unchanged into your mod's `Scripts/vendor`
