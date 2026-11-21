@@ -17,8 +17,12 @@
 - A picker choice may have a description: the side panel shows it after the setting's own
   while that choice is the value.
 - A live preview's buttons read '<name>: <value>', the name dimmed and On and Auto bright,
-  Off italic and dimmed; Sound sits 20 pixels further right, and Focus, left of it, blurs
-  the background picture while on.
+  Off italic and dimmed; Sound sits 20 pixels further right, and Background, left of it,
+  is On (the picture as it is, the default), Blurred, Dimmed (the picture 30% opaque) or
+  Off (a dim light blue screen instead of the picture).
+- The ModCore Settings page's Previews section: Play sound in previews (Auto, On or Off)
+  and Background in previews (On, Blurred, Dimmed or Off) are the live preview's buttons,
+  saved in config.ini; a click on a button saves it too.
 - A page link's underline sits just under its letters.
 - A menu-data field may store under its own section and key in its page's storage file,
   `storage={section=,key=}`; two fields at one section and key reject the page.

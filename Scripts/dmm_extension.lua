@@ -204,6 +204,9 @@ extension={
         -- A page's live preview, filled by its provider (ModCore Templates for template pages).
         local textures={}
         previewPanel.install(pages,{shared=ModRef,report=report,
+            -- The buttons' states are the MCS page's Previews settings.
+            read=function() return io_.read(directory..'../config.ini') end,
+            write=function(text) return io_.write(directory..'../config.ini',text) end,
             texture=function(path)
                 local cached=textures[path]
                 if cached and cached:IsValid() then return cached end

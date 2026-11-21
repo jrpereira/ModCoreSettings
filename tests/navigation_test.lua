@@ -100,12 +100,12 @@ assert(not displayPlan.content:find('Reference',1,true),'references never receiv
 -- MCS's own page, compiled from its menu data as menu_pages compiles it.
 local visuals=require('menu_data').manifest(require('mcs_page'))
 local visualItems=Choices.parse(visuals)
-assert(#visualItems==7)
+assert(#visualItems==9)
 local byId={}
 for index,item in ipairs(visualItems) do
     byId[item.id]=index
     if item.id=='SortBy' or item.id=='PreferredCategoryMinimum' or item.id=='SingleCategory' or item.id=='CompactStyle'
-        or item.id=='ModulesPerRow' then
+        or item.id=='ModulesPerRow' or item.id=='PreviewSound' or item.id=='PreviewBackground' then
         assert(not item.mcNavigation and item.file=='config.ini' and item.section=='Modules')
     elseif item.id=='MCS_Templates' then
         -- The slot ModCore Templates fills: a shown value that stores nothing.
@@ -114,7 +114,7 @@ for index,item in ipairs(visualItems) do
 end
 local mcsPath='/mods/1_ModCore_Settings/config.ini'
 -- As init_config leaves it: every key the page stores (it adds missing ones on open).
-files[mcsPath]='[Modules]\nCompactStyle=1\nSortBy=1\nPreferredCategoryMinimum=2\nSingleCategory=0\nModulesPerRow=2\n'
+files[mcsPath]='[Modules]\nCompactStyle=1\nSortBy=1\nPreferredCategoryMinimum=2\nSingleCategory=0\nModulesPerRow=2\nPreviewSound=1\nPreviewBackground=1\n'
 local visualProvider={id='ModCoreSettings',path='/mods/1_ModCore_Settings/mod_settings.ini',choices=visualItems}
 local visualModel=Choices.open(visualProvider)
 assert(not visualModel.error and not visualModel:dirty())

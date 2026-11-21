@@ -95,9 +95,11 @@ assert(preview.Slot.HorizontalAlignment==1 and preview.Slot.VerticalAlignment==3
     and preview.Slot.Padding.Left==40,'at the bottom, 68 above it, starting 40 in like the header and description text')
 assert(scroll.Slot.Padding.Bottom==324+68+16,'the description stops 16 above the preview')
 local frame=preview.content
-local background,blur,scale=frame.children[1],frame.children[2],frame.children[3]
+local fill,background,blur,scale=frame.children[1],frame.children[2],frame.children[3],frame.children[4]
 assert(blur.kind=='BackgroundBlur' and blur.blur==12 and blur.visible==1,'a blur over the picture, off by default')
-assert(background.texture==texture and background.visible==4,'the background picture fills it')
+assert(background.texture==texture and background.visible==4 and background.opacity==1,'the background picture fills it')
+assert(fill.kind=='Image' and fill.visible==1 and fill.ColorAndOpacity.B>fill.ColorAndOpacity.R
+    and fill.ColorAndOpacity.B<0.5,'a dim light blue screen, for the background off')
 local screen=scale.content
 local host=screen.content
 assert(scale.stretch==2 and screen.WidthOverride==1920 and screen.HeightOverride==1080 and host.kind=='Overlay',
@@ -107,11 +109,11 @@ assert(vars[Preview.VALUES]:match('^%d+\nStyle=fiend\nSize=30|80$'),'with the pa
 assert(commands[#commands]==Preview.COMMAND,'and the provider is told')
 
 -- Under the preview's right end, each in a fixed box so its text never moves it, its text
--- left-aligned: the sound button 20 past the preview's right edge, the focus button left of
+-- left-aligned: the sound button 20 past the preview's right edge, the background button left of
 -- it. Each reads '<name>:' (70% opaque) and its value: On and Auto white and bold, Off
 -- italic and 70% opaque.
-local focusBox,soundBox=stack.children[3],stack.children[4]
-local focusButton,soundButton=focusBox.content,soundBox.content
+local backgroundBox,soundBox=stack.children[3],stack.children[4]
+local backgroundButton,soundButton=backgroundBox.content,soundBox.content
 local function parts(button) local line=button.content;return line,line.children[1],line.children[2] end
 local soundLine,soundPrefix,soundValue=parts(soundButton)
 assert(soundBox.kind=='SizeBox' and soundBox.WidthOverride==150 and soundBox.HeightOverride==32
@@ -120,8 +122,8 @@ assert(soundBox.kind=='SizeBox' and soundBox.WidthOverride==150 and soundBox.Hei
     and soundBox.Slot.HorizontalAlignment==1 and soundBox.Slot.VerticalAlignment==3
     and soundBox.Slot.Padding.Left==40+576-150+20 and soundBox.Slot.Padding.Bottom==68-6-32,
     'the sound button, 20 past the preview\'s right end, its text left-aligned')
-assert(focusBox.WidthOverride==140 and focusBox.Slot.Padding.Left==40+576-150+20-140 and focusBox.visible==4,
-    'the focus button left of it')
+assert(backgroundBox.WidthOverride==230 and backgroundBox.Slot.Padding.Left==40+576-150+20-230 and backgroundBox.visible==4,
+    'the background button left of it')
 assert(soundPrefix.text=='Sound:' and soundPrefix.opacity==0.7 and soundValue.Slot.Padding.Left==6,'Sound: at 70%')
 local function bright(value) return value.ColorAndOpacity.SpecifiedColor.R==1 and value.opacity==1
     and value.Font.TypefaceFontName=='Bold' end
@@ -137,15 +139,23 @@ click()
 assert(vars[Preview.SOUND]=='on' and soundValue.text=='On' and bright(soundValue),'a click turns it on')
 click();assert(vars[Preview.SOUND]=='off' and soundValue.text=='Off' and dim(soundValue),'then off: italic, 70%')
 click();assert(vars[Preview.SOUND]=='auto' and bright(soundValue),'then back to auto')
--- Focus: off by default; on blurs the background picture.
-local _,focusPrefix,focusValue=parts(focusButton)
-assert(focusPrefix.text=='Focus:' and focusValue.text=='Off' and dim(focusValue),'Focus: Off')
+-- Background: on by default, the picture as it is; blurred blurs it; dimmed draws it 30%
+-- opaque; off shows a dim light blue screen instead.
+local _,backgroundPrefix,backgroundValue=parts(backgroundButton)
+assert(backgroundPrefix.text=='Background:' and backgroundValue.text=='On' and bright(backgroundValue),'Background: On')
 local commandsBefore=#commands
-click(focusButton)
-assert(focusValue.text=='On' and bright(focusValue) and blur.visible==4,'Focus: On blurs the picture')
-assert(#commands==commandsBefore,'focus is the panel\'s own, the provider is not told')
-click(focusButton)
-assert(focusValue.text=='Off' and blur.visible==1,'and off again')
+click(backgroundButton)
+assert(backgroundValue.text=='Blurred' and bright(backgroundValue) and blur.visible==4 and background.visible==4
+    and background.opacity==1 and fill.visible==1,'Background: Blurred blurs the picture')
+assert(#commands==commandsBefore,'the background is the panel\'s own, the provider is not told')
+click(backgroundButton)
+assert(backgroundValue.text=='Dimmed' and bright(backgroundValue) and blur.visible==1 and background.visible==4
+    and background.opacity==0.3 and fill.visible==1,'Background: Dimmed draws the picture 30% opaque')
+click(backgroundButton)
+assert(backgroundValue.text=='Off' and dim(backgroundValue) and blur.visible==1 and background.visible==1
+    and fill.visible==4,'Background: Off, a dim light blue screen')
+click(backgroundButton)
+assert(backgroundValue.text=='On' and background.visible==4 and background.opacity==1 and fill.visible==1,'and on again')
 -- The selected setting is shared, for auto.
 page.controls.current=2
 page.controls:tick()
@@ -160,12 +170,12 @@ assert(#commands==sent+1 and vars[Preview.VALUES]:find('Size=40|90',1,true),'a c
 
 -- Hiding the page closes the preview and gives the description its height back.
 page.controls:hide()
-assert(hidden==1 and preview.visible==1 and soundBox.visible==1 and focusBox.visible==1 and scroll.Slot.Padding.Bottom==0
+assert(hidden==1 and preview.visible==1 and soundBox.visible==1 and backgroundBox.visible==1 and scroll.Slot.Padding.Bottom==0
     and vars[Preview.HOST]==nil and vars[Preview.STATE]:match('^%d+ closed P$'),'closing hides it and tells the provider')
 -- Showing it again reuses the same panel.
 page.controls:show(1)
 assert(panel.content==stack and #stack.children==4 and preview.visible==4 and soundBox.visible==4
-    and focusBox.visible==4,'reopened in place')
+    and backgroundBox.visible==4,'reopened in place')
 -- A plain page after it closes the preview.
 page.controls:show(2)
 assert(preview.visible==1 and vars[Preview.STATE]:match(' closed P$'),'switching to a page without one closes it')
@@ -173,10 +183,54 @@ assert(preview.visible==1 and vars[Preview.STATE]:match(' closed P$'),'switching
 -- an Image without a texture would draw a white box.
 page.controls:show(3)
 assert(preview.visible==4 and background.visible==1 and vars[Preview.STATE]:match(' open Bare$'),'no picture, no background')
+-- On, blurred or dimmed without a picture shows nothing behind the host; off the screen.
+assert(blur.visible==1 and fill.visible==1,'on, no picture: nothing behind')
+click(backgroundButton)
+assert(background.visible==1 and blur.visible==1 and fill.visible==1,'blurred, no picture: nothing behind')
+click(backgroundButton);click(backgroundButton)
+assert(fill.visible==4,'off: the screen')
 page.controls:show(1)
-assert(background.visible==4,'a page with a picture shows it again')
+assert(background.texture==texture and background.visible==1 and fill.visible==4,
+    'a page with a picture loads it again, behind the screen while the background is off')
+click(backgroundButton)
+assert(background.visible==4,'and shows it on')
 page.controls:show(4)
 assert(preview.visible==4 and background.visible==1,'an unreadable picture leaves the preview without one')
 page.controls:hide()
 assert(#reports==0,table.concat(reports,'; '))
+-- Installed, the buttons start from config.ini's [Modules] PreviewSound and
+-- PreviewBackground at each build, and a click saves the new state there.
+local saved=Preview.saved('[Modules]\nPreviewSound = off\nPreviewBackground=dimmed\n')
+assert(saved.sound=='off' and saved.backdrop=='dimmed','the saved states')
+saved=Preview.saved('[Modules]\nPreviewSound=loud\n')
+assert(saved.sound=='auto' and saved.backdrop=='on','unset or unknown: the defaults')
+do
+    local config='[Modules]\nSortBy=1\nPreviewBackground=blurred\n'
+    local pages={build=function(tree)
+        local sidePanel,sideScroll=widget('SizeBox'),widget('ScrollBox');sidePanel:SetContent(sideScroll)
+        local built={detailScroll=sideScroll,controls={model={items={},pending={}}}}
+        function built.controls:show() end
+        function built.controls:tick() end
+        return built
+    end}
+    assert(Preview.install(pages,{shared=shared,tree={},texture=function() return texture end,
+        read=function() return config end,write=function(text) config=text end}))
+    local built=pages.build({},{{id='P',mcPreview={background='x.jpg'}}},nil,api)
+    built.controls:show(1)
+    local box=built.detailScroll:GetParent()
+    local frame2=box.children[2].content
+    assert(frame2.children[3].visible==4,'built blurred, as saved')
+    local button=box.children[3].content
+    local _,_,value=button.content,nil,button.content.children[2]
+    assert(value.text=='Blurred','the button reads the saved state')
+    button.pressed,button.hovered=true,true;built.controls:tick()
+    button.pressed=false;built.controls:tick()
+    assert(value.text=='Dimmed' and config:find('PreviewBackground=dimmed',1,true) and config:find('SortBy=1',1,true),
+        'a click saves the new state, other settings kept: '..config)
+    config=config:gsub('PreviewBackground=dimmed','PreviewBackground=off')
+    built=pages.build({},{{id='P',mcPreview={background='x.jpg'}}},nil,api)
+    built.controls:show(1)
+    assert(built.detailScroll:GetParent().children[3].content.content.children[2].text=='Off',
+        'the next build starts from the saved state, set on the MCS page')
+end
 print('PASS preview panel: a 16:9 preview under the description, its host and values shared with the provider')

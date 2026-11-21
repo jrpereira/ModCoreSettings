@@ -87,6 +87,10 @@ Settings page sets the rest:
 - **Use Compact Style** (Off, Index or Everywhere) gives the mod menu the pause menu's
   look in a loaded game: the game blurred behind a dark panel down the left and the page
   drawn smaller, on the mod list only (Index) or on every page.
+- Under **Previews**, **Play sound in previews** (Auto, On or Off; Auto plays a page's
+  preview sounds only while the selected setting is about sound) and **Background in
+  previews** (On, Blurred, Dimmed or Off, a plain light blue screen) set the two buttons
+  under a page's live preview, which save their clicks there too.
 
 A module whose `mod.json` dependencies are not all loaded at a version they accept
 carries a red ⚠ at the right of its row. Its details list each requirement after

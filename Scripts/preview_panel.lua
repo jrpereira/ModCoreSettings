@@ -22,22 +22,31 @@ M.SOUND,M.FOCUS='MCS.Preview.v1.sound','MCS.Preview.v1.focus'
 -- The sound button's states, in click order: auto lets the provider decide (Preymonition
 -- plays its sounds while a sound setting is selected), on always, off never.
 M.SOUNDS={'auto','on','off'}
--- The focus button's: on blurs the background picture, so what the provider draws over it
--- stands out.
-M.FOCUSES={'off','on'}
-local VALUE_LABELS={auto='Auto',on='On',off='Off'}
+-- The background button's: on shows the picture as it is, blurred blurs it and dimmed draws
+-- it DIMMED opaque, so what the provider draws over it stands out; off hides it behind a dim
+-- light blue screen.
+M.BACKGROUNDS={'on','blurred','dimmed','off'}
+-- Both buttons are the MCS page's Previews settings, [Modules] PreviewSound and
+-- PreviewBackground in config.ini: a page build starts from the saved states, and a click
+-- saves the new one.
+M.KEYS={sound='PreviewSound',backdrop='PreviewBackground'}
+M.DEFAULTS={sound='auto',backdrop='on'}
+local STATES={sound=M.SOUNDS,backdrop=M.BACKGROUNDS}
+local VALUE_LABELS={auto='Auto',on='On',off='Off',blurred='Blurred',dimmed='Dimmed'}
 -- The preview in DMM's 1280-wide page: 16:9, as wide as the description inside the side
 -- panel's 630 (its 40 and 12 margins leave 578), starting where the header and description
 -- text do, PREVIEW_LEFT in; its bottom PREVIEW_BOTTOM above the panel's; the description
 -- keeps PREVIEW_GAP above it.
 local PREVIEW_WIDTH,PREVIEW_HEIGHT,PREVIEW_BOTTOM,PREVIEW_GAP,PREVIEW_LEFT=576,324,68,16,40
 -- Under the preview's right end, SOUND_GAP below it: the sound button, SOUND_SHIFT past
--- the preview's right edge, and the focus button left of it. Each sits in a box of fixed
+-- the preview's right edge, and the background button left of it. Each sits in a box of fixed
 -- size, its text left-aligned, so the value changing never moves it. A button reads
 -- '<name>: <value>': the name PREFIX_OPACITY opaque; On and Auto bright white and bold, Off
--- italic and PREFIX_OPACITY opaque. BLUR is the focused background's blur strength.
-local SOUND_WIDTH,SOUND_HEIGHT,SOUND_GAP,SOUND_SHIFT,FOCUS_WIDTH=150,32,6,20,140
-local PREFIX_OPACITY,VALUE_GAP,BLUR=0.7,6,12
+-- -- italic and PREFIX_OPACITY opaque. BLUR is the blurred background's blur strength, DIMMED
+-- the dimmed picture's opacity, SCREEN_COLOR the dim light blue shown with the background off.
+local SOUND_WIDTH,SOUND_HEIGHT,SOUND_GAP,SOUND_SHIFT,BACKGROUND_WIDTH=150,32,6,20,230
+local PREFIX_OPACITY,VALUE_GAP,BLUR,DIMMED=0.7,6,12,0.3
+local SCREEN_COLOR={R=0.15,G=0.24,B=0.3,A=1}
 local WHITE={SpecifiedColor={R=1,G=1,B=1,A=1},ColorUseRule=0}
 
 -- The face of a label's font whose name holds word ('bold', 'italic'), or '' when it has
@@ -89,7 +98,7 @@ end
 
 -- options: shared (ModRef), texture(path) -> UTexture2D or nil, report(event,detail),
 -- exec(command) runs a console command (through the player's viewport by default),
--- sound {state=} kept between page builds.
+-- sound and backdrop {state=} kept between page builds, save(key,state) stores a click.
 function M.wrap(page,providers,api,options)
     if type(page)~='table' or type(page.controls)~='table' or not page.detailScroll then return page end
     local shared,report=options.shared,options.report or function() end
@@ -99,10 +108,20 @@ function M.wrap(page,providers,api,options)
     local current,shownValues=nil,nil
     local box,preview,background,host
     local sound=options.sound or {state='auto'}
-    local focusing=options.focus or {state='off'}
+    local backdrop=options.backdrop or {state=M.DEFAULTS.backdrop}
     local buttons={}
-    local blur
+    local blur,screenFill,pictured
     local focus
+    -- The background button's state: the picture (when there is one) blurred or dimmed, or
+    -- hidden behind the dim light blue screen.
+    local function showBackground()
+        if not background then return end
+        local state=backdrop.state
+        screenFill:SetVisibility(state=='off' and 4 or 1)
+        background:SetVisibility((pictured and state~='off') and 4 or 1)
+        background:SetRenderOpacity(state=='dimmed' and DIMMED or 1)
+        blur:SetVisibility((pictured and state=='blurred') and 4 or 1)
+    end
 
     -- The side panel: the description's scroll, and the preview at its bottom.
     local function build()
@@ -117,15 +136,21 @@ function M.wrap(page,providers,api,options)
         preview:SetClipping(1)
         local frame=new('Overlay')
         api.need(preview:SetContent(frame),'MCS preview frame')
+        -- The background off: a plain dim light blue screen, a tinted Image without texture.
+        screenFill=new('Image')
+        screenFill:SetColorAndOpacity(SCREEN_COLOR)
+        local fillSlot=frame:AddChildToOverlay(screenFill)
+        fillSlot:SetHorizontalAlignment(0);fillSlot:SetVerticalAlignment(0)
+        screenFill:SetVisibility(1)
         background=new('Image')
         local backgroundSlot=frame:AddChildToOverlay(background)
         backgroundSlot:SetHorizontalAlignment(0);backgroundSlot:SetVerticalAlignment(0)
-        -- Focus blurs the picture behind it, not what the host draws over it.
+        -- Blurred blurs the picture behind it, not what the host draws over it.
         blur=new('BackgroundBlur')
         blur:SetBlurStrength(BLUR)
         local blurSlot=frame:AddChildToOverlay(blur)
         blurSlot:SetHorizontalAlignment(0);blurSlot:SetVerticalAlignment(0)
-        blur:SetVisibility(focusing.state=='on' and 4 or 1)
+        blur:SetVisibility(1)
         local scale=new('ScaleBox');scale:SetStretch(2)
         local scaleSlot=frame:AddChildToOverlay(scale)
         scaleSlot:SetHorizontalAlignment(0);scaleSlot:SetVerticalAlignment(0)
@@ -137,12 +162,12 @@ function M.wrap(page,providers,api,options)
         previewSlot:SetHorizontalAlignment(1);previewSlot:SetVerticalAlignment(3)
         previewSlot:SetPadding({Left=PREVIEW_LEFT,Top=0,Right=0,Bottom=PREVIEW_BOTTOM})
         preview:SetVisibility(1)
-        -- The focus and sound buttons, under the preview's right end.
+        -- The background and sound buttons, under the preview's right end.
         if api.button then
             local soundLeft=PREVIEW_LEFT+PREVIEW_WIDTH-SOUND_WIDTH+SOUND_SHIFT
             for _,spec in ipairs({
-                {name='Focus',states=M.FOCUSES,kept=focusing,width=FOCUS_WIDTH,left=soundLeft-FOCUS_WIDTH},
-                {name='Sound',states=M.SOUNDS,kept=sound,width=SOUND_WIDTH,left=soundLeft}}) do
+                {name='Background',key=M.KEYS.backdrop,states=M.BACKGROUNDS,kept=backdrop,width=BACKGROUND_WIDTH,left=soundLeft-BACKGROUND_WIDTH},
+                {name='Sound',key=M.KEYS.sound,states=M.SOUNDS,kept=sound,width=SOUND_WIDTH,left=soundLeft}}) do
                 local button,label=api.button(options.tree,'')
                 button.IsFocusable=false
                 -- '<name>:' and the value, two texts in the button's own font, left-aligned.
@@ -228,8 +253,9 @@ function M.wrap(page,providers,api,options)
             -- Without a picture, or one that cannot be read, nothing shows behind the
             -- host: an Image without a texture would draw a white box.
             local texture=spec.background and options.texture and options.texture(spec.background)
-            if texture then background:SetBrushFromTexture(texture,false);background:SetVisibility(4)
-            else background:SetVisibility(1) end
+            if texture then background:SetBrushFromTexture(texture,false) end
+            pictured=texture~=nil and texture~=false
+            showBackground()
             preview:SetVisibility(4)
             for _,entry in ipairs(buttons) do entry.box:SetVisibility(4) end
             box:SetPadding({Left=0,Top=0,Right=0,Bottom=PREVIEW_HEIGHT+PREVIEW_BOTTOM+PREVIEW_GAP})
@@ -267,8 +293,12 @@ function M.wrap(page,providers,api,options)
                         spec.kept.state=spec.states[index%#spec.states+1]
                         local styled,why=pcall(M.styleValue,entry,spec.kept.state)
                         if not styled then report('PREVIEW_FAILED',tostring(why)) end
-                        if spec.name=='Focus' then
-                            if blur then blur:SetVisibility(spec.kept.state=='on' and 4 or 1) end
+                        if options.save then
+                            local saved,err=pcall(options.save,spec.key,spec.kept.state)
+                            if not saved then report('PREVIEW_FAILED','saving '..spec.key..': '..tostring(err)) end
+                        end
+                        if spec.name=='Background' then
+                            showBackground()
                         elseif shared then
                             shared:SetSharedVariable(M.SOUND,sound.state)
                             if options.exec then pcall(options.exec,M.COMMAND) end
@@ -284,7 +314,7 @@ function M.wrap(page,providers,api,options)
     return page
 end
 
--- Shows a button's value for state: On and Auto bright white in the font's bold face;
+-- Shows a button's value for state: any but Off bright white in the font's bold face;
 -- Off in its italic face (or slanted, without one) and PREFIX_OPACITY opaque.
 function M.styleValue(entry,state)
     local value,base=entry.value,entry.base
@@ -305,20 +335,49 @@ function M.styleValue(entry,state)
     end
 end
 
--- options as for wrap; tree and api come from each build.
+-- The saved button states in config.ini text: {sound=,backdrop=}, an unset or unknown
+-- value as its default.
+function M.saved(text)
+    local Ini=require('mc_ini')
+    local states={}
+    for name,key in pairs(M.KEYS) do
+        local ok,entry=pcall(function() return Ini.entries(Ini.parse(text or ''),'Modules',key)[1] end)
+        local value=ok and entry and entry.value:match('^%s*(.-)%s*$')
+        states[name]=M.DEFAULTS[name]
+        for _,state in ipairs(STATES[name]) do if state==value then states[name]=value end end
+    end
+    return states
+end
+
+-- options as for wrap, and read() -> config.ini text, write(text) saves it; tree and api come
+-- from each build.
 function M.install(pages,options)
     assert(type(pages)=='table' and type(pages.build)=='function','DMM pages API unavailable')
     if pages.mcPreviewVersion then return false end
     local build=pages.build
-    -- The sound and focus buttons' states last the session.
-    local sound,focus={state='auto'},{state='off'}
+    -- The sound and background buttons' states: the saved ones at each build, else the last.
+    options=options or {}
+    local sound,backdrop={state=M.DEFAULTS.sound},{state=M.DEFAULTS.backdrop}
+    local read,write=options.read,options.write
     pages.build=function(tree,providers,status,api)
         local page=build(tree,providers,status,api)
+        if read then
+            local ok,text=pcall(read)
+            if ok and type(text)=='string' then
+                local states=M.saved(text)
+                sound.state,backdrop.state=states.sound,states.backdrop
+            end
+        end
         local own={}
-        for key,value in pairs(options or {}) do own[key]=value end
+        for key,value in pairs(options) do own[key]=value end
         own.tree=tree
         own.sound=sound
-        own.focus=focus
+        own.backdrop=backdrop
+        if read and write then
+            own.save=function(key,state)
+                write(require('mc_ini').set(read() or '','Modules',key,state))
+            end
+        end
         local ok,result=pcall(M.wrap,page,providers,api,own)
         if not ok then
             if own.report then own.report('PREVIEW_FAILED',tostring(result)) end

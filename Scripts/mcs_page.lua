@@ -6,9 +6,10 @@ return {
     storage={file='config.ini',section='Modules'},
     groups={
         {id='Pages',style='none'},
-        -- The Modules tab's settings, under Options and Listing headings.
+        -- The Modules tab's settings, under Options, Listing and Previews headings.
         {id='Options',conditions={visible={field='MCS_Page',values={0}}}},
         {id='Listing',conditions={visible={field='MCS_Page',values={0}}}},
+        {id='Previews',conditions={visible={field='MCS_Page',values={0}}}},
         -- The Templates tab: one slot that ModCore Templates fills with every loaded template.
         {id='Templates',style='none',conditions={visible={field='MCS_Page',values={1}}}},
     },
@@ -43,6 +44,19 @@ return {
         {id='ModulesPerRow',group='Listing',label='Modules per row',default=2,
             description='Columns in the mod list, in every sort.',
             values={{value=1,label='1'},{value=2,label='2'},{value=3,label='3'}}},
+        -- The live preview's two buttons (preview_panel), which save their clicks here too.
+        {id='PreviewSound',group='Previews',label='Play sound in previews',default='auto',
+            description='Whether a page\'s live preview plays its sounds. The Sound button under the preview cycles the same choices.',
+            values={{key='auto',label='Auto',
+                    description='Only while the selected setting is about sound, such as a sound or its volume.'},
+                {key='on',label='On',description='Always.'},
+                {key='off',label='Off',description='Never.'}}},
+        {id='PreviewBackground',group='Previews',label='Background in previews',default='on',
+            description='How a page\'s live preview shows its background picture, so what is drawn over it stands out. The Background button under the preview cycles the same choices.',
+            values={{key='on',label='On',description='The picture as it is.'},
+                {key='blurred',label='Blurred',description='The picture blurred.'},
+                {key='dimmed',label='Dimmed',description='The picture faded to 30%.'},
+                {key='off',label='Off',description='A plain dim light blue screen instead of the picture.'}}},
         -- Shown as is until ModCore Templates fills it (settings:templates); its rows keep
         -- their own groups, one heading per template category.
         {id='MCS_Templates',group='Templates',label='Templates',widget='text',default=0,
