@@ -1,6 +1,8 @@
 {
   "allowed_paths": [],
   "vendored": {
+    ".github/workflows/release.yml": "ModCoreSettings",
+    ".github/workflows/repository-hygiene.yml": "ModCoreSettings",
     "Scripts/vendor/mc_ini.lua": "ModCoreSettings",
     "Scripts/vendor/mc_log.lua": "ModCoreSettings",
     "Scripts/vendor/menu_contributions.lua": "ModCoreSettings",
