@@ -41,8 +41,8 @@ local PREVIEW_WIDTH,PREVIEW_HEIGHT,PREVIEW_BOTTOM,PREVIEW_GAP,PREVIEW_LEFT=576,3
 -- Under the preview's right end, SOUND_GAP below it: the sound button, SOUND_SHIFT past
 -- the preview's right edge, and the background button left of it. Each sits in a box of fixed
 -- size, its text left-aligned, so the value changing never moves it. A button reads
--- '<name>: <value>': the name PREFIX_OPACITY opaque; On and Auto bright white and bold, Off
--- -- italic and PREFIX_OPACITY opaque. BLUR is the blurred background's blur strength, DIMMED
+-- '<name>: <value>': the name PREFIX_OPACITY opaque; any state but Off bright white and
+-- bold, Off italic and PREFIX_OPACITY opaque. BLUR is the blurred background's blur strength, DIMMED
 -- the dimmed picture's opacity, SCREEN_COLOR the dim light blue shown with the background off.
 local SOUND_WIDTH,SOUND_HEIGHT,SOUND_GAP,SOUND_SHIFT,BACKGROUND_WIDTH=150,32,6,20,230
 local PREFIX_OPACITY,VALUE_GAP,BLUR,DIMMED=0.7,6,12,0.3

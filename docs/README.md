@@ -89,7 +89,7 @@ Settings page sets the rest:
   drawn smaller, on the mod list only (Index) or on every page.
 - Under **Previews**, **Play sound in previews** (Auto, On or Off; Auto plays a page's
   preview sounds only while the selected setting is about sound) and **Background in
-  previews** (On, Blurred, Dimmed or Off, a plain light blue screen) set the two buttons
+  previews** (On, Blurred, Dimmed or Off, a dim light blue screen) set the two buttons
   under a page's live preview, which save their clicks there too.
 
 A module whose `mod.json` dependencies are not all loaded at a version they accept
