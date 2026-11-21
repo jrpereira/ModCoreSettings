@@ -37,6 +37,9 @@ fails('configDirectory needs a manifest','MCT',{pages={{id='MCT',name='a',config
 fails('folder name','MCT',{pages={{id='MCT',name='a',attach='Mods/x'}}})
 fails('invalid page 1 group','MCT',{pages={{id='MCT',name='a',group='core'}}})
 assert(Menu.validate('MCD',{pages={{id='MCD.sounds',name='Sounds Explorer',group='tool'}}}),'tool pages are valid')
+assert(Menu.validate('MCC',{pages={{id='MCC',name='Controls'},{id='MCC.keys',name='Keys',under='MCC',group='inner'}}}),
+    'inner pages are valid')
+fails('an inner page needs under','MCC',{pages={{id='MCC.keys',name='Keys',group='inner'}}})
 fails('invalid page 1 name','MCT',{pages={{id='MCT',name='a\nb'}}})
 fails('unknown contribution field','MCT',{pages={},aggregate={}})
 

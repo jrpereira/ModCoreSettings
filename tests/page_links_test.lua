@@ -207,4 +207,88 @@ do
     assert(f.page.controls:tick()==true and f.texts[1]=='controls:visuals page is unavailable.')
 end
 
+-- Back on a page a link opened returns to the link's page, revealing and selecting its row;
+-- a chain unwinds in order, and a page opened from the browser forgets the trail.
+do
+    local calls={}
+    local function items(link)
+        return {
+            {id='Tab',mcNavigation=true,values={0,1},visibility={}},
+            {id='Link',mcNavigation=true,mcLinkPage=link,visibility={{target=1,values={[1]=true}}}},
+        }
+    end
+    local providers={
+        {id='Main',choices=items('Main.inner')},
+        {id='Main.inner',mcBrowserHidden=true,choices=items('Deep')},
+        {id='Deep',choices={{id='X',visibility={}}}},
+        {id='Other',choices={{id='Y',visibility={}}}},
+    }
+    local page={rows={{providerIndex=1},{providerIndex=3},{providerIndex=4}},controlStatus={},mode='browser'}
+    page.allRows={page.rows[1],{providerIndex=2},page.rows[2],page.rows[3]}
+    local models={}
+    page.controls={tick=function() return false end,
+        show=function(self,index)
+            local model={items=providers[index].choices,pending={0,0},sets={}}
+            function model:set(i,value) self.pending[i]=value;self.sets[#self.sets+1]=self.items[i].id..'='..value end
+            function model:dirty() return false end
+            self.model=model;models[index]=model
+        end,
+        refresh=function() calls[#calls+1]='refresh' end,
+        select=function(_,index,keyboard) calls[#calls+1]='select '..index..tostring(keyboard) end}
+    function page:showBrowser() self.mode='browser';calls[#calls+1]='browser' end
+    function page:showDetail(row)
+        local index=self.rows[row].providerIndex
+        self.mode='detail';calls[#calls+1]='detail '..providers[index].id
+        self.controls:show(index)
+    end
+    local reports={}
+    local built=Links.wrap(page,providers,{},nil,function(event,detail) reports[#reports+1]=event..' '..detail end)
+    local function follow()
+        local model=built.controls.model
+        model.mcActivateLink=true;model:set(2,0)
+        assert(built.controls:tick()==true)
+    end
+    built:showDetail(1)
+    models[1]:set(1,1)
+    follow()
+    assert(built.controls.model==models[2],'the inner page opens')
+    follow()
+    assert(built.controls.model==models[3],'a link on the inner page opens the next one')
+    calls={}
+    -- DMM's Back: showBrowser, then the page is back in detail.
+    built:showBrowser()
+    assert(built.mode=='detail' and built.controls.model==models[2],table.concat(calls,','))
+    assert(built.rows[1].providerIndex==1,'the listed rows return after a hidden page reopens')
+    built.controls:tick()
+    assert(table.concat(calls,',')=='browser,browser,detail Main.inner,refresh,select 2true',table.concat(calls,','))
+    assert(table.concat(models[2].sets,',')=='Tab=1','the link row is revealed again')
+    calls={}
+    built:showBrowser()
+    built.controls:tick()
+    assert(built.controls.model==models[1] and table.concat(calls,',')=='browser,browser,detail Main,refresh,select 2true',
+        table.concat(calls,','))
+    calls={}
+    built:showBrowser()
+    assert(built.mode=='browser' and table.concat(calls,',')=='browser','Back on the first page reaches the browser')
+    -- Opened from the browser, a page starts a new trail.
+    built:showDetail(1)
+    follow()
+    built:showBrowser()
+    built:showDetail(3)
+    calls={}
+    built:showBrowser()
+    assert(built.mode=='browser' and table.concat(calls,',')=='browser','a page opened from the browser goes back to it')
+    -- A page that cannot reopen leaves the browser showing and is reported.
+    built:showDetail(1)
+    follow();follow()
+    page.allRows={page.rows[1],page.rows[2],page.rows[3]}
+    calls={}
+    built:showBrowser()
+    assert(built.mode=='browser' and table.concat(calls,',')=='browser',table.concat(calls,','))
+    assert(reports[1] and reports[1]:find('PAGE_LINK_FAILED return to Main.inner',1,true),tostring(reports[1]))
+    calls={}
+    built:showBrowser()
+    assert(table.concat(calls,',')=='browser','the trail is dropped after a failed return')
+end
+
 print('PASS page links open targets through the browser and refuse dirty pages')

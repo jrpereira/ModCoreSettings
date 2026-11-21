@@ -37,8 +37,10 @@ settings as [`menu` data](#menu-data) (preferred) or a `manifest`, either with
 contributor) or `attach` (a mod folder name). `link` makes a
 [slot link](#slot-rows) entry. `group='tool'` lists the page only on the ModCore
 Settings page's Developer Tools tab, which opens it; the mod list does not show it.
-A tool page needs settings, as any page DMM opens does. `group='module'` is accepted
-and has no effect.
+A tool page needs settings, as any page DMM opens does. `group='inner'` makes an inner
+page: it needs `under`, is listed nowhere, and opens only through a
+[page link](#page-links), typically a row on its parent; Back returns to the link's page.
+`group='module'` is accepted and has no effect.
 
 Placement on every menu build:
 
@@ -409,6 +411,26 @@ navigation pickers so the slot shows, and selects the slot's first row. With
 `mcType=tab`, a link shows its first choice as underlined text in a picker's value
 column, dimmed until hovered or selected. Its label lines up with the rows around it.
 `mcLevel=5` sets the row label in small (12pt) muted text, which suits a notice.
+
+Back on a page a link opened returns to the page the link was on, sets its navigation
+pickers so the link's row shows, and selects that row; Back there goes on as before, so a
+chain of links unwinds in order. A page opened from the mod list starts afresh, and with
+unapplied changes Back still asks to apply or discard them first. So a page with
+`under` pages marked `group='inner'` and link rows to them reads as one page with inner
+pages, each with its own Apply:
+
+```ini
+[Setting.Example_Keys]
+Id=Example_Keys
+Label=Keys
+Type=picker
+Default=0
+PresetValues=0|1
+PresetLabels=edit|edit
+mcNavigation=1
+mcType=tab
+mcLinkPage=ExampleMod.keys
+```
 
 ### Live preview
 

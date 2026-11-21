@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Inner pages: a contributed page with `group='inner'` and `under` is listed nowhere and
+  opens through a page link. Back on any page a link opened now returns to the link's
+  page with its row selected, instead of to the mod list; a chain of links unwinds in
+  order. The vendored `menu_contributions.lua` is version 9.
+
 - A slot whose rows keep their groups (`slotGroups`) also keeps a row that stands in for
   its group's heading (`mcCategory`), so a contributed picker can head the rows after it.
 

@@ -78,6 +78,13 @@ Pages.apply(toolProviders,{{id='MCD',pages={{id='MCD.sounds',name='Sounds Explor
     manifest=manifest,configDirectory='/d'}}}},parse,{},report)
 expect(toolProviders,'Alpha,MCD.sounds,Zeta','tool pages are sorted by name')
 assert(toolProviders[2].mcBrowserGroup=='tool' and toolProviders[2].mcBrowserIndent==nil)
+-- An inner page follows its parent like any child page, never listed: links open it.
+local innerProviders={mod('Alpha'),mod('Zeta')}
+Pages.apply(innerProviders,{{id='MCC',pages={{id='MCC',name='Controls',attach='Alpha',manifest=manifest,configDirectory='/c'},
+    {id='MCC.keys',name='Keys',under='MCC',group='inner',manifest=manifest,configDirectory='/c'}}}},parse,{},report)
+expect(innerProviders,'Alpha,MCC,MCC.keys,Zeta','an inner page follows its parent')
+assert(innerProviders[3].mcBrowserHidden==true and innerProviders[3].mcBrowserGroup=='inner'
+    and not innerProviders[2].mcBrowserHidden,'only the inner page is hidden from the browser')
 
 -- Rebuilds are idempotent; withdrawn contributions restore the placeholders they replaced.
 Pages.apply(providers,{mct},parse,state,report)

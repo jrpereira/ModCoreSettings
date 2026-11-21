@@ -304,6 +304,19 @@ assert(browsing.opened[1]=='A','other entries open their page')
 browsing:setFilter(true)
 assert(shown(browsing)==4 and not browsing.compatibleOnly,'there is no compatible-only filter: every module stays listed')
 assert(browsing:tickFilter()==false,'the filter button does nothing')
+-- An inner page (group='inner') follows its parent but is never listed; links open it.
+do
+    local items={{id='Main',name='Main',author='X',choices={{id='a'}}},
+        {id='Main.inner',name='Inner',author='X',choices={{id='b'}},mcBrowserLevel=4,mcBrowserIndent=20,
+            mcBrowserGroup='inner',mcBrowserHidden=true}}
+    local pages=browserPages()
+    Groups.install(pages)
+    local built=pages.build({},items,nil,{})
+    local listed,present={},{}
+    for _,row in ipairs(built.rows) do listed[built.items[row.providerIndex].id]=true end
+    for _,row in ipairs(built.allRows) do present[built.items[row.providerIndex].id]=true end
+    assert(listed.Main and not listed['Main.inner'] and present['Main.inner'],'the inner page has a row but is not listed')
+end
 -- Mods without settings are dimmed and named without DMM's notice; hovering only
 -- brightens them. The hint counts module folders, not menu entries.
 browsing:setFilter(false)
