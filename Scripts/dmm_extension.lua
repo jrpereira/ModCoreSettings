@@ -149,17 +149,6 @@ extension={
         local function read(path)
             return assert(io_.read(path),'unreadable '..path)
         end
-        -- The Mod Index's Reload Config button: asks ModCoreSettings' own state to reload every
-        -- subscribed module (config_reload.lua); shown while that state handles reloads.
-        local Reload=module('config_reload')
-        local reloadButton={
-            ready=function() return ModRef:GetSharedVariable(Reload.READY)=='1' end,
-            last=function() return Reload.lastLoaded(ModRef) end,
-            fire=function()
-                local viewport=FindFirstOf('GameViewportClient')
-                assert(viewport and viewport:IsValid(),'game viewport unavailable')
-                viewport:ProcessConsoleExec(Reload.TRIGGER..' button',nil,nil)
-            end}
         local grouping=moduleCategories.reader(directory..'../cache/modules_register.json',directory..'../config.ini',nil,
             {taxonomy=taxonomy,json=indexJson,report=report,seenPath=directory..'../cache/folder_info.json'})
         browserGroups.install(pages,report,function(content) return choices.parse(content) end,
@@ -168,7 +157,6 @@ extension={
                 local options=grouping(...)
                 local columns=compactStyle and compactStyle.columns()
                 if columns and type(options)=='table' then options.columns=columns end
-                if type(options)=='table' then options.reload=reloadButton end
                 return options
             end,read,sortButton)
         config.install(choices)

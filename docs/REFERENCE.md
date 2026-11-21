@@ -473,15 +473,16 @@ end)
 ```
 
 The id is any text of 1 to 128 bytes, dots included; subscribing again replaces the
-callback. Reloads are triggered by the Mod Index's **Reload Config** button, shown at the
-right of its title with "Last loaded: HH:MM:SS" before it, and by the game window
-regaining focus when the UE4SS Lua Event Bridge (1.4.0 or later) is installed. Any Lua
-state may trigger one with the console command `MC_ConfigReload_v1 <reason> [<source id>]`:
-the subscriber named as source already reloaded and is skipped.
+callback. Reloads are silent: the game window regaining focus triggers one when the UE4SS
+Lua Event Bridge (1.4.0 or later) is installed, and Apply already notifies the module whose
+page it saved (Apply notifications). Any Lua state may trigger one with the console command
+`MC_ConfigReload_v1 <reason> [<source id>]` (reason `button` is never merged): the
+subscriber named as source already reloaded and is skipped.
 
 ModCoreSettings handles the trigger in its own state and runs each subscriber's command
-once. A button press always reloads; an automatic trigger within a second of the last
-reload is merged into it. Commands go through the game's viewport, so no player is needed:
+once. A `button` trigger always reloads; an automatic trigger within a second of the last
+reload is merged into it. Commands go through the game's viewport, which is also their
+executor (UE4SS' `ProcessConsoleExec` refuses a nil one), so no player is needed:
 the main menu reloads as a loaded game does. Before the viewport exists (very early startup,
 when modules have just read their files) a trigger is dropped and logged once as
 `RELOAD_DROPPED`. A subscriber whose command fails is logged once as `RELOAD_FAILED`; the

@@ -10,7 +10,7 @@
 --                                   '<revision>\n<reason>\n<unix time>'
 --   MC_ConfigReload_v1.ready        '1' once the trigger is handled here
 --   MC_ConfigReload_v1.last         unix time of the last fan-out (else this module's start)
--- A button press is always fanned out. An automatic trigger (focus, a module) within MERGE
+-- A 'button' trigger is always fanned out. An automatic trigger (focus, a module) within MERGE
 -- seconds of the last fan-out is merged into it and dropped. Commands go through the game's
 -- viewport, so no player is needed (the main menu reloads too); before the viewport exists
 -- (very early startup) a trigger is dropped and logged once.
@@ -92,10 +92,14 @@ function M.listen(hub,register,shared,report)
     shared:SetSharedVariable(M.READY,'1')
 end
 
--- 'HH:MM:SS' of the last fan-out (or the start), for the Mod Index's button; nil when unknown.
-function M.lastLoaded(shared,date)
-    local time=tonumber(shared:GetSharedVariable(M.LAST) or '')
-    return time and (date or os.date)('%H:%M:%S',time) or nil
+-- Runs command through the game's viewport: options.exec for hub. UE4SS' ProcessConsoleExec
+-- takes no nil executor (no overload matches), and at the main menu there is no player
+-- controller, so the viewport is its own executor. find() returns the viewport or nil.
+function M.viewportExec(find)
+    return function(command)
+        local viewport=find()
+        return viewport~=nil and viewport:ProcessConsoleExec(command,nil,viewport)==true
+    end
 end
 
 return M

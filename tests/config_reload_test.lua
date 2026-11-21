@@ -62,7 +62,15 @@ assert(vars[Reload.READY]=='1' and Api.reloadReady())
 clock=2000
 listened.MC_ConfigReload_v1('MC_ConfigReload_v1 button',{'button'})
 assert(#ran==1);deliver()
-assert(Reload.lastLoaded(shared,function(_,t) return 't'..t end)=='t2000')
+assert(vars[Reload.LAST]=='2000')
+-- Through the viewport, which is its own executor: UE4SS refuses a nil one.
+local execCalls={}
+local view={ProcessConsoleExec=function(self,command,reserved,executor)
+    execCalls[#execCalls+1]={command,reserved,executor,self};return true end}
+local exec=Reload.viewportExec(function() return view end)
+assert(exec('X')==true and execCalls[1][1]=='X' and execCalls[1][2]==nil and execCalls[1][3]==view,
+    'the viewport executes as its own executor')
+assert(Reload.viewportExec(function() return nil end)('X')==false,'no viewport: not handled')
 -- The Event Bridge's focus event, when installed, on the game thread.
 local Focus=require('config_reload_focus')
 assert(Focus.subscribe(function() end,{})==false,'no Event Bridge: no focus trigger')

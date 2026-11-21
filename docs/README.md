@@ -71,10 +71,9 @@ next restart.
 
 ## The Modules page
 
-Open **Mod Settings** to see the Modules page. Its **Reload Config** button, at the right
-of the title, reloads the settings of every module that supports it after you edit their
-config files by hand; "Last loaded" beside it shows when that last happened. With the
-UE4SS Lua Event Bridge installed, returning to the game window does the same. Its **Sort
+Open **Mod Settings** to see the Modules page. With the UE4SS Lua Event Bridge installed,
+returning to the game window after editing config files by hand reloads the settings of
+every module that supports it. Its **Sort
 by** button (DMM's Filter Mods, Backspace) cycles through four ways to list your mods, and
 the ModCore Settings page sets the rest:
 

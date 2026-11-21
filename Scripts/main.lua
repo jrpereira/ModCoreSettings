@@ -61,10 +61,7 @@ local reloading,reloadError=pcall(function()
     end
     local hub=Reload.hub({shared=ref,report=log,
         ready=function() return viewport()~=nil end,
-        exec=function(command)
-            local target=viewport()
-            return target~=nil and target:ProcessConsoleExec(command,nil,nil)==true
-        end})
+        exec=Reload.viewportExec(viewport)})
     Reload.listen(hub,RegisterConsoleCommandHandler,ref,log)
     -- The game window regaining focus: the Event Bridge's event, when it is installed.
     local subscribed,why=pcall(require('config_reload_focus').subscribe,function()
