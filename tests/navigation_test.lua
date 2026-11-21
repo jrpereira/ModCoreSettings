@@ -113,7 +113,8 @@ for index,item in ipairs(visualItems) do
     else assert(item.mcNavigation and not item.file) end
 end
 local mcsPath='/mods/1_ModCore_Settings/config.ini'
--- As init_config leaves it: every key the page stores (it adds missing ones on open).
+-- Positions, as DMM's own open reads them: this test opens the page without the storage
+-- MCS gives it in game (page_hooks.stored writes keys; see mcs_page_storage_test.lua).
 files[mcsPath]='[Modules]\nCompactStyle=1\nSortBy=1\nPreferredCategoryMinimum=2\nSingleCategory=0\nModulesPerRow=2\nPreviewSound=1\nPreviewBackground=1\n'
 local visualProvider={id='ModCoreSettings',path='/mods/1_ModCore_Settings/mod_settings.ini',choices=visualItems}
 local visualModel=Choices.open(visualProvider)
