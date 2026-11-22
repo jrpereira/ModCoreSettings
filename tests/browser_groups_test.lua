@@ -406,22 +406,10 @@ do
     pressedNow.controls=true;assert(pageWithTitle:tickFilter(released)==false)
     pressedNow.controls=false;assert(pageWithTitle:tickFilter(released)==true,'a click is handled')
     assert(pageWithTitle.opened[1]=='ModCoreControls','the link opens its page')
-    -- ModCore Settings' own link opens its Settings tab; its page opens on Controls.
-    local sets={}
-    local showDetail=pageWithTitle.showDetail
-    function pageWithTitle:showDetail(index)
-        showDetail(self,index)
-        local id=items[self.rows[index].providerIndex].id
-        self.controls={refresh=function() sets[#sets+1]='refresh' end,model={items=id=='ModCoreSettings'
-            and {{id='MCS_Page'}} or {{id='c'}},set=function(_,at,value) sets[#sets+1]=at..'='..value end}}
-    end
+    -- ModCore Settings' own link opens its page, which starts on its Settings tab.
     pressedNow.settings=true;pageWithTitle:tickFilter(released)
     pressedNow.settings=false;assert(pageWithTitle:tickFilter(released)==true)
-    assert(pageWithTitle.opened[2]=='ModCoreSettings' and table.concat(sets,',')=='1=2,refresh',table.concat(sets,','))
-    sets={}
-    pressedNow.controls=true;pageWithTitle:tickFilter(released)
-    pressedNow.controls=false;pageWithTitle:tickFilter(released)
-    assert(pageWithTitle.opened[3]=='ModCoreControls' and #sets==0,'other links open as they are')
+    assert(pageWithTitle.opened[2]=='ModCoreSettings')
 end
 local rowA,indexA=rowOf(browsing,'A')
 local rowB,indexB=rowOf(browsing,'B')

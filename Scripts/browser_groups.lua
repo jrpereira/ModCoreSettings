@@ -12,8 +12,8 @@ local TITLE = 'Modules'
 local QUIET_OPACITY, QUIET_HOVER_OPACITY, QUIET_SELECTED_OPACITY = 0.5, 0.75, 0.7
 -- The page that carries the index tab (Developer Tools): MCS's own.
 local HOST = 'ModCoreSettings'
--- The MCS_Page values of its tabs: the index tab and its own Settings tab (mcs_page).
-local TABS = {settings=2, tools=3}
+-- The MCS_Page value of the index tab (mcs_page).
+local TABS = {tools=3}
 local COLLECTION_ICON = '⁂'
 -- Every list is a grid of this many columns unless options.columns (1-3, [Modules]
 -- ModulesPerRow) says otherwise, the ungrouped Alphabetical and Load Order lists included.
@@ -1028,25 +1028,12 @@ function M.install(pages, report, parse, folderVersion, folderManifest, grouping
                 end)
                 if not ok then links = {};report('BROWSER_GROUPS_FAILED', err) end
             end
-            -- ModCore Settings' own link opens its Settings tab: the page opens on Controls.
-            local function settingsTab(self, id)
-                local controls = id == HOST and self.controls
-                local model = controls and controls.model
-                if not model or model.error or type(model.items) ~= 'table' then return end
-                for index, item in ipairs(model.items) do
-                    if item.id == 'MCS_Page' then
-                        model:set(index, TABS.settings)
-                        if type(controls.refresh) == 'function' then controls:refresh() end
-                        return
-                    end
-                end
-            end
             local function open(self, id)
                 for rowIndex, row in ipairs(self.rows or {}) do
                     local provider = providers[row.providerIndex]
                     if provider and provider.id == id then
                         self:showDetail(rowIndex)
-                        return settingsTab(self, id)
+                        return
                     end
                 end
                 -- Not listed (a filter hides it): offered to showDetail as the only row.
@@ -1058,7 +1045,7 @@ function M.install(pages, report, parse, folderVersion, folderManifest, grouping
                         local ok, err = pcall(self.showDetail, self, 1)
                         self.rows = listed
                         assert(ok, err)
-                        return settingsTab(self, id)
+                        return
                     end
                 end
             end

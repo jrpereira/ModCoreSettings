@@ -100,7 +100,7 @@ Author: the version it needs and the one loaded, unmet ones first.
 
 Mods without settings fold into a final "and N more" entry in each group.
 
-The ModCore Settings page has four tabs and opens on the first: **Controls** shows
+The ModCore Settings page has four tabs and opens on **Settings**: **Controls** shows
 ModCore Controls' page (the Quickslots templates, the key mappings and the behaviours),
 **Templates** shows ModCore Templates' loaded templates by category, the active ones
 marked, **Settings** holds ModCore Settings' own options below, and **Developer Tools**

@@ -3,7 +3,7 @@
 ## Unreleased
 
 - The ModCore Settings page's tabs are Controls | Templates | Settings | Developer Tools,
-  and it opens on Controls. Controls shows ModCore Controls' page, which it fills through
+  and it opens on Settings. Controls shows ModCore Controls' page, which it fills through
   the new slot `settings:controls`; Settings is the former Modules tab. The mod list's
   settings link opens the Settings tab.
 - Slots take more kinds of rows: page links, which open their page from the host with

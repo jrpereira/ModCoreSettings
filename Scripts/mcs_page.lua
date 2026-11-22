@@ -1,8 +1,8 @@
 -- ModCoreSettings' own page, contributed like any module's page and attached to its
 -- folder, so it takes the mod's name, author and icon from mod.json. Its tabs, in order:
--- Controls (MCS_Page 0, the one it opens on), a slot that ModCore Controls fills with its
+-- Controls (MCS_Page 0), a slot that ModCore Controls fills with its
 -- page; Templates (1), a slot that ModCore Templates fills; Settings (2), ModCore
--- Settings' own; and Developer Tools (3), which browser_groups appends on every build.
+-- Settings' own and the one it opens on; and Developer Tools (3), which browser_groups appends on every build.
 return {
     storage={file='config.ini',section='Modules'},
     groups={
@@ -17,7 +17,7 @@ return {
         {id='Previews',conditions={visible={field='MCS_Page',values={2}}}},
     },
     fields={
-        {id='MCS_Page',group='Pages',label='Page',style='title',action=true,default=0,
+        {id='MCS_Page',group='Pages',label='Page',style='title',action=true,default=2,
             values={{value=0,label='Controls'},{value=1,label='Templates'},{value=2,label='Settings'},
                 {value=3,label='Developer Tools'}}},
         -- Shown as is until ModCore Controls fills it (settings:controls); its rows keep their

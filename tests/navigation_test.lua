@@ -124,9 +124,9 @@ assert(not visualModel:dirty(),'page selection remains transient')
 visualModel:set(byId.SortBy,0)
 assert(visualModel:dirty() and visualModel:apply(),'grouping preference is applied durably')
 local reopened=Choices.open(visualProvider)
--- The page opens on its first tab, Controls.
+-- Controls is the first tab; the page opens on Settings.
 assert(byId.MCS_Page==1 and visualItems[1].values[1]==0 and visualItems[1].labels[1]=='Controls')
-assert(not reopened.error and reopened.pending[byId.MCS_Page]==0
+assert(not reopened.error and reopened.pending[byId.MCS_Page]==2
     and reopened.pending[byId.SortBy]==0 and reopened.pending[byId.PreferredCategoryMinimum]==2
     and reopened.pending[byId.ModulesPerRow]==2)
 assert(not files[mcsPath]:find('MCS_Page',1,true),
