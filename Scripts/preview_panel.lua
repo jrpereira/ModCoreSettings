@@ -41,12 +41,13 @@ local PREVIEW_WIDTH,PREVIEW_HEIGHT,PREVIEW_BOTTOM,PREVIEW_GAP,PREVIEW_LEFT=576,3
 -- The buttons' text is this many points smaller than DMM's button font.
 local BUTTON_SHRINK=2
 -- Under the preview's right end, SOUND_GAP below it: the sound button, SOUND_SHIFT past
--- the preview's right edge, and the background button left of it. Each sits in a box of fixed
+-- the preview's right edge, and the background button left of it, its box BACKGROUND_OVERLAP
+-- under the sound button's (its text ends well before its box does). Each sits in a box of fixed
 -- size, its text left-aligned, so the value changing never moves it. A button reads
 -- '<name>: <value>': the name PREFIX_OPACITY opaque; any state but Off bright white and
 -- bold, Off italic and PREFIX_OPACITY opaque. BLUR is the blurred background's blur strength, DIMMED
 -- the dimmed picture's opacity, SCREEN_COLOR the dim light blue shown with the background off.
-local SOUND_WIDTH,SOUND_HEIGHT,SOUND_GAP,SOUND_SHIFT,BACKGROUND_WIDTH=150,32,6,20,230
+local SOUND_WIDTH,SOUND_HEIGHT,SOUND_GAP,SOUND_SHIFT,BACKGROUND_WIDTH,BACKGROUND_OVERLAP=150,32,6,34,230,21
 local PREFIX_OPACITY,VALUE_GAP,BLUR,DIMMED=0.7,6,12,0.3
 local SCREEN_COLOR={R=0.15,G=0.24,B=0.3,A=1}
 local WHITE={SpecifiedColor={R=1,G=1,B=1,A=1},ColorUseRule=0}
@@ -169,7 +170,7 @@ function M.wrap(page,providers,api,options)
         if api.button then
             local soundLeft=PREVIEW_LEFT+PREVIEW_WIDTH-SOUND_WIDTH+SOUND_SHIFT
             for _,spec in ipairs({
-                {name='Background',key=M.KEYS.backdrop,states=M.BACKGROUNDS,kept=backdrop,width=BACKGROUND_WIDTH,left=soundLeft-BACKGROUND_WIDTH},
+                {name='Background',key=M.KEYS.backdrop,states=M.BACKGROUNDS,kept=backdrop,width=BACKGROUND_WIDTH,left=soundLeft-BACKGROUND_WIDTH+BACKGROUND_OVERLAP},
                 {name='Sound',key=M.KEYS.sound,states=M.SOUNDS,kept=sound,width=SOUND_WIDTH,left=soundLeft}}) do
                 local button,label=api.button(options.tree,'')
                 button.IsFocusable=false

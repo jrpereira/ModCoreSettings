@@ -109,7 +109,7 @@ assert(vars[Preview.VALUES]:match('^%d+\nStyle=fiend\nSize=30|80$'),'with the pa
 assert(commands[#commands]==Preview.COMMAND,'and the provider is told')
 
 -- Under the preview's right end, each in a fixed box so its text never moves it, its text
--- left-aligned: the sound button 20 past the preview's right edge, the background button left of
+-- left-aligned: the sound button 34 past the preview's right edge, the background button left of
 -- it. Each reads '<name>:' (70% opaque) and its value: On and Auto white and bold, Off
 -- italic and 70% opaque.
 local backgroundBox,soundBox=stack.children[3],stack.children[4]
@@ -120,9 +120,9 @@ assert(soundBox.kind=='SizeBox' and soundBox.WidthOverride==150 and soundBox.Hei
     and soundBox.visible==4 and soundButton.kind=='Button' and soundLine.kind=='HorizontalBox'
     and soundLine.Slot.HorizontalAlignment==1
     and soundBox.Slot.HorizontalAlignment==1 and soundBox.Slot.VerticalAlignment==3
-    and soundBox.Slot.Padding.Left==40+576-150+20 and soundBox.Slot.Padding.Bottom==68-6-32,
-    'the sound button, 20 past the preview\'s right end, its text left-aligned')
-assert(backgroundBox.WidthOverride==230 and backgroundBox.Slot.Padding.Left==40+576-150+20-230 and backgroundBox.visible==4,
+    and soundBox.Slot.Padding.Left==40+576-150+34 and soundBox.Slot.Padding.Bottom==68-6-32,
+    'the sound button, 34 past the preview\'s right end, its text left-aligned')
+assert(backgroundBox.WidthOverride==230 and backgroundBox.Slot.Padding.Left==40+576-150+34-230+21 and backgroundBox.visible==4,
     'the background button left of it')
 assert(soundPrefix.text=='Sound:' and soundPrefix.opacity==0.7 and soundValue.Slot.Padding.Left==6,'Sound: at 70%')
 local function bright(value) return value.ColorAndOpacity.SpecifiedColor.R==1 and value.opacity==1
