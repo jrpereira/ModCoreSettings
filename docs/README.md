@@ -21,7 +21,7 @@ For players:
   drawn from the current values, applied or not, with **Sound** and **Background**
   buttons.
 - **Config reload:** returning to the game window after editing config files by hand
-  reloads the settings of every module that supports it (needs the Event Bridge).
+  reloads the settings of every module that supports it (needs UE4SS Lua Extensions).
 
 For mod authors:
 
@@ -63,12 +63,11 @@ DMM's numeric INI writer directly.
 
 ## Requirements and installation
 
-Use Dawnwalker, UE4SS with Lua 5.4, DMM 1.0.7.1 (the declared minimum) and the UE4SS Lua
-Extensions' File Bridge and Sound Bridge, 1.1.0 or newer. Install and enable MCS under
-`Mods/1_ModCore_Settings`. MCS still runs without the two bridges, with less: no file
-dates for the mod browser or atomic config writes without the File Bridge, and no sound
-when you pick a mod's own sound file without the Sound Bridge. The Event Bridge (1.4.0 or
-newer) is optional: with it, returning to the game window reloads edited config files.
+Use Dawnwalker, UE4SS with Lua 5.4, DMM 1.0.7.1 (the declared minimum) and UE4SS Lua
+Extensions 1.4.0 or newer. Install and enable MCS under `Mods/1_ModCore_Settings`. MCS
+still runs without UE4SS Lua Extensions, with less: no file dates for the mod browser or
+atomic config writes, no sound when you pick a mod's own sound file, no config reload
+when you return to the game window, and logging only to `UE4SS.log`.
 
 MCS keeps DMM's `Scripts/main.lua` as `main.dmm.lua` and puts its own launcher in
 its place, which starts MCS and then DMM. Restart the game after installing MCS while
@@ -126,9 +125,10 @@ Extensions' entries in the mod list open their tabs.
 
 ## Logging
 
-Logs appear in `UE4SS.log` at WARN and above. With the UE4SS Lua Log Bridge installed,
-levels are set per mod and category in the bridge's `config.ini` (`[Levels]
-ModCoreSettings=DEBUG`), and the global level on its Logs page.
+Logs appear in `UE4SS.log` at WARN and above. With UE4SS Lua Extensions installed,
+levels are set per mod and category in its Log Bridge's `config.ini` (`[Levels]
+ModCoreSettings=DEBUG`), and the global level in the Logs section of the Extensions tab
+of the ModCore Settings page.
 
 ## Documentation
 

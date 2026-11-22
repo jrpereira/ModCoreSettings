@@ -194,7 +194,7 @@ menu={
 - A value's `note` is shown small under it. `module='<mod folder>'` notes that
   mod's name, as the mod browser shows it.
 - A value's `sound` is a Wwise event path under `/Game/`, a WAV file's full path (played
-  centred, as recorded, through UE4SS Lua Sound Bridge 1.1.0; a list file names it in its
+  centred, as recorded, through UE4SS Lua Extensions 1.4.0 or newer; a list file names it in its
   mod as `sounds/x.wav`), or `'none'`: it plays
   instead of DMM's change sound when the row changes to that value
   (`mcChoiceSounds` on the picker; see [presentation metadata](#presentation-metadata)).
@@ -516,8 +516,8 @@ end)
 ```
 
 The id is any text of 1 to 128 bytes, dots included; subscribing again replaces the
-callback. Reloads are silent: the game window regaining focus triggers one when the UE4SS
-Lua Event Bridge (1.4.0 or later) is installed, and Apply already notifies the module whose
+callback. Reloads are silent: the game window regaining focus triggers one when UE4SS Lua
+Extensions (1.4.0 or later) is installed, and Apply already notifies the module whose
 page it saved (Apply notifications). Any Lua state may trigger one with the console command
 `MC_ConfigReload_v1 <reason> [<source id>]` (reason `button` is never merged): the
 subscriber named as source already reloaded and is skipped.
@@ -792,7 +792,7 @@ Recently Added lists mods by their latest install or update, newest first, under
 hours, Last 7 days, Last 30 days and Earlier. A mod is dated when a game start first finds
 it installed or changed (its top-level files and folders; settings files and logs written
 while playing do not count). Mods already installed when ModCore Settings first ran are
-listed as Earlier, unless UE4SS Lua File Bridge is installed, which dates them by their
+listed as Earlier, unless UE4SS Lua Extensions is installed, which dates them by their
 files' creation times. Removing a mod forgets it, so a reinstall counts as new. The list
 is rebuilt with the applied values when you return to it, after any page's Apply.
 

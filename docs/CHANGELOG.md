@@ -2,6 +2,8 @@
 
 ## v1.10.0
 
+- Requires UE4SS Lua Extensions 1.4.0 or newer, in place of its File Bridge and Sound
+  Bridge 1.1.0. Without it MCS still runs, with less.
 - The ModCore Settings page's tabs are Settings | Controls | Templates | Extensions |
   Developer Tools, and it opens on Settings. Settings is the former Modules tab; Controls
   shows ModCore Controls' page and Extensions the UE4SS Lua Extensions' page. Slot
@@ -16,7 +18,7 @@
 - The ModCore Settings page's Previews section: Play sound in previews (Auto, On or Off)
   and Background in previews (On, Blurred, Dimmed or Off) are the live preview's buttons,
   saved in config.ini; a click on a button saves it too.
-- Config reload: returning to the game window (with the UE4SS Lua Event Bridge 1.4.0 or
+- Config reload: returning to the game window (with UE4SS Lua Extensions 1.4.0 or
   later) silently reloads every module that subscribed through `settings_api` 3's
   `onReload`; any mod may trigger the same with the console command `MC_ConfigReload_v1`.
 - A setting may leave out `ConfigFile`, `ConfigSection` and `ConfigKey`: it is stored in
@@ -40,7 +42,7 @@
   with that row showing and selected, so a link can open a page on one of its tabs.
 - A slot whose rows keep their groups (`slotGroups`) also keeps a row that stands in for
   its group's heading (`mcCategory`), so a contributed picker can head the rows after it.
-- Logging goes through the UE4SS Lua Log Bridge when it is installed: levels per mod
+- Logging goes through UE4SS Lua Extensions' Log Bridge when it is installed: levels per mod
   and category from the bridge's settings, changeable in game. Without it, WARN and
   above go to UE4SS.log as before. `log_level.txt` is no longer read; mods that vendor
   `mc_log.lua` (version 2) need no changes to their calls.
