@@ -7,38 +7,17 @@ repository's root. Live integration requires the dependencies in the [README](RE
 
 ## Offline tests
 
-Run every Lua suite from Bash:
-
 ```sh
 export DMM_CHOICES_PATH="/path/to/DawnwalkerModMenu/Scripts/choices.lua"
 bash tools/run_lua_tests.sh
 ```
 
-Parser integration suites, and the parser halves of others, need DMM's own parser and
-print `SKIP` without `DMM_CHOICES_PATH`. The runner fails on a skip unless
-`MCS_ALLOW_SKIP=1` is set. CI sets it, because DMM's parser is not redistributable, and
-lists every skipped suite as a warning; run the full set locally before publishing.
-
-Focused checks include `lua5.4 tests/settings_api_test.lua` for notifications
-and `lua5.4 tests/page_hooks_test.lua` for custom storage.
+Some suites need Dawnwalker Mod Menu's own `Scripts/choices.lua`, which MCS cannot
+redistribute; without `DMM_CHOICES_PATH` they are skipped, and the runner fails unless
+`MCS_ALLOW_SKIP=1` is set.
 
 ## In-game checks
 
-Restart after launcher installation or metadata changes. Check capture, Escape
-cancellation, Apply, Restore, Reset, reopening and restart persistence. Check
-slot navigation and the consuming mod's behavior separately.
-Fixtures simulate the Unreal UI boundary; they do not establish native widget
-behavior or compatibility with a different DMM layout.
-
-## Module identification
-
-`python3 work/classifier/build_catalog_data.py` generates the shared category tree
-and normalized folder-to-category map from `work/classifier/taxonomy.json` and
-the reviewed training records. `work/` is not in the repository, so run it after
-changing that data and commit the two files; packaging ships the committed files
-as they are. Runtime classification does not compute fingerprints.
-
-The `mod_registry_test.lua`, `module_patterns_test.lua` and `startup_test.lua`
-suites cover normalized folder lookup, boot cache ownership, file index handoff
-and failure isolation. See [Module categories](MODULE_CATEGORIES.md) for cache
-and lookup behavior. Verify the first scan, cached restart and browser grouping in game.
+Restart after installing MCS or changing settings metadata. Check key capture, Escape
+cancellation, Apply, Restore, Reset, reopening and restart persistence, slot navigation,
+and the consuming mod's behavior. Offline tests do not show how pages look in game.

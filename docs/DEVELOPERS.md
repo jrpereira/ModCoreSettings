@@ -145,11 +145,7 @@ the collision on Apply stays with your storage hook.
 Capture changes DMM's pending value. Apply calls your storage hook with all
 stored values and changed IDs; return the saved values only after persistence
 succeeds. Raise an error to reject the Apply. Navigation/read-only rows are
-excluded. Numeric Apply events omit text keybinds, so reload your config when
-handling the event, as MCC does.
-
-A page containing only text settings emits no numeric Apply event. Such a page
-needs its own post-save notification from the storage hook to its gameplay state.
+excluded. [Apply notifications](#react-to-apply) deliver keybinds as their stored text.
 
 Escape cancels capture. Modifier chords, Escape bindings, wheel directions and
 gamepad capture are unsupported.
@@ -199,7 +195,7 @@ Markers stop at `Min`, `Max`, `LowMax`, `HighMin`, `DeltaMin` and `DeltaMax`. Le
 row lets go. While the row is selected, the footer shows `ADJUST`, or `DONE` while a marker
 is grabbed, beside the Enter or A glyph, and a help box above the description explains the
 keys. The mouse moves the nearer marker to the step it is pressed on and drags it until
-the button is let go. As with keybinds, numeric Apply events omit range values.
+the button is let go. Apply notifications deliver a range as `'<low>|<high>'`.
 
 ## Add presentation only when needed
 
@@ -213,8 +209,8 @@ the button is let go. As with keybinds, numeric Apply events omit range values.
 | Shared page area | `mcSlot` | Let MCT contribute visual settings to Controls |
 
 See the [integration reference](REFERENCE.md) for complete metadata, generated
-pages, links, presets and missing defaults. Use MCS metadata and the two
-vendored clients; internal UI modules are not a provider API.
+pages, links, presets and missing defaults. The metadata and the vendored clients
+are the provider API; nothing else in MCS is.
 
 ## Check your integration
 

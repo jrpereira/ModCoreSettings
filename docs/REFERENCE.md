@@ -57,11 +57,10 @@ Placement on every menu build:
   withdrawn.
 - Otherwise: sorted by name with other mods, so a page that returns does not move.
 
-Contributed pages need no `mod_settings.ini` on disk; ModCoreSettings keeps
-their manifest in memory and only uses `configDirectory` to resolve `ConfigFile`.
+Contributed pages need no `mod_settings.ini` on disk; `configDirectory` only
+resolves `ConfigFile`.
 
-Publishing writes a new generation of files and then switches the contributor's
-shared variable; the menu keeps showing the previous generation until then.
+The menu keeps showing a contributor's previous pages until a new `publish` completes.
 `publish` rejects structurally invalid pages. Menu data and manifests are checked
 when the menu builds; any failure (menu data, manifest, id collision, ambiguous
 `attach`) skips that contributor's pages and is logged once. The rest of the menu
@@ -114,9 +113,8 @@ menu={
   `style='none'` hides it (`style='category'`, the default, shows it).
 - A group's `groups` are its subgroups, one level deep, shown after its own fields:
   `{id='Quickslots',label='Player Quickslots',groups={{id='Fangdango',label='Fangdango'}}}`.
-  A subgroup's heading is smaller and sits 12 pixels right of the row indent; its fields indent
-  20 pixels further, their labels 1pt smaller, in compact rows: 4 pixels shorter,
-  values 1pt smaller (`mcWithin`). A subgroup with `style='none'` shows no heading,
+  A subgroup's heading is smaller and indented; its fields indent further, in compact
+  rows (`mcWithin`). A subgroup with `style='none'` shows no heading,
   so its fields are drawn as the group's own. A group whose fields are all in subgroups still
   shows its heading, but takes no `conditions` or presentation properties.
 - A field's `type` is what it holds and its `widget` how it shows. `type` may be
@@ -140,14 +138,12 @@ menu={
   Keys are letters, digits and `_ . -`, 1 to 128 bytes, never a number, unique per field.
   A keyed enum needs `storage` and at least two choices, and is a `picker`, `tabs` or
   `cycler` that is not an `action` or `link` row. Rules that name it (`visible`, `label`,
-  `order`, `dim`) list its keys. DMM sees each choice's position for the current build only
-  (`mcKeys`); no position is saved or notified. It can fill another page's
+  `order`, `dim`) list its keys. Only keys are saved or notified, never positions. It can fill another page's
   [slot](#slot-rows) and is still stored by its own page.
 
   **Listed choices.** A keyed enum may hold `{from=<list file>, root=<mod folder>}` entries
-  among its choices. Every time the page is built (each time the menu opens, and after each
-  Apply) ModCoreSettings runs `<root>/Scripts/<from>` and puts the choices it returns in that
-  entry's place, so files a mod adds while the game runs show the next time the menu opens:
+  among its choices. Each time the menu opens, and after each Apply, ModCoreSettings runs
+  `<root>/Scripts/<from>` and puts the choices it returns in that entry's place, so files a mod adds while the game runs show the next time the menu opens:
 
   ```lua
   values={{key='none',label='None'},{from='choices/cue_sounds.lua',root=modFolder},
@@ -193,9 +189,8 @@ menu={
   | `order={field=,values={[value]=rank}}` | groups | ordered groups exchange places by rank | `mcOrderWhen`, `mcOrders` |
 
   A `label` or `order` key may be a list of values sharing one entry:
-  `values={[{1,2}]='Side Keys',[3]='Top Keys'}`. Each value appears once. Readers
-  unfold lists once with `menu_contributions.unfold(map, where)`, so published
-  menu data holds single values only.
+  `values={[{1,2}]='Side Keys',[3]='Top Keys'}`. Each value appears once.
+  `menu_contributions.unfold(map, where)` expands such a map into single values.
 - A value's `note` is shown small under it. `module='<mod folder>'` notes that
   mod's name, as the mod browser shows it.
 - A value's `sound` is a Wwise event path under `/Game/`, a WAV file's full path (played
@@ -272,10 +267,9 @@ Category rule gates it. A row carries its own `VisibleWhen`/`VisibleValues`
 only when they name a row the same contributor inserted earlier in that slot.
 DMM ANDs that rule with the Category rule. A row without its own rule takes the
 slot row's rule; a slot row with its own `VisibleWhen` rejects rows that bring
-one. Source Category rules are not carried. Only core DMM fields are copied, so
-inserted rows render as plain pickers, toggles or sliders, and ModCoreSettings' own types
-(`range`, `keybind`) keep the fields their type reads. The exception is a
-row label rule (`mcLabelWhen`/`mcLabels`): it is copied when `mcLabelWhen` names
+one. Source Category rules are not carried. Inserted rows show as plain pickers, toggles or sliders without the host's presentation
+metadata, and ModCoreSettings' own types (`range`, `keybind`) keep what their type
+declares. The exception is a row label rule (`mcLabelWhen`/`mcLabels`): it is copied when `mcLabelWhen` names
 a row the same contributor inserted earlier, and the row is skipped otherwise. A
 row named by `mcSlotLabel=1` keeps no label rule. A picker's `mcChoiceNotes` is also
 copied. Read-only rows stay shown values that store nothing. A [page link](#page-links)
@@ -286,8 +280,8 @@ shows unchanged. Each `rows` entry is all or nothing: one invalid setting skips
 that entry, logged as `SLOT_ROW_SKIPPED`, and other entries still insert.
 
 Add `mcSlotGroups=1` to the slot row to let inserted rows keep their source groups.
-Each source group becomes a group of the host, `mcSlot.<slot>.<n>`, headed like any
-group: DMM starts a heading wherever the group changes. One source page's entries share
+Each source group becomes a group of the host page, headed like any group. One source
+page's entries share
 its groups. The group keeps its source Category's `mcLabel` (else its name), `mcHeading`,
 `mcLevel`, `mcHelp` and `mcSilent`, and takes the slot group's `VisibleWhen` rule; a
 source group with its own `VisibleWhen` or `mcLabelWhen` skips that entry. A row keeps
@@ -351,8 +345,8 @@ the order they publish in does not matter. The page shows as an ordinary page, i
 declared place (`under`, `attach`), when none of its rows has an available
 slot: the host page is not listed or does not declare the slot. Its rows then
 work as on any page, with the same page id and storage. Build such a page to
-stand alone. Availability is decided per menu build; a row entry rejected
-later, while the page loads, does not bring the fallback back.
+stand alone. This is decided each time the menu opens; a row entry rejected
+while the host page loads does not bring the fallback back.
 
 A page with `link='<provider>:<slot>'` and no manifest is a browser entry for
 that slot. Selecting it opens the slot's page and sets the navigation pickers
@@ -367,10 +361,10 @@ slots skips the whole contribution, pages included.
 ### Page hooks
 
 A page whose settings change at runtime, or that owns its own storage, names a
-hooks file instead of menu data or a manifest. ModCoreSettings loads it in its own menu
-state, once per session, and modules beside it can be `require`d. Every hooks
-folder shares DMM's module search path, and the first module loaded under a name
-wins, so give helper modules names unique to your mod (MCC's use `mc_`):
+hooks file instead of menu data or a manifest. It is loaded once per session, in the
+menu's Lua state, not your mod's, and modules beside it can be `require`d. Every hooks
+folder shares one module search path, and the first module loaded under a name wins,
+so give helper modules names unique to your mod:
 
 ```lua
 {id='ExampleMod',name='Example',attach='ExampleMod',
@@ -433,7 +427,7 @@ so a link can open a page on one of its tabs (`mcLinkPage=ExampleMod.keys#Exampl
 A row the page lacks leaves it as it opens. With
 `mcType=tab`, a link shows its first choice as underlined text in a picker's value
 column, dimmed until hovered or selected. Its label lines up with the rows around it.
-`mcLevel=5` sets the row label in small (12pt) muted text, which suits a notice.
+`mcLevel=5` sets the row label in small muted text, which suits a notice.
 
 Back on a page a link opened returns to the page the link was on, sets its navigation
 pickers so the link's row shows, and selects that row; Back there goes on as before, so a
@@ -458,19 +452,21 @@ mcLinkPage=ExampleMod.keys
 ### Live preview
 
 Menu data may declare `preview={background=<picture path>}`. While that page is shown,
-the bottom of the side panel holds a 16:9 preview (576 by 324, 68 above the panel's
-bottom and 40 in from its left, where the header and description text start; the
-description scrolls above it): the background picture, and over it an Overlay host 1920 by
-1080, scaled to fit. Without a picture, or with one that cannot be read, nothing shows
-behind the host. The background and sound buttons sit under the preview's right end. Background, the panel's own and not shared, is On (the picture as it is), Blurred, Dimmed (the default: the picture 30% opaque) or Off (a dim light blue screen instead of the picture). Both buttons are the ModCore Settings page's Previews settings, Play sound in previews and Background in previews ([Modules] PreviewSound and PreviewBackground in config.ini): a page starts from the saved states and a click saves the new one. ModCoreSettings
-shares the preview with the page's provider:
+the bottom of the side panel holds a 16:9 preview, the description scrolling above it:
+the background picture, and over it a host Overlay laid out as a 1920 by 1080 screen,
+scaled to fit. Without a picture, or with one that cannot be read, nothing shows behind
+the host. Two buttons sit under the preview: Background, which the player sets to On (the
+picture as it is), Blurred, Dimmed (the default) or Off (a plain dim screen instead of the
+picture), and Sound. Both are also the ModCore Settings page's Previews settings, Play
+sound in previews and Background in previews: a page starts from the saved states and a
+click saves the new one. ModCoreSettings shares the preview with the page's provider:
 
 | Shared variable | Value |
 |---|---|
 | `MCS.Preview.v1.host` | the host Overlay while open, else nil |
 | `MCS.Preview.v1.state` | `<revision> open <page id>` or `<revision> closed <page id>` |
 | `MCS.Preview.v1.values` | `<revision>`, then one `id=value` line per setting: the page's current values, applied or not; a keyed picker's as its key |
-| `MCS.Preview.v1.sound` | the sound button under the preview: `auto` (default; the provider decides), `on` or `off`; saved as `PreviewSound` |
+| `MCS.Preview.v1.sound` | the sound button under the preview: `auto` (default; the provider decides), `on` or `off` |
 | `MCS.Preview.v1.focus` | the selected setting's id, or empty |
 
 and runs the console command `MCS_Preview_v1` after each change: opening, closing, any
@@ -497,7 +493,7 @@ Lua state. There is one active callback per provider ID; subscribing again throu
 the same client replaces it. Another Lua state cannot claim that provider ID.
 Existing revisions are not replayed at subscription time: load startup values
 from your config. Unsubscribing stops delivery but does not release the native
-handler/claim; fully restart after script reloads. `values` contains every applied
+provider ID's claim; restart the game after script reloads. `values` contains every applied
 stored setting: numbers as numbers, and text as the page stores it: a keyed enum's key,
 a range's `'low|high'`, a keybind. `changes` contains `{old=...,new=...}` only for
 changed IDs. Treat the event and its nested tables as read-only. Callback failure cannot turn a completed save
@@ -526,88 +522,65 @@ page it saved (Apply notifications). Any Lua state may trigger one with the cons
 `MC_ConfigReload_v1 <reason> [<source id>]` (reason `button` is never merged): the
 subscriber named as source already reloaded and is skipped.
 
-ModCoreSettings handles the trigger in its own state and runs each subscriber's command
-once. A `button` trigger always reloads; an automatic trigger within a second of the last
-reload is merged into it. Commands go through the game's viewport, which is also their
-executor (UE4SS' `ProcessConsoleExec` refuses a nil one), so no player is needed:
-the main menu reloads as a loaded game does. Before the viewport exists (very early startup,
-when modules have just read their files) a trigger is dropped and logged once as
-`RELOAD_DROPPED`. A subscriber whose command fails is logged once as `RELOAD_FAILED`; the
-others still reload.
-
-| Shared variable | Value |
-| --- | --- |
-| `MC_ConfigReload_v1.ready` | `1` while ModCoreSettings handles the trigger |
-| `MC_ConfigReload_v1.last` | unix time of the last reload, else of ModCoreSettings' start |
-| `MC_ConfigReload_v1.index` | the subscribers' hex ids, space-separated |
-| `MC_ConfigReload_v1_<hex id>.owner`, `.data` | set while subscribed; `<revision>\n<reason>\n<unix time>` |
+Each subscriber is called once per reload. A `button` trigger always reloads; an
+automatic trigger within a second of the last reload is merged into it. Reloads work in
+the main menu as in a loaded game. A trigger during very early startup, before the game
+can run commands, is dropped and logged once as `RELOAD_DROPPED`. A subscriber whose
+reload fails is logged once as `RELOAD_FAILED`; the others still reload.
 
 ## Presentation metadata
 
-`mcType=tab` renders an ordinary picker as outlined, right-aligned choices
-with a 24-pixel right inset on the same row as its label. Choices sit 4 pixels
-apart; the selected choice's outline is drawn at full strength. It supports up to eight
+`mcType=tab` renders an ordinary picker as outlined, right-aligned choices on the
+same row as its label, the selected choice's outline bright. It supports up to eight
 choices and retains DMM's keyboard/controller navigation, pending model and
 Apply/Restore behavior. A single choice suits a read-only row.
 
 `mcReferenceLabel=<text>` on an `mcReadOnly=1`, `mcType=tab` picker adds a
-disabled button showing that text to the left of its choices, which then take
-150 pixels.
+disabled button showing that text to the left of its choices.
 
-`mcType=cycle` renders a picker as one button showing only the current choice at
-13pt; a click moves to the next choice, wrapping. The button is as wide as the
+`mcType=cycle` renders a picker as one button showing only the current choice; a click moves to the next choice, wrapping. The button is as wide as the
 keybind editor's key box and sits in its key column, so it lines up under keys.
 DMM's keyboard/controller navigation is retained.
 
 `mcType=onoff` renders a picker whose choices are 0 and 1 as an on/off switch
-centred in the value column, with the current choice's label to its left (2 points
-smaller than a picker's value at 75% opacity, right-aligned, 12 pixels from it). The switch is a 44×20 outline 2 pixels thick, and inside it, 3
-pixels clear, a toggle filling the left half (0, off, grey) or the right half
-(1, on, gold, the indicators' color). Off, the whole switch is drawn at 60% strength.
-The outline is dimmed until its row is hovered or selected, when it brightens and a
-dim glow fills the switch. A change slides the toggle across in 0.2 seconds, easing
-out, its color blending between grey and gold. A click anywhere across the value
-column flips it; DMM's keyboard/controller navigation is retained.
+centred in the value column, with the current choice's label to its left: off (0) grey
+and dimmer, on (1) gold. The switch brightens while its row is hovered or selected, and
+a change slides the toggle across. A click anywhere across the value column flips it;
+DMM's keyboard/controller navigation is retained.
 
-`mcWrap=1` on an `mcReadOnly=1` picker shows its value as 13pt left-aligned
+`mcWrap=1` on an `mcReadOnly=1` picker shows its value as left-aligned
 text in a wider column, broken after commas so no line reaches 34 characters;
 the row grows to fit its lines.
 
 `mcPlayerExists=1` on a setting or `[Category.*]` shows it only while a player is in
-the world (a player controller possessing a pawn); `mcPlayerExists=0` only while
-none is, as in the main menu. It works like a hidden Yes|No picker that follows the
-player, combined with any `VisibleWhen`, so a row keeps its own rule; rows whose
-`VisibleWhen` source it hides are hidden too. The check runs whenever DMM checks
-visibility: on opening the page and on each change. Pages without it never check.
+the world (a game is loaded); `mcPlayerExists=0` only while none is, as in the main
+menu. It combines with any `VisibleWhen`, so a row keeps its own rule; rows whose
+`VisibleWhen` source it hides are hidden too. It is checked when the page opens and on
+each change.
 
 `mcSilent=1` on a setting or `[Category.*]` keeps DMM's interface sounds (hover,
 select, change) off its rows, as on rows that play sounds of their own.
 
 `mcDimValues=<value>|<value>` on a picker fades the whole row, label and value,
-to 45% opacity while its own value is one of those listed, the opacity of a
-disabled choice. Each value must be one of the picker's `PresetValues`. It is
+as a disabled choice is, while its own value is one of those listed. Each value must be one of the picker's `PresetValues`. It is
 presentation only: the row stays enabled and its value saves as usual.
 
 `mcTable=<code>:<text>|<code>:<text>|...` on an `mcReadOnly=1` picker replaces the
 row with a static table of pairs, such as `2192:→|25CF:●`. `mcColumns=<n>` (1–6,
-default 1) sets the columns, filled top to bottom. Codes are 12pt muted and texts
-18pt, each centred horizontally and vertically in a cell sized for the longest code
-or text plus 4 pixels of padding; each pair is centred in its column. Every line is
-40 pixels high, so columns stay level and texts line up whatever the codes' widths.
-A table taller than 360 pixels scrolls; 9 lines fit, such as 48 entries in 6
-columns.
+default 1) sets the columns, filled top to bottom: small muted codes beside larger
+texts, lined up across columns. A table of more than 9 lines scrolls.
 The code ends at the first `:`; neither part may contain `|`. Both are trimmed,
 non-empty and at most 8 characters; a table has at most 256 entries. A malformed
 table shows "Unavailable:" and the reason in its place; the page still loads. It
 cannot be combined with `mcWrap` or `mcType`, and `mcColumns` requires it. Like
 every read-only row it is never saved or marked dirty. Contributors can check
 their values offline with `menu_contributions.textTable(value, columns)`, which
-decodes them as ModCoreSettings does and raises on malformed input. A hooks page
+accepts what ModCoreSettings accepts and raises on malformed input. A hooks page
 writes the fields into the manifest its `manifest()` returns.
 
 `mcChoiceNotes=<value>:<text>;<value>:<text>` on a picker gives choices a note,
-shown small and muted on a second line under the current choice, within DMM's
-40-pixel row; the choice's label moves up to make room. Each value must be one
+shown small and muted on a second line under the current choice; the choice's label
+moves up to make room. Each value must be one
 of the picker's `PresetValues` and appear once; the text is trimmed, cannot
 contain `;` and has at most 64 characters. A choice without a note shows one
 line as before. The note is presentation only: saved values are unchanged. Tab,
@@ -619,9 +592,8 @@ of DMM's change sound; `none` in place of a path plays nothing. Choices not list
 and hover and select, keep DMM's sounds, and `mcSilent` still silences the row. A
 path is a Wwise event under `/Game/`, either `/Game/Path/Event` or
 `/Game/Path/Event.Event`, at most 256 characters. Each value must be one of the
-picker's `PresetValues` and appear once. Sounds play at the player's character, at
-most one every 0.06 seconds. Any change on such a row first stops the sound the
-previous choice started, with a 0.1-second fade, so long sounds work as previews;
+picker's `PresetValues` and appear once. Any change on such a row first fades out
+the sound the previous choice started, so long sounds work as previews;
 opening another page or closing the menu stops it too. The game's own sounds are not
 touched. An event that cannot be loaded or played is logged
 once as `CHOICE_SOUND_FAILED`. Slot rows keep their choice sounds.
@@ -629,7 +601,7 @@ once as `CHOICE_SOUND_FAILED`. Slot rows keep their choice sounds.
 Set `mcNavigation=1` on a picker to use its choices only for menu navigation.
 The picker can drive ordinary `VisibleWhen` / `VisibleValues` rules, but has no
 config key, never marks the menu dirty, and is omitted from Apply events. Its
-selected view lasts while the menu model is open. Navigation pickers use DMM's
+selected view lasts while the page is open. Navigation pickers use DMM's
 arrow selector unless they explicitly request another presentation.
 
 Set `mcTabsWidth` to an integer from 160 through 440 to reserve that total
@@ -637,17 +609,16 @@ width in pixels for the horizontal choices. The default grows by option count
 up to 384 pixels. A two-option `mcTabsWidth=440` picker is twice the default
 220-pixel width while retaining 144 pixels for its label.
 
-`mcLevel=0` inherits the existing font. Levels 2–6 use sizes
-16, 15, 14, 12 and 11 respectively. Level2/3 use the heading color;
-Level4 uses normal body text; Level5/6 use
-muted text, with Level5 at 85% opacity. The property applies to setting labels
+`mcLevel=0` inherits the existing font. Levels 2–6 are successively smaller:
+levels 2 and 3 in the heading color, level 4 as normal body text, levels 5 and 6
+muted. The property applies to setting labels
 and Category headings without changing control types. A setting label at level 2
-is 20pt, larger than a level-2 heading, because it names the page's main choice.
+is larger than a level-2 heading, because it names the page's main choice.
 `mcLevel=1` on a setting gives it the title style, like `mcHeading=true`.
 
 Set `mcCategory=1` on a setting to make it stand in for its group's heading. Its
-label takes the Category heading's look: 18pt muted, unindented, with the
-heading's spacing and the 1-pixel rule beneath, which shows and hides with the row.
+label takes the Category heading's look, rule beneath included, which shows and
+hides with the row.
 While it shows, the rows after it indent beneath it as they
 would under a visible heading. Pair it with `mcHeading=0` on the group so the
 heading does not show twice. It cannot be combined with `mcLevel` or `mcHeading`.
@@ -680,9 +651,8 @@ rendered when its category heading is suppressed. `mcHeading` accepts
 `false`/`true` or `0`/`1` and defaults to `true` on categories.
 
 Set `mcWithin=<category>` on a category to make it a subgroup of that category:
-its heading is 15pt in the heading color, 12 pixels right of the row indent and
-10 pixels below the rows above, with no rule. Its rows indent 20 pixels further,
-their labels 1pt smaller, in compact rows: 4 pixels shorter, values 1pt smaller.
+its heading is smaller, indented and without a rule, and its rows indent further, in
+compact rows.
 One level only: the named category cannot itself be a subgroup. DMM takes
 no category without settings, so when the named category has no rows of its own,
 `mcWithinLabel=<text>` on its subgroups is its heading, drawn as a category heading
@@ -734,25 +704,23 @@ mcOrders=0:20;1:10
 
 Only opted-in categories exchange positions, in ascending rank order. Other
 categories remain in their original positions. Rows retain their setting IDs,
-config keys and children. Reordering occurs on a relevant value change, using
-DMM's existing menu refresh; no additional timer is created.
+config keys and children. Reordering follows the source's value as it changes.
 
 ## Missing defaults
 
 DMM opens a page only when its config file holds every key. Whenever a page with
 stored settings opens, ModCoreSettings adds each missing declared key with its
-`Default`, in one file transaction, and keeps every other byte and unknown key.
+`Default`, and keeps every other line and unknown key.
 There is no migration: values under retired keys are ignored, never converted. A
 config that cannot be completed (for example a duplicated key) sets DMM's normal
 error state and disables editing and Apply until it is corrected. No DMM source
-files are modified. If a crash interrupts the transaction, the next open restores a
-moved-aside original and removes leftover `.mc-init.tmp`/`.mc-init.bak` files that
-are provably redundant; any other leftover file is named in the page error for you
-to review and delete.
+files are modified. If the game crashes while a config is being completed, the next
+open restores it; a leftover file it cannot account for is named in the page error for
+you to review and delete.
 
 ## Mapped presets
 
-ModCoreSettings expands mapped presets inside DMM's own pending model. Declare a picker with
+Mapped presets set several settings from one picker, as pending edits. Declare a picker with
 `CustomValue`, a pipe-separated `MappedPresetTargets` list of setting IDs, and
 semicolon-separated `MappedPresetValues` entries. Each entry has the form
 `presetValue:targetValue|targetValue`, in target order. For example:
@@ -768,19 +736,16 @@ needs a complete mapping. Targets may be sliders, pickers or toggles; values mus
 fit their declared ranges, steps or choices. Overlapping and nested presets are
 rejected, including overlap with DMM's ordinary `PresetTargets`.
 
-Selecting a preset synchronously updates all targets before DMM refreshes or
-applies. Preset-derived target changes hide their dirty indicators while retaining
-the actual pending/committed differences. A manual target edit selects Custom and
-marks only that target against the selected preset's visual baseline. Returning
-all targets to a named preset selects it automatically. Custom cannot be chosen
-directly. Apply and Restore clear the visual baseline.
-Apply and Restore remain DMM operations. Opening an inconsistent saved preset
+Selecting a preset updates all targets at once. Targets the preset changed show no
+unapplied-change marks of their own; Apply still saves them. A manual target edit
+selects Custom and marks only that target. Returning all targets to a named preset
+selects it automatically. Custom cannot be chosen directly. Opening an inconsistent saved preset
 preserves its keys and changes the pending picker to Custom.
 
 ## Module ids
 
-While it loads, before the UE4SSLuaEventBridge loop starts, ModCore Settings shares
-each enabled module's `mod.json` `id` with every Lua state:
+As it loads, ModCore Settings shares each enabled module's `mod.json` `id` with every
+Lua state:
 
 ```lua
 local id=ModRef:GetSharedVariable('MCS_ModuleId_v1.'..folder)  -- folder as installed, e.g. '9_ModCore_Fangdango'
@@ -790,7 +755,7 @@ local ready=ModRef:GetSharedVariable('MCS_ModuleId_v1.ready')   -- '1' once all 
 An id is a plain identifier: a letter, then letters, digits and underscores, at most
 64. A folder whose `mod.json` has no id, an invalid one, or one another folder also
 declares has none; the last two are logged. Without the ready flag ModCore Settings did
-not load or its scan failed.
+not load or could not list the modules.
 
 ## Module requirements
 
@@ -799,8 +764,7 @@ enabled folders, matched by their `mod.json` `id`, else their folder name. UE4SS
 always loaded. A dependency's `version` is a minimum with a trailing `+` (`1.6.0+`; a `?`
 part counts as 0, so `1.6.?+` is 1.6.0 or later) and an exact version without one;
 versions compare part by part as numbers. A loaded module's version is its `mod.json`
-`version`, else its `VERSION` file, else `dlls/main.json`, else a `local VERSION = "…"`
-line near the top of `Scripts/main.lua` (Dawnwalker Mod Menu's own main).
+`version`, else the one in its `VERSION` file.
 
 In the mod list a module with any dependency not met carries a red `⚠` at its right,
 centred on the row. Hovering or selecting a module shows a Requirements section after
@@ -810,10 +774,33 @@ then met ones, marked `√`; each group alphabetical.
 
 ## Module categories
 
-ModCore Settings' Settings tab provides Sort by (Recently Added/Categories/Alphabetical/Load Order) and, with Categories, Collections valid with # modules (No/2/3) and Modules appear in a single category (Off/On), and Modules per row (1/2/3) in every sort, all under a Listing heading. Apply saves [Modules] SortBy (2/1/0/3), PreferredCategoryMinimum (0/2/3), SingleCategory (0/1) and ModulesPerRow (1/2/3) in config.ini. Defaults are Categories, 2, Off and 2. Modules per row sets the columns of every list's grid, the ungrouped Alphabetical and Load Order lists included; mod names are left-aligned in every layout. With a single category, a mod whose categories span several top categories is listed only under the one holding most of them; a tie goes to the one declared first, a preferred category counting as declared first. The mod list's title line carries one link, settings, top right, opening ModCore Settings' page on its Settings tab. The mod list's footer button (DMM's Filter Mods, Backspace) is Sort by: each press moves to the next way, saves it the same way and re-sorts the list. Inside every group mods follow load order (in Recently added, newest first), those with settings first. Load Order lists mods in load order, each with its load-order number; mods without settings fold to the end as in every list, so the numbers shown skip them.
+ModCore Settings' Settings tab sets how the mod list is shown, under a Listing heading:
+Sort by (Recently Added, Categories, Alphabetical or Load Order; default Categories),
+and with Categories, Collections valid with # modules (No, 2 or 3; default 2) and
+Modules appear in a single category (Off or On; default Off); Modules per row (1, 2 or 3;
+default 2) applies in every sort. They are saved under `[Modules]` in its `config.ini`.
+With a single category, a mod whose categories span several top categories is listed
+only under the one holding most of them; a tie goes to the one declared first, a
+preferred category counting as declared first. The mod list's footer button (DMM's
+Filter Mods, Backspace) is Sort by: each press moves to the next way, saves it and
+re-sorts the list. Inside every group mods follow load order (in Recently Added, newest
+first), those with settings first. Load Order numbers each mod; mods without settings
+fold to the end as in every list, so the numbers shown skip them. The mod list's title
+line carries one link, settings, opening ModCore Settings' page on its Settings tab.
 
-Recently added lists mods by their latest install or update, newest first, under Last 24 hours, Last 7 days, Last 30 days and Earlier. On each boot MCS records every active mod folder's top level in `cache/folder_info.json`: its files (name, size and, with the file bridge, creation and modification times) and folders, when the folder was added and when it was last updated. A folder it has not seen is added at the boot time; one whose top-level files or folders changed is updated at the boot time. Settings files (`.ini` other than `mod_settings.ini`), logs and `cache/` or `logs/` folders written while playing are ignored. Removed folders are forgotten, so a reinstall counts as new. Folders present when the record was first made are listed as Earlier. With [UE4SSLuaFileBridge](https://github.com/jrpereira/UE4SSLuaFileBridge) installed, the file is written atomically and a folder seen for the first time takes the newest creation time of its top-level files instead, so nothing is left as Earlier only because it was already installed; an update in place keeps old creation times, so it is still dated by the boot that noticed it. Deleting the file loses only those update dates. The module browser is rebuilt with the applied values when you return to it; so it is after any page's Apply.
+Recently Added lists mods by their latest install or update, newest first, under Last 24
+hours, Last 7 days, Last 30 days and Earlier. A mod is dated when a game start first finds
+it installed or changed (its top-level files and folders; settings files and logs written
+while playing do not count). Mods already installed when ModCore Settings first ran are
+listed as Earlier, unless UE4SS Lua File Bridge is installed, which dates them by their
+files' creation times. Removing a mod forgets it, so a reinstall counts as new. The list
+is rebuilt with the applied values when you return to it, after any page's Apply.
 
-Browser grouping is described in [Module categories](MODULE_CATEGORIES.md#browser-behavior). Every mod, ModCore's own included, groups by the same rules. Unregistered folders and conflicting matches use Other or Specialized.
+Browser grouping is described in [Module categories](MODULE_CATEGORIES.md#browser-behavior). Every mod, ModCore's own included, groups by the same rules.
 
-ModCore Settings' own page has four tabs, `MCS_Page` values in brackets: Settings (0), Controls (1), Templates (2) and Developer Tools (3). It opens on Settings. Controls holds one slot, `settings:controls`, that ModCore Controls fills with its whole page: the Quickslots templates (its own slot `controls:visuals`, filled by ModCore Templates), the Mappings links to its Mappings page and Behaviours, keeping their groups (`mcSlotGroups=1`). Templates holds `settings:templates`, which ModCore Templates fills with every loaded template, one group per category. Settings holds ModCore Settings' own Options, Listing and Previews. Developer Tools is generated, rebuilt with the mod list, listing the `group='tool'` pages. ModCore Controls' and ModCore Templates' mod list entries are slot links that open their tabs. Like any page it holds at most 256 settings; past that it shows without its slot rows, logged as `SLOT_ROWS_SKIPPED`. With ModCore's own modules and Fangdango's templates the four tabs hold about 55.
+ModCore Settings' own page has four tabs and opens on Settings: Settings holds ModCore
+Settings' own Options, Listing and Previews; Controls shows ModCore Controls' page, which
+fills the slot `settings:controls`; Templates holds the slot `settings:templates`, which
+ModCore Templates fills with every loaded template, one group per category; and Developer
+Tools lists the `group='tool'` pages. ModCore Controls' and ModCore Templates' mod list
+entries open their tabs.

@@ -1,19 +1,8 @@
 # Module categories
 
-MCS identifies installed UE4SS mod folders during startup and gives each one
-categories from, in order: the categories its `mod.json` declares, its normalized
-folder name in `data/folder_categories.lua`, or a purpose heuristic over its Lua files.
-The index is rebuilt on every boot and published to `cache/modules_register.json`
-for the DMM browser; nothing is cached between boots. Inspected files are read as
-data and never executed. Category data does not use shared variables.
-
-The offline classifier stages the shared taxonomy in
-`work/classifier/taxonomy.json`. It generates `data/module_categories.lua` (C)
-from that taxonomy and `data/folder_categories.lua` (M→C) from classified sample
-folder names. Folder names are case-folded and normalized to alphanumeric
-characters; conflicting labels for one normalized name are omitted. The M→C
-data carries the taxonomy `version` and its own content `revision`. Classifier
-research files stay outside the installed payload.
+Each time the game starts, MCS gives every installed UE4SS mod its categories, from the
+first of these that has any: the categories its `mod.json` declares, MCS's list of known
+mod folders, or a guess from the mod's Lua files. Nothing a mod ships is run to do so.
 
 ## Author declarations
 
@@ -37,7 +26,7 @@ Declare main categories (the ids before the brackets below), categories, or both
 Each category counts as its main category, and selecting both a main category and
 one of its categories does not consume two slots. Only the first three distinct
 main categories, in declaration order, are kept; the rest are dropped and named in
-a WARN line (`MODULE_IDENTIFICATION_SKIPPED`). An Unclassified main category
+a warning (`MODULE_IDENTIFICATION_SKIPPED`). An Unclassified main category
 (`niche`, `other`) cannot be combined with any other: such a declaration is
 rejected and the next step classifies the mod. `ambiguous` is set by the classifier
 only; a mod cannot declare it. Parent membership is derived; no primary category is
@@ -60,52 +49,38 @@ For each active mod folder (one UE4SS starts: it holds `enabled.txt` or is
 enabled in `Mods/mods.txt` as `Name : 1`) with
 `Scripts/`, `dlls/` or a `mod.json`:
 
-1. **Module:** categories declared in `mod.json`. Invalid ones are first passed
-   through the taxonomy's optional `remap(C)` function, then dropped; the valid
-   rest is used, within the main-category rules above.
-2. **Data:** the normalized folder name is looked up in
-   `data/folder_categories.lua`.
-3. **Auto:** the purpose heuristic scans the folder's Lua files. It is tentative
-   and abstains to `other` when it finds no clue.
+1. **Module:** categories declared in `mod.json`. Unknown ones are dropped; the
+   valid rest is used, within the main-category rules above.
+2. **Data:** the folder name, ignoring case and punctuation, is looked up in MCS's list
+   of known mods.
+3. **Auto:** a guess from the mod's Lua files. It is tentative and falls back to
+   `other` when it finds no clue.
 
 A step that leaves no valid category passes to the next. Problems such as an
 unreadable `mod.json` are logged as `MODULE_IDENTIFICATION_SKIPPED` and never stop
 startup. Shared-directory Pak installations are outside this folder scan.
 
-## Index
-
-`cache/modules_register.json` uses `schema_version: 2`, the taxonomy `version`,
-and a `modules` object keyed by installed folder. Each entry records
-`categories`, derived `parents`, `tags`, optional `preferred` and `icon`, its
-`source` (`module`, `data` or `auto`) and `confidence`. Nothing is carried
-over between boots; the file is rewritten only when its content changes, using a
-temporary file followed by replacement. The DMM reader retains its
-last valid snapshot if the index is temporarily absent or invalid. An index error
-does not prevent the settings integration from loading.
-
 ## Browser behavior
 
-MCS controls the index page, titled **Modules**. It lists MCS's modules: pages and
-detected mods whose folder is an active module in the index, MCS's own page and the
-developer tools. Disabled folders, their settings pages and packages outside `Mods/`
+MCS controls the index page, titled **Modules**. It lists every active mod, its
+settings pages, and MCS's own page. Disabled folders, their settings pages and packages outside `Mods/`
 are not listed. There is no compatible-only filter; the title takes no input.
 
 Every mod follows the same rules; ModCore's own modules group themselves through
 their `mod.json` like any other mod.
 
 - **Top categories** are listed in taxonomy order, each once it has a module. A
-  module appears once per top category its categories belong to; placements reuse
-  the same provider and settings.
+  module appears once per top category its categories belong to, each time with the
+  same settings.
 - **Collections** follow, in the load order of their first module. A collection is
   a `preferred` name shared by at least Collections valid with # modules
   distinct folders; `preferred: author` uses the declared author. A module in a
   valid collection is listed only there. A `preferred` value naming a category
   counts as that category declared first and forms no collection.
 - **Within a group**, modules follow load order, as UE4SS starts Lua mods: folders
-  enabled in `mods.txt` first, in that file's order, then the rest by upper-cased
-  folder name (the order Windows lists them in, so `ModA` comes before `Mod_X`).
-  Numbered folders (`0_` … `9_`) keep their sequence. Mods with a native DLL start
-  in an earlier phase, which the order does not show. Child pages stay with their parent. Modules with settings come first; the
+  enabled in `mods.txt` first, in that file's order, then the rest by folder name,
+  ignoring case (`ModA` comes before `Mod_X`). Numbered folders (`0_` … `9_`) keep
+  their sequence. Mods with a native DLL start earlier, which the order does not show. Child pages stay with their parent. Modules with settings come first; the
   rest fold into a final "and X more with no settings" entry, which lists them
   when selected.
 - **Headers** show the group's icon in a box of its own, a small line naming the
@@ -114,16 +89,15 @@ their `mod.json` like any other mod.
 
 Module totals, including the list's "N mods" count, and collection thresholds count
 distinct folders, not placements, headings or settings pages. Mods without settings
-are named without DMM's "No settings available" notice, dimmed to 50% (75% on hover,
-70% when selected) without the full highlight; "and N more" entries likewise sit at 50%
-and 75% on hover.
+are named without DMM's "No settings available" notice and dimmed, as are "and N more"
+entries.
 
 ModCore Settings' Settings tab chooses the listing, saved in `config.ini` under
 `[Modules]`:
 
-- **Sort by** (`SortBy`): Categories (1, the default) groups as above; Recently
-  Added (2) lists mods by when they were installed or updated, newest first, in
-  sections by age; Alphabetical (0) lists every mod by name; Load Order (3) lists
+- **Sort by** (`SortBy`): Categories (the default) groups as above; Recently
+  Added lists mods by when they were installed or updated, newest first, in
+  sections by age; Alphabetical lists every mod by name; Load Order lists
   them in load order, each with its number. The mod list's footer button (DMM's
   Filter Mods, Backspace) moves to the next way and saves it the same way.
 - **Collections valid with # modules** (`PreferredCategoryMinimum`, No/2/3, with

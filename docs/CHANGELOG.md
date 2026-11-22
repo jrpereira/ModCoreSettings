@@ -3,45 +3,37 @@
 ## Unreleased
 
 - The ModCore Settings page's tabs are Settings | Controls | Templates | Developer Tools,
-  and it opens on Settings. Controls shows ModCore Controls' page, which it fills through
-  the new slot `settings:controls`; Settings is the former Modules tab. The mod list's
-  settings link opens the Settings tab.
+  and it opens on Settings. Controls shows ModCore Controls' page; Settings is the former
+  Modules tab. Slot `settings:controls` holds ModCore Controls' page.
 - The mod list's title line has one link, **settings**, which opens ModCore Settings'
   page on its Settings tab. `mod.json`'s `title_link` is no longer read.
 - Slots take more kinds of rows: page links, which open their page from the host with
-  Back returning to it, and ModCoreSettings' range and keybind settings. A slot inside
-  inserted rows is filled where it lands (ModCore Templates' Quickslots rows inside the
-  Controls tab), its rows still stored by their own page.
+  Back returning to it, and ModCoreSettings' range and keybind settings. A slot among
+  inserted rows is filled too (ModCore Templates' Quickslots rows inside the Controls
+  tab), its rows still saved by their own page.
 - A hidden page whose rows fill a slot stays in the menu, listed nowhere: its inner pages
   open, the slots it declares take rows, and a link to it opens the page that shows its
-  rows. A contributor whose pages host another's rows is placed first, whatever the
-  order they publish in.
-
+  rows. The order contributors publish in no longer matters.
 - Inner pages: a contributed page with `group='inner'` and `under` is listed nowhere and
   opens through a page link. Back on any page a link opened now returns to the link's
   page with its row selected, instead of to the mod list; a chain of links unwinds in
-  order. The vendored `menu_contributions.lua` is version 9.
+  order. `menu_contributions.lua` is version 9.
 - A page link may end in `#<row id>` (`mcLinkPage=<page id>#<row id>`): the page opens
-  with that row showing and selected, its navigation pickers set as needed, so a link can
-  open a page on one of its tabs.
-
+  with that row showing and selected, so a link can open a page on one of its tabs.
 - A slot whose rows keep their groups (`slotGroups`) also keeps a row that stands in for
   its group's heading (`mcCategory`), so a contributed picker can head the rows after it.
-
 - Logging goes through the UE4SS Lua Log Bridge when it is installed: levels per mod
   and category from the bridge's settings, changeable in game. Without it, WARN and
-  above go to UE4SS.log as before. `log_level.txt` is no longer read; the vendored
-  `mc_log.lua` (version 2) ignores its `path` option, and its calls are unchanged.
+  above go to UE4SS.log as before. `log_level.txt` is no longer read; mods that vendor
+  `mc_log.lua` (version 2) need no changes to their calls.
 
 ## v1.9.1
 
 - Options -> Use Compact Style (Off, Index or Everywhere; Off by default): in a loaded game
   the mod menu takes the pause menu's look, the game blurred behind a dark panel down the
-  left, the page drawn at 80% from its top left without its dividers, section headings
-  bold and 20% smaller, rows without their indent, and the mod list one column, 20%
-  narrower; Index on the mod list, Everywhere on every page.
+  left and the page drawn smaller; Index on the mod list, Everywhere on every page.
 - The mod menu's footer sits low, as in the game's own menus, Back on the left and the
-  actions packed to the right, and the page above it takes the 70 pixels it frees.
+  actions on the right, leaving more room for the page.
 - The Modules tab's settings, Sort by's choices and Developer Tools rows have descriptions.
 - A slot that keeps its rows' groups (`slotGroups`) and names them (`slotLabel`) heads its
   first group with its own label.
@@ -49,133 +41,101 @@
 - A setting's title above its description is white, as the mod list names its mods.
 - A picker choice may have a description: the side panel shows it after the setting's own
   while that choice is the value.
-- A live preview's buttons read '<name>: <value>', 2 points smaller than other buttons, the name dimmed and any state but Off bright,
-  Off italic and dimmed; Sound sits 20 pixels further right, and Background, left of it,
-  is On (the picture as it is), Blurred, Dimmed (the picture 30% opaque, the default) or
-  Off (a dim light blue screen instead of the picture).
+- A live preview's buttons read '<name>: <value>'. Background is On (the picture as it
+  is), Blurred, Dimmed (the default) or Off (a plain dim screen instead of the picture).
 - The ModCore Settings page's Previews section: Play sound in previews (Auto, On or Off)
   and Background in previews (On, Blurred, Dimmed or Off) are the live preview's buttons,
   saved in config.ini; a click on a button saves it too.
-- A page link's underline sits just under its letters.
 - Config reload: returning to the game window (with the UE4SS Lua Event Bridge 1.4.0 or
   later) silently reloads every module that subscribed through `settings_api` 3's
   `onReload`; any mod may trigger the same with the console command `MC_ConfigReload_v1`.
 - A menu-data field may store under its own section, key and file,
-  `storage={section=,key=,file=}`; a page whose rows use several files is stored by
-  ModCoreSettings, and two fields at one file, section and key reject the page.
+  `storage={section=,key=,file=}`; two fields at one file, section and key reject the page.
 - A setting may leave out `ConfigFile`, `ConfigSection` and `ConfigKey`: it is stored in
   the page's `config.ini`, in the section named by `[Mod] ConfigSection` (else, when it
-  also leaves out `ConfigFile`, by `[Mod] Id`), under its own `Id`. Settings that state them are stored as before.
+  also leaves out `ConfigFile`, by `[Mod] Id`), under its own `Id`. Settings that state
+  them are stored as before.
 - A config file that repeats a section opens: the repeats count as one section, and
   missing keys are added at the end of its last occurrence.
-- The mod list opens faster: building it lists the game folder once for all list files,
-  instead of once per picker that lists its choices.
+- The mod list opens faster when pickers list their choices from files.
 - A live preview without a background picture, or with one that cannot be read, shows
-  nothing behind its host instead of a white box.
+  nothing behind it instead of a white box.
 - A list file's `context.head(path, count)` reads a file's first bytes in the mod folder,
   so it can leave out files it cannot use.
-- A live preview's sound button sits under the preview's right end instead of its top right.
-- A merged page's notice is two points smaller, instead of one.
+- Small layout fixes: the preview's sound button, page-link underlines and merged-page
+  notices.
 
 ## v1.9.0
 
 - Requires UE4SS Lua File Bridge and Sound Bridge 1.1.0 or newer. Without them MCS still
-  runs, with less: no file dates or atomic config writes, and no sound for a picked file.
-- A live preview's sound button (top right): Auto (the default; the provider decides, and
+  runs, with less: no file dates or safe config writes, and no sound for a picked file.
+- A live preview's sound button: Auto (the default; the page's provider decides, and
   Preymonition sounds while a sound setting is selected), On or Off. The selected setting
   is shared as `MCS.Preview.v1.focus`, the button as `MCS.Preview.v1.sound`.
-- A choice's sound may be a WAV file: selecting it plays the file, centred and as recorded,
-  through UE4SS Lua Sound Bridge (1.1.0), and the next selection stops it. A list file
-  names the file in the mod's folder (`sound='sounds/x.wav'`).
+- A choice's sound may be a WAV file: selecting it plays the file through UE4SS Lua Sound
+  Bridge, and the next selection stops it. A list file names the file in the mod's folder
+  (`sound='sounds/x.wav'`).
 - A page can show a live preview: menu data with `preview={background=<picture>}` gets a
-  16:9 area at the bottom of the side panel, the picture behind a 1920 by 1080 screen
-  scaled to fit. The page's provider fills it, told through shared variables and the
-  `MCS_Preview_v1` command, with the page's values, applied or not, after every change.
-- A picker's arrows are drawn halfway in towards its pips, closer to the value.
-- A merged page's notice (with its link) is a point smaller, its lines closer, and framed
-  by a thin outline that ends with the value column, its selection background just inside it.
-- Key boxes are 12% wider (108 pixels), still centred in the value column; Mode and X move
-  out to make room.
+  16:9 area at the bottom of the side panel. The page's provider draws it from the page's
+  values, applied or not, after every change, through the `MCS.Preview.v1` shared
+  variables and the `MCS_Preview_v1` command.
+- Settings rows are wider and their values roomier, so longer choice names fit; key boxes
+  are wider too. The mod list keeps its widths.
+- Pickers show one pip per choice up to 24 choices (was 16); more choices show a track
+  and thumb.
 - Left and Right move a range's markers on a row merged into another page (for example
   ModCore Controls' options); only Enter reached it before.
-- Ranges take the same 240-pixel value column as pickers and sliders, their line as wide as
-  the pips and slider bars.
-- Settings rows are wider and their values roomier: rows take 610 of the 630-pixel
-  settings column (DMM builds 584), leaving the scrollbar its 16. A picker's arrows narrow
-  to 20 pixels, close to their art, and its value column grows from 190 to 240 pixels with
-  4 pixels of button padding each side instead of 12, so the text has 224 pixels instead of
-  158. Toggles, sliders, tabs, keys, ranges, links and notes follow the wider value column.
-  The mod list keeps its widths.
-- Pickers show one pip per choice up to 24 choices (was 16), 3 pixels apart above 16; more
-  choices show the track and thumb.
 - A page link opens with Enter (controller: A) or a click, no longer with Left or Right.
-- A link's text sits in a picker's value column on every row, so it lines up with the
-  values below it; a notice's link no longer sits further right.
-- Category headings, notices and their rules start at the page edge instead of 2 pixels
-  left of it, where the row's clipping cut off the first letter's edge.
+- Category headings, notices and links line up with the values and page edge; a heading's
+  first letter is no longer clipped.
 - Keyed pickers can list their choices from a mod's own list file: a `{from=, root=}` entry
   among the choices is replaced, each time the menu opens and after each Apply, by what
-  `<root>/Scripts/<from>` returns, given the mod's folder listing. Files a mod adds while the
-  game runs show the next time the menu opens. A failing list keeps its last good choices
-  and is logged once as `MENU_LIST_FAILED`.
+  `<root>/Scripts/<from>` returns. Files a mod adds while the game runs show the next time
+  the menu opens. A failing list keeps its last good choices and is logged once as
+  `MENU_LIST_FAILED`.
 - A page-hooks file whose `menu()` declares `storage` and has no `load()` is stored the
-  way a menu-data page is, keyed pickers included, so its choices can be listed afresh each
-  time the menu opens. Its `action()` still runs.
-- An error in ModCoreSettings while the menu builds a page, or in a settings page's controls,
-  no longer stops Dawnwalker Mod Menu for the session. It is logged once as
-  `MCS_BUILD_FAILED` (ERROR) with its cause, and from then on, until the game restarts,
-  Dawnwalker Mod Menu builds its own page from its own mod list, without ModCoreSettings'
-  grouping, index tabs or contributed pages; after a failure in the controls, its own controls
-  too. Settings are not changed.
+  way a menu-data page is, keyed pickers included. Its `action()` still runs.
+- An error in ModCoreSettings while the menu builds a page no longer stops Dawnwalker Mod
+  Menu for the session. It is logged once as `MCS_BUILD_FAILED` (ERROR), and until the game
+  restarts Dawnwalker Mod Menu shows its own plain mod list, without ModCoreSettings'
+  grouping, tabs or contributed pages. Settings are not changed.
 - A failure while grouping the mod list keeps the list as it was instead of stopping the
   menu; it is logged as `BROWSER_GROUPS_FAILED`.
 
 ## v1.8.0
 
 - A page link is drawn as underlined text in the value column, dimmed until hovered,
-  instead of a framed button; its label lines up with the rows around it.
-- Sliders sit 2 pixels lower, level with pickers' choice indicators.
-- A picker showing a choice note draws its value, note and indicator 2 pixels higher.
-- Key names longer than 10 characters are drawn 2pt smaller in the keybind editor.
+  instead of a framed button.
+- Long key names are drawn smaller in the keybind editor.
 - Menu data enums can be keyed: each choice has a text `key` instead of a number `value`,
   and the setting is saved, loaded and notified as that key. Adding, removing or reordering
   choices keeps every saved key that is still offered, and a key that is not falls back to
   the default. Keyed pickers also work as slot rows on another page.
 - `settings_api` version 2 delivers every applied setting, text included: keyed enum keys,
   ranges as `low|high` and keybinds. Consumers re-vendor `Scripts/vendor/settings_api.lua`;
-  a version 1 copy keeps receiving DMM's own numeric notifications until then.
+  a version 1 copy keeps receiving numeric values only until then.
 - `menu_contributions` version 8 accepts keys in value lists.
-- The Modules tab no longer reserves a Lua Extensions section. ModCore Lua Extensions lists
-  itself in the mod list instead, with the installed extensions' count and each extension's settings
-  on its own page.
-- Slot rows split from one hidden page share one source: its groups appear once in the slot
-  and Apply saves every row, instead of failing with "config changed externally" after the
-  first.
+- The Modules tab no longer reserves a Lua Extensions section; UE4SS Lua Extensions lists
+  itself in the mod list instead.
+- Slot rows from one hidden page share its groups once in the slot, and Apply saves every
+  row, instead of failing with "config changed externally" after the first.
 - The Modules page counts a mod enabled in `Mods/mods.txt` (`Name : 1`) as loaded, as
-  UE4SS does, instead of only folders holding `enabled.txt`; such mods and their settings
-  pages are no longer dropped, nor reported as missing requirements.
+  UE4SS does; such mods and their settings pages are no longer dropped, nor reported as
+  missing requirements.
 - Load Order follows the order UE4SS starts Lua mods: `mods.txt` entries first, in file
-  order, then the remaining folders by upper-cased name, so `ModA` now precedes `Mod_X`.
-- Saving a mod's settings no longer lists that mod under Recently Added: the `.old` and
-  `.new` copies made while saving are not counted as an update.
-- Keybind capture ignores the mouse wheel, as documented: a wheel turn while capturing
-  leaves the binding unchanged, and wheel names in a config file are not accepted.
+  order, then the remaining folders by name, ignoring case, so `ModA` now precedes `Mod_X`.
+- Saving a mod's settings no longer lists that mod under Recently Added.
+- Keybind capture ignores the mouse wheel, as documented, and wheel names in a config
+  file are not accepted.
 - Resetting a selected action or link row (Delete or the footer's Reset) no longer runs the
-  action or opens the link; such rows have nothing to reset.
-- Startup takes one game-directory snapshot instead of two: DawnwalkerModMenu's folder is
-  found beside this mod's own.
-- A changed setting's star and italic label now update on the same frame as the edit,
-  drawn in DawnwalkerModMenu's own Lua state. ModCoreSettings no longer polls open pages
-  from its second state (every 50 to 250 ms), and rows carry no hidden identity or signal
-  captions; the "Error: no identity" row states are gone with them.
-- Config files saved with a UTF-8 byte order mark (as Notepad can) keep their first section:
-  `mc_ini` version 2 no longer reads that section's keys as global ones.
+  action or opens the link.
+- A changed setting's star and italic label update as soon as it is edited.
+- Config files saved with a UTF-8 byte order mark (as Notepad can) keep their first section.
 
 ## v1.7.1
 
-- The Modules page places 33 more mods in a category by their folder name, from reviews of
-  newly harvested Nexus mods, and Combat Disengage now appears under Movement as well as
-  Combat.
+- The Modules page recognises 33 more mods by their folder name, and Combat Disengage now
+  appears under Movement as well as Combat.
 
 ## v1.7.0
 
@@ -187,18 +147,15 @@
 ## v1.6.0
 
 - A field-type editor can declare `help`: how to use its control, shown in its own box
-  between a setting's title and description, in 10-point dim text on a dim amber band. The
-  range row uses it to explain Enter (A) to grab and let go of a handle.
-- Clicking above a pip (or its share of the track) on an arrow picker's indicator chooses
-  that value; clicking either side of the indicator still steps like the arrow there.
+  between a setting's title and description. The range row uses it to explain Enter (A)
+  to grab and let go of a handle.
+- Clicking above a pip on an arrow picker's indicator chooses that value; clicking either
+  side of the indicator still steps like the arrow there.
 - A range row's handles show only while the row is hovered or selected, and while one is
   grabbed the other hides. The mouse now drags reliably: a press takes the nearer handle and
   it follows the pointer until the button is let go, even off the track.
-- Pickers and sliders share one row height (40) and value size (2 points smaller); a range
-  row's line sits where a slider's bar does. The selected page tab's underline is redrawn
-  inside the tab, and its label sits a pixel higher.
-- A row selected with the keyboard takes the focus, so the game's hidden cursor no longer
-  leaves another row looking hovered.
+- Pickers and sliders share one row height and value size.
+- A row selected with the keyboard no longer leaves another row looking hovered.
 - Fixed: A on a controller did not reach field-type editors such as the range row, and the
   footer hint did not show the Enter glyph on a keyboard.
 - Fixed: Enter on a field-type editor could also press DMM's Back button, leaving the page.
@@ -207,15 +164,10 @@
 
 - `Type=range` settings pick a low and a high value on one track, stored as one text value
   `<low>|<high>` (e.g. `70|90`), on pages with storage hooks. `Min`, `Max`, `Step` (1 to 40
-  steps), `DeltaMin` and `DeltaMax` (bounds on high-low) and `Suffix` declare it. The row
-  is drawn like a slider, in a picker's value column: the span (`70% - 90%`) above, 2 points
-  smaller; a thin line, lit and thicker across the span, dim until the row is selected or
-  hovered; a thin handle at each end. Left/Right highlight a handle, which gets a white
-  contour; Enter, or A on a controller, grabs it (raised; the other dims) so Left/Right move
-  it a step, and lets go again. Handles stop at the limits. The mouse moves the nearer
-  handle to the pressed step and drags it.
-- `Type=range` takes `LowMax` and `HighMin`: the highest the low marker goes and the lowest
-  the high one goes.
+  steps), `DeltaMin` and `DeltaMax` (bounds on high-low), `LowMax`, `HighMin` and `Suffix`
+  declare it. Left/Right highlight a handle; Enter, or A on a controller, grabs it so
+  Left/Right move it a step, and lets go again. The mouse moves the nearer handle to the
+  pressed step and drags it.
 - Menu data declares what a setting holds and how it shows, separately. A field's `type` is
   `enum`, `integer` or `range` (inferred from `values` when left out; a range is always
   declared), its `values` the domain, and its `widget` the view: `picker`, `tabs`, `cycler`,
@@ -224,16 +176,13 @@
   group's heading) or `notice` (small, muted text); a group's `style` is `category` (the
   default) or `none`. The keys `choices`, `range`, `tabs`, `cycle`, `onOff`, `readOnly`,
   `heading`, `level`, `category` and `referenceLabel`, and a group's `heading`, `level` and
-  `parent.level`, are removed; sizes follow a row's place on the page.
+  `parent.level`, are removed.
 - A menu-data range takes `values={min=,max=,step=,suffix=,delta=}` with `default={low,high}`.
-  `min` and `max` are edges, or `{low marker's, high marker's}` bounds; `delta` is the
-  smallest and largest `high-low`.
-- A menu-data page with `storage` that holds a range or keybind row is loaded and saved by
-  ModCoreSettings, since DMM stores numbers only: every stored row under its section,
-  missing keys added on Apply, every other byte kept.
-- While a range row is selected, the footer shows the Enter glyph (A on a controller) with
-  `ADJUST`, or `DONE` while a handle is grabbed. The game has no action bound to both, so the
-  glyph is ConfirmReturn's on a keyboard and Confirm's on a controller.
+- A menu-data page with `storage` that holds a range or keybind row is saved by
+  ModCoreSettings: every stored row under its section, missing keys added on Apply, the
+  rest of the file kept.
+- While a range row is selected, the footer shows `ADJUST`, or `DONE` while a handle is
+  grabbed.
 - Field-type editors can take a row's Left/Right, Enter and A (`navigation=true`), and
   show a footer hint.
 
@@ -242,30 +191,19 @@
 - Each enabled module's `mod.json` `id` is shared at load as `MCS_ModuleId_v1.<folder>`,
   followed by `MCS_ModuleId_v1.ready`, so other modules (ModCore Templates) can key their
   settings by module id. An invalid id, or one two folders declare, is logged and not shared.
-- `mcType=onoff` renders a picker with the choices 0 and 1 as an on/off switch centred in
-  the value column, the current choice's label to its left: a 44×20 outline with a toggle in its
-  left half (off, grey, drawn dimmer) or right half (on, gold). A change slides the toggle
-  across in 0.2 seconds, blending grey and gold on the way. A click anywhere across the value
-  column flips it; the outline brightens and a dim glow fills it while its row is hovered or
-  selected. Menu data takes it as `onOff=true`.
-- An arrow picker's new value slides in from the side it was stepped towards, fading in, over
-  0.2 seconds; its indicator fades the old pip out and the new one in (a thumb fades out,
-  moves and fades back in).
-- A slider's fill and mark slide to a new value over 0.2 seconds, easing out; while dragging
-  they follow the pointer closely.
-- A click past an arrow picker's last choice, on its faint arrow or that side of its value,
-  wraps around to the first, and before the first to the last. Keys and controller still stop
-  at the ends.
-- Subgroup rows indent 20 pixels beyond the row indent (was 14). They are also compact: 4
-  pixels shorter, their values 1 point smaller, with indicators, notes and slider bars kept
-  where they were above the row's bottom.
-- A subgroup without a heading (`heading=false`, `mcHeading=0`) draws its rows as its parent
-  group's own: regular indent, size and height.
-- Outlines draw their side bars between the top and bottom bars, so no corner is drawn twice.
+- `mcType=onoff` shows a picker with the choices 0 and 1 as an on/off switch, the current
+  choice's label beside it; a click anywhere across the value flips it. Menu data takes it
+  as `onOff=true`.
+- Pickers and sliders animate to a new value.
+- A click past an arrow picker's last choice wraps around to the first, and before the
+  first to the last. Keys and controller still stop at the ends.
+- Subgroup rows indent further and are more compact.
+- A subgroup without a heading (`heading=false`, `mcHeading=0`) shows its rows as its
+  parent group's own.
 
 ## v1.3.1
 
-- The browser places five more mods in categories by their folder name.
+- The browser recognises five more mods by their folder name.
 
 ## v1.3.0
 
@@ -274,7 +212,7 @@
   played instead of DMM's change sound when the row changes to them (`none` plays nothing).
   The next change, another page or closing the menu stops the previous choice's sound, so
   long sounds work as previews.
-- Menu data takes a choice's `sound` (an event path or `'none'`) and writes it as `mcChoiceSounds`.
+- Menu data takes a choice's `sound` (an event path or `'none'`).
 - Menu data covers the rest of the presentation metadata: `silent`, `category`, `cycle`,
   `tabsWidth`, `wrap`, `table` and `referenceLabel` on fields; `help`, `silent` and `parent` on groups.
 - Menu data's state-dependent rules move under `conditions`: `visible` (a picker rule,
@@ -285,619 +223,418 @@
 ## v1.2.0
 
 - The browser's title-line links are declared by the mods themselves: a `mod.json`
-  `title_link` gives the link text (ModCore Settings and ModCore Controls declare theirs),
-  where the browser used to name those two pages itself.
-- One crash-safe file reader and replacer, `safe_file.lua`, shared with the other ModCore
-  modules, serves the configuration initializer, the module registry, the module browser
-  data, the Sort by button and published page descriptors. A crash mid-write leaves the
-  previous file in place; a `.old` copy of each replaced file is kept beside it.
-- INI text is read and edited through one shared module, `mc_ini.lua`, also used by ModCore
-  Templates: manifests, the configuration initializer, the Sort by button and the module
-  browser preferences. Edits splice the original text, so every other byte stays as it was.
-- The release version lives in a `VERSION` file at the mod root, like the other ModCore
-  modules, instead of in `Scripts/main.lua`.
-- The repository tools and their shared tests are owned here and listed as vendored copies
-  in the other ModCore repositories, so a drifted copy is reported.
-- The hidden-widget text formats MCS's two Lua states exchange are named in one file,
-  `mcs_protocols.lua`.
-- The player check and the text-area poll measure wall-clock time (`os.time`) instead of CPU
-  time.
-- Clicking the outer 40% of a picker's value, either side, steps like the arrow on that side;
-  the middle 20% selects the row as before. The choice indicator under the value spans 75% of
-  its width, its pips sharing it evenly.
+  `title_link` gives the link text.
+- A crash while ModCore Settings saves a file leaves the previous file in place.
+- Saving a config file keeps every other line of it as it was.
+- The version lives in a `VERSION` file at the mod root, like the other ModCore modules.
+- Clicking either side of a picker's value steps like the arrow on that side.
 - Subgroups: a menu-data group's `groups` are its subgroups, one level deep (manifests:
   `mcWithin=<category>` on a category, with `mcWithinLabel` heading a category that has no
-  rows). A subgroup heading is smaller, at the row indent and without a rule; its rows
-  indent 10 pixels further, 3pt smaller. Menu-data fields now stay together under their
-  group, in group order.
-- Menu data puts a picker in the page title row with `heading=true` (compiles to
-  `mcHeading=1`) instead of `level=1`; a field's `level` now takes 0 or 2–6.
+  rows). Menu-data fields now stay together under their group, in group order.
+- Menu data puts a picker in the page title row with `heading=true` (`mcHeading=1`)
+  instead of `level=1`; a field's `level` now takes 0 or 2–6.
 - ModCore Settings' page has no Errors tab any more; its tabs are Modules, Templates and
   Developer Tools. The Templates tab is a slot, `settings:templates`, that ModCore Templates
   fills with its list of loaded templates.
 - A slot row with `mcSlotGroups=1` (menu data `slotGroups=true`) lets inserted rows keep their
-  source groups: each becomes a group of the host page with its own heading, shown under the
-  slot group's rule.
-- Menu data fields can be slots: `slot=<name>` (and `slotLabel=true`) on a read-only field
-  with choices compiles to `mcSlot`/`mcSlotLabel`, so a menu-data page can host other
-  contributors' rows.
-- Read-only rows can be mirrored into a slot. They stay shown values with no storage and never
-  dirty the page. Navigation and link rows still cannot.
+  source groups, each with its own heading.
+- Menu data fields can be slots: `slot=<name>` (and `slotLabel=true`) on a read-only field,
+  so a menu-data page can host other contributors' rows.
+- Read-only rows can be mirrored into a slot. They stay shown values with no storage.
 - ModCore Settings' Modules tab reserves two slots after Listing, `settings:extensions` and
-  `settings:verifications`, which UE4SS Lua Extensions fills with its installed count and a
-  startup verification switch per extension.
-- A picker choice's note is 1 point smaller (10), and while it shows, the note and the value
-  sit 4 pixels higher than before. An arrow picker showing no note has its indicator
-  2 pixels higher.
+  `settings:verifications`, for UE4SS Lua Extensions.
 - Pickers with arrows show how many choices they have and which is current: a row of pips
-  under the value (a track with a thumb beyond 16 choices), in the row's bottom pixels below
-  any choice note. It is at half strength until its row is hovered or selected. While its row
-  is hovered or selected, the current pip (or the thumb) is 2 pixels taller than the others,
-  centred on the same line.
-- At a picker's first or last choice the arrow that has nowhere to go stays visible at 50%
-  instead of disappearing. A disabled picker still hides both.
-- In grouped mod lists, mod names are 2 points smaller (12, the "and N more" entry 10) and each
-  grid cell or row is 3 pixels shorter above and below. Each group after the first starts 10
-  pixels further down, and hovering a group heading no longer highlights it.
-- Page tabs (top right): every separator line stays thin and dim, the selected tab's too. The
-  selected tab glows behind its label and under it, with a 4-pixel soft band 1 pixel lower and a 1-pixel line 3 pixels below the tab, a hovered tab's background lights up, and
-  the other tabs' labels are dimmed 20%. When the tab row has focus, DMM's focus highlight
-  shows on the selected tab instead of across the whole title row.
-- A hidden page attached to a mod now also hides that mod's own entry when the mod has
-  settings of its own, not only a detected placeholder without settings. A contributor can
-  therefore replace several mods' entries with one page. The entry returns when the
-  contributor withdraws or does not load.
-- `mcText` rows and the UE4SS.log reader are removed with the Errors tab.
+  under the value (a track with a thumb beyond 16 choices), brighter while the row is
+  hovered or selected.
+- At a picker's first or last choice the arrow that has nowhere to go stays visible,
+  dimmed, instead of disappearing.
+- Grouped mod lists are more compact, and hovering a group heading no longer highlights it.
+- Page tabs (top right) are restyled: the selected tab glows and the others are dimmed.
+- A hidden page attached to a mod also hides that mod's own entry when the mod has
+  settings of its own, so a contributor can replace several mods' entries with one page.
+  The entry returns when the contributor withdraws or does not load.
+- `mcText` rows are removed with the Errors tab.
 
 ## v1.1.0
 
 - A key row's `DefaultControl` keys come from `Scripts/vendor/standard_keys.lua`, which
-  mods vendor to bind the same keys. Like ModCore Controls, it prefers the game's own
-  action over a same-named one elsewhere and shows nothing when that is ambiguous, and it
-  reads profile entries naming the action and its mapping name together.
-- Field-type editors such as the key editor are read on each menu frame only while
-  their row is shown.
+  mods vendor to bind the same keys.
 - Contributed pages can describe their settings as `menu` data (groups, fields with
-  choices or a range, visibility and label rules, storage) instead of a DMM
-  manifest; ModCoreSettings builds the page. Descriptor contract 4, client
-  version 6. Page hooks may return `menu(context)` in place of `manifest(context)`,
-  and get `context.moduleName(folder)`.
+  choices or a range, visibility and label rules, storage) instead of a DMM manifest.
+  Descriptor contract 4, client version 6. Page hooks may return `menu(context)` in place
+  of `manifest(context)`, and get `context.moduleName(folder)`.
 - A contributed page that takes the place of a mod's entry shows that mod's name,
-  author, version and icon from its `mod.json`. A mod whose `mod.json` puts it in
-  the `ModCore` group is listed on the Modules tab without declaring
-  `group='module'`. `mod.json` `icon` is shown for detected mods too.
+  author, version and icon from its `mod.json`. `mod.json` `icon` is shown for detected
+  mods too.
 - `mcLabel=<text>` names a category heading in place of its category name.
-- The mod browser has no ModCore special case. ModCore's modules group through
-  their `mod.json` (`"preferred": "ModCore"`) like any other mod.
-  Top categories come first, then collections. Within a group, mods walk by
-  category then load order, and mods without settings fold into a final
-  "… and X more with no settings" entry.
-- Group headers show the icon in a box of their own, a small line naming the group
-  (top category, Collection or Author) and the title, with a rule that fills the
-  rest of the width.
+- ModCore's modules group in the mod list through their `mod.json`
+  (`"preferred": "ModCore"`) like any other mod. Top categories come first, then
+  collections. Within a group, mods follow category then load order, and mods without
+  settings fold into a final "and X more with no settings" entry.
+- Group headers show the group's icon, a small line naming the group (top category,
+  Collection or Author) and the title.
 - The ModCore page is gone. Its Errors and Developer Tools tabs are on ModCore
   Settings' own page. The Installed, Highlighted Modules and Core Functionality tabs
   are gone, with their settings.
-- ModCore Settings' own page is contributed menu data (`Scripts/mcs_page.lua`), like
-  every other ModCore page, and takes its name and icon from `mod.json`. The mod no
-  longer ships a `mod_settings.ini`. Its Modules tab settings keep their
-  `config.ini` keys.
+- ModCore Settings' own page takes its name and icon from `mod.json`. Its Modules tab
+  settings keep their `config.ini` keys.
 - Group modules is now Sort by: Recently Added, Categories, Alphabetical or Load Order
   (numbered). The mod list's Filter Mods button (Backspace) is now Sort by and cycles
-  them. Inside every group, mods follow load order (Recently added: newest
-  first), those with settings first. Recently added lists mods newest first by when each was installed or last
-  updated, as MCS saw its folder's top level (`cache/folder_info.json`, which also lists each folder's top-level files).
+  them. Inside every group, mods follow load order (Recently Added: newest first), those
+  with settings first. Recently Added lists mods newest first by when each was installed
+  or last updated.
 - Modules per row (1, 2 or 3; default 2) sets how many mods each group shows per row
   in the Categories and Recently Added views. Mod names are left-aligned in every layout.
-  Grid cells are 7 px shorter, and a group's "and N more with no settings" entry
-  (no leading ellipsis) takes a grid place like a mod.
 - Sort by is saved as `[Modules] SortBy`; `GroupModules` is no longer read.
 - Declared categories follow taxonomy v3: the first three main categories in
   declaration order are kept and the rest are named in a warning; `niche` or `other`
   beside another category rejects the declaration; `ambiguous` is the classifier's
-  alone. Top category icons come from the taxonomy data.
+  alone.
 - Mod folders are listed whatever their names hold; only `.bak` copies are skipped.
-- The browser reads each mod's `mod.json` as JSON, once per session.
-- Missing config keys are still added with their defaults; the unused migration
-  rules (`DefaultFrom`, `DefaultFromMap`, `ValueMap`, `DefaultRule`) are removed.
-- Lighter on an open menu: dirty labels are checked every 250 ms once a page is
-  quiet (50 ms while it changes), a page's default-key lookups share one scan per
-  second and stop when the game has no mapping, the player check is kept for a
-  second, Apply and Sort by keep at most one previous browser page, and controller
-  input no longer polls tab hover. The Errors tab first reads the last 256 KiB of
-  `UE4SS.log` instead of 1 MiB.
-- The cache folder is created without starting a shell when it already exists.
-- A Sort by button that fails to move puts its label back and is reported once.
-- With UE4SSLuaFileBridge installed (optional), Recently added uses each mod's real
-  install date and MCS's cache files are written atomically. Without it, nothing changes.
-- After any page's changes are applied, the mod browser is rebuilt when you return to
-  it, as if the menu had been closed and opened again.
-- A level-one setting takes the page title row on every page, and never shows a
-  dirty star there; ModCoreSettings no longer treats ModCore Templates pages
-  differently.
-- Module browsing uses Gameplay, Content, Presentation, Technical & Support and
-  Other sections, with up to three declared categories, separate tags and inferred
-  parents. The MCS-owned file index replaces category shared variables; legacy
-  caches are reclassified without category aliases.
-- MCS identifies installed UE4SS mod folders at startup, caches their categories in
-  `cache/modules_register.json`, and supplies category grouping to the browser.
-  Identification errors leave the settings integration available.
-- `mcTable=<code>:<text>|...` with `mcColumns=1..6` shows static code and text
-  pairs in level, aligned columns, each part centred in an evenly padded cell;
-  `menu_contributions.textTable` checks them offline.
-- The ModCore page has Modules | Errors | Developer Tools tabs. Errors shows the
-  latest error lines of `UE4SS.log` in a scrollable area, newest at the bottom.
-- `mcText=<source>` shows a host text source in a scrollable area.
+- Missing config keys are still added with their defaults; the migration keys
+  (`DefaultFrom`, `DefaultFromMap`, `ValueMap`, `DefaultRule`) are removed.
+- The menu is lighter on performance while open.
+- With UE4SS Lua File Bridge installed (optional), Recently Added uses each mod's real
+  install date and MCS's own files are saved safely.
+- After any page's changes are applied, the mod list is rebuilt when you return to it.
+- A level-one setting takes the page title row on every page, and never shows an
+  unapplied-change star there.
+- Module browsing uses Gameplay, Content, Presentation, Technical & Support and Other
+  sections, with up to three declared categories, separate tags and inferred parents.
+- `mcTable=<code>:<text>|...` with `mcColumns=1..6` shows static code and text pairs in
+  aligned columns; `menu_contributions.textTable` checks them offline.
+- The ModCore page has Modules | Errors | Developer Tools tabs. Errors shows the latest
+  error lines of `UE4SS.log`.
+- `mcText=<source>` shows a text source in a scrollable area.
 - `mcSilent=1` keeps DMM's interface sounds off a row or category.
 - `mcDimValues=<value>|...` fades a picker's row while its value is one of those listed.
 - `mcPlayerExists=1|0` shows a row or category only while a player is, or is not,
   in the world, alongside its `VisibleWhen`.
 - Page hooks may add `action(context,id,value,values)`, run when a navigation row
   is set; a one-label navigation tab row is a single button that runs it.
-- ModCore Dev Tools is listed under Foundation Modules; Lua Event Bridge stays last.
-- Tabs keep at least 3 pixels between their label and each edge; a longer label
-  widens its own tab. Page headers leave 12 pixels before the first entry.
-- A read-only tab row whose choices share one label (such as No settings) is
-  sized and placed like an Open link.
+- A longer tab label widens its own tab.
 
 ## v1.0.1
 
 - `mcChoiceNotes` gives picker choices a small muted second line under the
-  current choice, such as the module providing a template. It is copied onto
-  slot rows.
+  current choice, such as the module providing a template. Slot rows keep it.
 - Keybind rows sharing `mcConflictScope` that bind the same key and trigger
-  show a dim red key background on every edit; the navigation picker separating
-  the two rows shows its choice and arrows in red. Apply is unchanged.
+  show a dim red key background; the navigation picker separating the two rows shows
+  its choice and arrows in red. Apply is unchanged.
 - Unapplied changes show as a `*` after the page title instead of the
   "Unapplied changes" status text. Errors and failed Applies still show as text.
-- The dirty `*` follows each label's text, so it no longer overlaps unindented
-  labels such as `mcCategory` rows. Keybind rows now show it when edited.
-- The page status sits beside header tabs under the divider instead of below them.
+  Keybind rows now show the `*` when edited.
 - A hooks page whose `load()` returns a value the setting cannot hold keeps the
   default and logs `HOOK_VALUES_SKIPPED`, instead of breaking the page.
-- A crash during config initialization no longer blocks the page: the next open
-  restores a moved-aside original and removes redundant leftover files.
-- A failure loading the DMM hooks is logged as `DMM_HOOKS_FAILED` with its cause
-  instead of asking for a restart; fatal integration events log at ERROR.
-- An unresolved default control is retried while its keybind row is open, and
-  X and Mode act only when released over the button.
-- Manifests are read by one shared reader that matches DMM, including comment
-  lines in navigation metadata. The undocumented raw `mcHeader` key is ignored.
+- A crash while a config file was being completed no longer blocks the page: the next
+  open restores it.
+- A failure to start inside Dawnwalker Mod Menu is logged as `DMM_HOOKS_FAILED` with its
+  cause instead of asking for a restart.
 - Release packages include `enabled.txt`, so the mod is enabled when installed.
-- `mcType=tab` choices are outlined and sit 4 pixels apart; the selected choice's
-  outline is bright.
-- A page-link row (`mcNavigation=1`, `mcLinkPage`, `mcType=tab`) wraps a long label
-  within its column and grows to fit, keeping the link button right-aligned and
-  vertically centred; a one-line label keeps the 40-pixel row.
-- `mcWrap=1` shows a read-only value as 13pt text in a wider column, broken after
-  commas below 34 characters, in a row that grows to fit.
-- `mcType=cycle` shows a picker as one 13pt button with only the current choice,
-  in the keybind editor's key column at the key box's width; a click moves to the
-  next choice.
-- The keybind editor reads Mode, key, X. A bound key is 16pt in the active tab
-  yellow, in a box at full strength; Mode and X backgrounds are at 30% of a
-  standard control's, 8 pixels from the key. Unbound with a default control, the
-  key box shows a small gray "default" (9pt) at its top and the default keys
-  (11pt, dimmed white) flush with its bottom, at half strength, replacing
-  the `Default: <keys>` caption. A default control that
-  cannot be resolved yet is looked up again on the next render instead of never.
-  Mode is 66 pixels wide with a background 20% stronger than X's. X rests at 70%
-  and lights up in the active tab yellow under the pointer. The "optional"
-  placeholder is 14pt.
+- `mcType=tab` choices are outlined.
+- A page-link row (`mcNavigation=1`, `mcLinkPage`, `mcType=tab`) wraps a long label.
+- `mcWrap=1` shows a read-only value as wrapped text in a wider column.
+- `mcType=cycle` shows a picker as one button with only the current choice; a click
+  moves to the next choice.
+- The keybind editor reads Mode, key, X. Unbound with a default control, the key box
+  shows the default keys dimmed under a small "default" label.
 - Keybind rows name the mouse buttons Left, Right and Middle Button, and numpad
   digits NumPad 0 to NumPad 9. Saved values keep the engine key names.
 - A keybind's default trigger is the first one listed in `Triggers`, instead of
   Tap whenever Tap is listed.
-- Keybind and other field-editor rows indent like toggle rows. Their labels were
-  indented twice, once on the row content and again on the label.
-- Log at levels TRACE, DEBUG, INFO, WARN, ERROR and CRITICAL, writing WARN and above
-  by default; `log_level.txt` in the mod folder sets the level. The vendorable
-  `Scripts/mc_log.lua` provides the same logger to other mods. Row errors are now
-  written as warnings; the startup notice is INFO.
-- Add menu contributions: other mods publish generated pages as data through the
-  vendorable `menu_contributions.lua` client instead of installing DMM extensions.
-- Add `mcLinkPage` for navigation pickers that open another page; it replaces
-  `mcLinkProvider`.
-- Group module pages in the ModCore browser group only when they declare it.
-- Remove tab-picker contours and inset all tab choices, including provider links,
-  24 pixels from the right edge.
-- Give every tab-style picker option a light one-pixel outline so adjacent choices remain visibly aligned.
-- Rename the installed mod folder to `1_ModCore_Settings`.
-- Remove the slider-based keybind (`mcType=keybind` on an integer setting, with
-  `mcOptional`, `mcDefaultControl`, `mcMode` and `mcGroupedBy`) and `Pair=` mode
-  pickers, with their key capture, click routing and virtual-key table, and the
-  example mod that used them. `Type=keybind` replaces them. Only `mcType=tab`
-  remains as an `mcType`.
-- Add setting types DMM does not know, starting with `Type=keybind`: one setting
-  holding `none` or `<FKey>|<trigger>` as text, whose row carries the key box, the
-  trigger control, the clear button and the default keys. DMM keeps building the
-  row and owning Apply, Reset and dirty state; the editor reads and fills its own
-  controls.
-- Stop editing Dawnwalker Mod Menu's files. ModCoreSettings keeps DMM's
-  `main.lua` as `main.dmm.lua` and starts it through a small launcher that hooks
-  DMM's modules first, recreating the lifecycle events from outside DMM. DMM
-  updates and redeploys are picked up automatically; a failed hook never stops DMM.
-- Rename runtime markers, DMM lifecycle identifiers, and initialization file prefixes from `kem` to `mc`.
-- Add 20 pixels of bottom spacing beneath the page header.
-- Add slot rows: a page marks a read-only row with `mcSlot=<name>` and other
-  contributors publish their own settings into it (`rows` in
-  `menu_contributions.lua`, descriptor contract 2). Inserted rows stay owned,
-  stored and applied by their source page.
-- Add slot links: a contributed page with `link='<provider>:<slot>'` opens that
-  slot's page with the slot showing.
-- Show a hidden row-source page as an ordinary page when none of its rows has
-  an available slot.
-- Add `mcSlotLabel=1`: the first inserted row takes the slot row's label and
-  level, so a host can present a contributed picker as a section heading.
-- Add `mcCategory=1`: a setting stands in for its group's heading, in the heading's
-  style, with the group's other rows indented beneath it. `mcSlotLabel=1` passes
-  it to the first inserted slot row.
-- Level-styled setting labels (`mcLevel`, `mcHeading`) show their size when first
-  drawn; they kept the stock size until another change reapplied the font.
-- `mcLinkPage` also takes a slot address (`<provider>:<slot>`): the link opens the
-  slot's host page with the slot showing.
+- Logs at levels TRACE, DEBUG, INFO, WARN, ERROR and CRITICAL, WARN and above by default;
+  `log_level.txt` in the mod folder sets the level. Other mods can vendor
+  `Scripts/mc_log.lua` for the same logger.
+- Menu contributions: other mods publish generated pages as data through the vendorable
+  `menu_contributions.lua` client instead of installing DMM extensions.
+- `mcLinkPage` for navigation pickers that open another page; it replaces
+  `mcLinkProvider`. It also takes a slot address (`<provider>:<slot>`).
+- The installed mod folder is `1_ModCore_Settings`.
+- `Type=keybind` replaces the slider-based keybind (`mcType=keybind` with `mcOptional`,
+  `mcDefaultControl`, `mcMode` and `mcGroupedBy`) and `Pair=` mode pickers: one setting
+  holding `none` or `<FKey>|<trigger>` as text, with key box, trigger control, clear button
+  and default keys. Only `mcType=tab` remains as an `mcType`.
+- ModCoreSettings no longer edits Dawnwalker Mod Menu's files: it keeps DMM's `main.lua`
+  as `main.dmm.lua` and starts DMM through a small launcher, so DMM updates are picked up
+  automatically.
+- Runtime markers and settings prefixes are `mc` instead of `kem`.
+- Slot rows: a page marks a read-only row with `mcSlot=<name>` and other contributors
+  publish their own settings into it. Inserted rows stay owned, saved and applied by
+  their source page. A hidden row-source page shows as an ordinary page when none of its
+  rows has an available slot.
+- Slot links: a contributed page with `link='<provider>:<slot>'` opens that slot's page
+  with the slot showing.
+- `mcSlotLabel=1`: the first inserted row takes the slot row's label and level, so a host
+  can present a contributed picker as a section heading.
+- `mcCategory=1`: a setting stands in for its group's heading, with the group's other
+  rows indented beneath it.
 - Inserted slot rows keep their label rule (`mcLabelWhen`/`mcLabels`) when it names
-  a row the same contributor inserted earlier, so conditional labels work in slots.
-- Enlarge level-two setting labels, including Control Layout and Control Map,
-  and inset submodule browser highlights with their rows.
-- Bind queued picker presses to the preceding hovered control sample and discard
-  them when another control is hovered at delivery, avoiding cross-control clicks
-  without adding native widget access to the input callback.
-- Dim unbound key labels and add `mcOptional=1` key rows with a click-to-clear
-  `optional [x]` control.
-- Expand key capture to the standard virtual-key keyboard, keypad, punctuation,
-  browser, media, and mouse-button set while keeping Escape reserved for cancellation.
-- Show a header picker's choices as tabs hanging from the title divider; the
-  selected tab has bright separators and a faint glow.
-- Add page hooks: a contributed page may name a Lua file that generates its
-  manifest on every menu build and optionally owns its storage (`load` and
-  `apply`), so no mod needs its own DMM extension (descriptor contract 3).
-- A row whose identity is missing, mismatched, duplicated or from another page,
-  whose key decoration fails, or whose paired or grouping row has one of these
-  problems shows only its label and a short error. The page's other rows still
-  work; previously one such row left the whole page undecorated.
-- An unbound optional key shows `optional` in italics, dim yellow when it has an
-  `mcDefaultControl` and dim gray otherwise; the `Optional` marker is gone.
-  With a default control, `Default: <keys>` shows beside it: every keyboard key
-  bound to the action in the Settings key profile, so they show in menus and
-  outside combat too. With no keyboard key bound, nothing shows beside it.
-- Move the README and changelog into `docs/`; release packages publish every
-  document from `docs/` at the mod root.
+  a row the same contributor inserted earlier.
+- `mcOptional=1` key rows with a click-to-clear control; unbound keys are dimmed.
+- Key capture covers the standard keyboard, keypad, punctuation, browser, media and
+  mouse-button keys; Escape cancels capture.
+- A header picker's choices show as tabs hanging from the title divider.
+- Page hooks: a contributed page may name a Lua file that generates its manifest on every
+  menu build and optionally owns its storage (`load` and `apply`), so no mod needs its own
+  DMM extension (descriptor contract 3).
+- A row with invalid metadata shows only its label and a short error; the page's other
+  rows still work.
+- An unbound key with a `mcDefaultControl` shows the keyboard keys the game binds to that
+  action.
+- Release packages publish every document at the mod root.
 
 ## v0.3.1
 
-- Refine preset dirty-state handling, grouped presentation, and missing-default initialization.
-- Consolidate developer documentation and extract release notes from this changelog.
-
-- Use the ModCoreSettings identity and `_ModCore_Settings` installation folder.
-- Read `mc*` presentation metadata; legacy decoration aliases are no longer supported.
+- Preset unapplied-change marks, grouped presentation and missing-default initialization
+  are refined.
+- Uses the ModCoreSettings name and `_ModCore_Settings` installation folder.
+- Reads `mc*` presentation metadata; older metadata names are no longer supported.
 
 ## v0.3.0
 
-- Rename the runtime and DMM extension to KEngineMenu (KEM), packaged under `_KEngineMenu`.
-- Use `mc*` manifest metadata and `MC_` runtime markers without reading old `amm*` metadata or migrating old settings.
-- Keep generated KEngineTemplates module-page title controls separate from its ordinary Templates page.
+- Renamed KEngineMenu (KEM), installed under `_KEngineMenu`.
+- Uses `mc*` metadata; older `amm*` metadata and settings are not read.
 
 ## v0.2.25
 
-- Added native Controls-page grouping, including controller settings.
-- Added provider menu levels, optional hidden headings, wider horizontal pickers, and paired key/mode controls.
-- Made Tap/Hold a single toggle beside Key capture, with Default as a separate option and matching dark backgrounds, including when Default is selected.
-- Added the bundled menu-fixes template under `Scripts/fixes.lua`.
-- Improved key capture, hover feedback, row reconstruction, and setting updates through the DMM provider interface.
-
-Offline Lua and Python checks and package validation passed. The new menu layout still needs live in-game acceptance.
+- Controls-page grouping, including controller settings.
+- Menu levels, optional hidden headings, wider horizontal pickers and paired key and
+  mode controls.
+- Tap/Hold is a single toggle beside the key, with Default as a separate option.
+- Better key capture, hover feedback and setting updates.
 
 ## v0.2.24
 
-- Align the 75-pixel paired Tap/Hold control beside its key field at the same height and match the key's active dark background; retain its hover and Default-dimmed states.
+- The Tap/Hold control lines up beside its key field.
 
 ## v0.2.23
 
-- Soften the shared Tap/Hold background while Default is selected, including its hover glow.
+- The Tap/Hold control is softened while Default is selected.
 
 ## v0.2.22
 
-- Reduce the shared paired Tap/Hold control to half of its reserved 150-pixel mode column without changing key or Default placement.
+- The Tap/Hold control is narrower.
 
 ## v0.2.21
 
-- Render paired Tap/Hold modes in one full-width control that toggles on click; keep an optional Default mode in its separate reserved column.
-- Preserve declared numeric mode values and standalone tab pickers.
+- Tap/Hold modes are one control that toggles on click, with an optional Default mode
+  beside it.
 
 ## v0.2.20
 
-- Move the bundled `menu.fixes` template to `Scripts/fixes.lua` for TE's module registration path, preserving its identity and enabled default.
-- Use normal left alignment for ordinary Mod Menu entries; keep explicit provider indentation.
-- Correct paired-row and fixes-template regression expectations without changing those runtime behaviors.
+- Ordinary Mod Menu entries are left-aligned.
 
 ## v0.2.19
 
-- Apply paired-picker hover glow to the hovered tab individually instead of across the full tab row.
-- Enable the bundled Dawnwalker settings-page fixes template by default.
+- Hover glow on paired pickers highlights the hovered tab only.
+- The bundled Dawnwalker settings-page fixes are enabled by default.
 
 ## v0.2.18
 
-- Keep paired key fields and Tap/Hold tabs in fixed columns; render an optional third `-1` Default tab in a reserved left column.
+- Paired key fields and Tap/Hold tabs keep fixed columns, with an optional Default tab.
 
 ## v0.2.17
 
-- Remove the native empty-key prompt and reject empty key capture; use a paired `Default` mode to disable capture.
+- Empty key capture is rejected; a paired `Default` mode turns capture off.
 
 ## v0.2.16
 
-- Place three-option `Pair` tabs to the left of their key field when the third value is `-1`.
-- Disable and dim key capture while that `-1` option is selected without disabling the picker.
-- Restore paired-tab hover feedback, hide the native empty-key prompt, and shift ordinary Mod Menu entries left by 20 pixels.
+- Three-option `Pair` tabs sit left of their key field; capture is dimmed while Default
+  is selected.
 
 ## v0.2.15
 
-- Keep `Pair` pickers in the original 150-pixel mode column beside their 96-pixel key control.
-- Add a subtle background behind paired tabs so their shared control surface remains visible.
-- Reduce active-menu selector and dirty-label refresh latency from 100 ms to 50 ms.
+- Paired tabs have a background behind them; the menu responds faster.
 
 ## v0.2.14
 
-- Restore key controls in `Pair` rows after the setting-identity schema gained the `ammTabsWidth` field.
-- Parse the paired target, tab width, values, and labels from their current schema positions.
+- Key controls in `Pair` rows show again.
 
 ## v0.2.13
 
-- Make the picker that declares `Pair` own the composite row and its visible label.
-- Render the paired key inside that picker only while DMM considers the key setting visible.
-- Keep arbitrary picker values, including negative defaults, independent from positional tab navigation.
+- The picker that declares `Pair` owns the combined row and its label.
 
 ## v0.2.12
 
-- Center each horizontal picker label within its allocated option slot.
+- Horizontal picker labels are centred in their slot.
 
 ## v0.2.11
 
-- Rename the template directory from `template` to the shared `templates` convention.
+- The template folder is `templates`.
 
 ## v0.2.10
 
-- Add `ammTabsWidth` so generated horizontal pickers can reserve up to 440 pixels for their options.
-- Keep existing tab widths unchanged unless a provider explicitly requests the wider layout.
+- `ammTabsWidth` lets horizontal pickers take up to 440 pixels.
 
 ## v0.2.9
 
-- Rename every public decoration metadata key from the old `Deco...` form to the `amm...` prefix.
-- Remove compatibility parsing for the old prefix so manifests have one concise schema.
+- Metadata keys use the `amm...` prefix instead of `Deco...`.
 
 ## v0.2.8
 
-- Let generated provider pages request a smaller Mod Menu browser font and a bounded left indentation.
-- Preserve level-two, left-aligned styling for ordinary modules and aggregate pages.
+- Generated pages can ask for a smaller mod list font and a bounded indent.
 
 ## v0.2.7
 
-- Move the Dawnwalker settings-page fixes out of AMM startup and into `templates/fixes.lua` under `menu.fixes`.
-- Leave the template without event declarations or runtime hook registration.
+- The Dawnwalker settings-page fixes are a template, `menu.fixes`.
 
 ## v0.2.6
 
-- Bind native settings reconstruction through `DogwoodUI.SettingTabWidget`, whose inherited functions are hookable before the settings Blueprint is loaded.
-- Track relocated controller-row selection through `RebelSettingEntryWidgetBase:SetSettingSelected` so the Controls page can display its native controller panel.
-- Remove the rejected Blueprint-hook registration path that prevented the v0.2.5 controller transfer from running.
+- The Controls page shows the game's controller panel when a moved controller setting is
+  selected.
 
 ## v0.2.5
 
-- Add a native `Controller Settings` category after the three mouse settings on the Controls page.
-- Move Preset, Controller Sensitivity and Vibrations into that category using the game's own live setting descriptors and widget factory.
-- Show the native controller preset panel on the right when a relocated controller setting is selected.
-- Empty the former Controller page after a successful transfer and rebuild native navigation without polling or config-order assumptions.
+- The Controls page gets a Controller Settings category after the mouse settings, holding
+  Preset, Controller Sensitivity and Vibrations; the former Controller page is empty.
 
 ## v0.2.4
 
-- Add `ammHeading=0` for categories whose rows should remain visible without rendering their category heading.
-- Render the mod-browser selector as a level-one page header with a themed divider, and align its level-two mod names to the same left edge.
-- Add a native `Mouse Settings` category header above the first three entries on the Controls page.
-- Construct native header text through Unreal's text library in UE4SS Lua states where the convenience `FText` global is unavailable.
+- `ammHeading=0` hides a category's heading while keeping its rows.
+- The mod list's selector is a page header with a divider.
+- The Controls page gets a Mouse Settings heading.
 
 ## v0.2.0
 
-- Capture left/right Shift, Control, Alt and Windows keys as distinct Windows virtual-key values while rejecting modifier chords.
-- Remove the unused key-code support wrapper and obsolete row-state fields.
-- Rename Mod Menu Decorator to Adaptive Mod Menu across the runtime, package, repository, documentation.
-- Use the AdaptiveModMenu/AMM identity consistently across row metadata, DMM patch markers, configuration markers.
-- Retire an enabled `ModMenuDecorator` installation during AMM bootstrap by deleting its `enabled.txt`, creating `deprecated.txt` containing `AdaptiveModMenu`, and attempting to unload it when UE4SS supports cross-mod unloading.
-- Stage and verify every DMM replacement before moving the original modules to verified backups, and roll back the complete transaction if promotion fails.
-- Remove unreleased legacy decoration aliases and row-marker formats; accept only the canonical AMM configuration and metadata contracts.
-- Consolidate page retirement into the lifecycle close path and remove the redundant host-open event.
-- Register the menu click callback lazily after DMM lifecycle installation succeeds.
-- Restore ordinary provider configuration initialization through DMM's authoritative provider model.
-- Recover interrupted DMM patch transactions from verified baselines and remove incomplete staging files.
-- Keep failed Settings API handler registration from retaining a process-wide ownership claim.
-- Leave `enabled.txt` under user or mod-manager control instead of including it in release archives.
+- Left and right Shift, Control, Alt and Windows keys are captured separately; modifier
+  chords are rejected.
+- Renamed Adaptive Mod Menu (AMM); an installed Mod Menu Decorator is retired.
+- `enabled.txt` is left to you or your mod manager.
 
 ## v0.1.52
 
-- Fix DMM localization module loading in the standalone decorator state by
-  passing only the rewritten path to `loadfile`. This restores localized dirty
-  label matching without adding polling or UObject access during startup.
+- Unapplied-change labels work again.
 
 ## v0.1.51
 
-- Remove the process-wide `UTextBlock::SetText` hook implicated in crash AA40011448729B47EDFCB8846C95AF72.
-- Observe dirty text only on bound DMM rows during the existing active-menu update; no dirty-label callback runs during gameplay.
-- Add one `PAGE_TIMING` diagnostic per page build with discovery, localization, decoration, route and dirty-binding durations.
-- Replace the native mapped-preset adapter with DMM extension API version 1 and ship a pure-Lua package with no DLL.
+- Fixes a crash; the mod no longer needs a DLL.
 
 ## v0.1.50
 
-- Replace the unavailable `UButton:OnButtonClickedEvent` hook with one bounded left-mouse key callback.
-- Deliver queued clicks to the hovered paired picker only from the existing menu-scoped game-thread update.
-- Avoid sparse delegate access, repeated failed hook registrations and repeated pair-construction failures.
-- Keep attribution of crash E880E96A4DB5418CA744558698206985 unresolved; its game-thread null dereference has a different signature from the earlier UE4SS delegate-reflection crashes.
+- Clicks on paired pickers are more reliable.
 
 ## v0.1.49
 
-- Remove reflected access to UButton's sparse multicast `OnClicked` property.
-- Queue owned picker clicks through the hookable `UButton::OnButtonClickedEvent` function, retaining the same menu scope, receiver validation and teardown.
-- Keep crash attribution unresolved: the supplied startup dump matches the delegate-reflection failure signature, while its log belongs to the following launch.
+- Picker clicks are handled differently, to avoid a startup crash.
 
 ## v0.1.48
 
-- Bind normal DMM page selections from the exact active provider `ScrollBox`, avoiding a full widget-tree traversal on first and repeated openings.
-- Build refresh routes only for recognized setting and decoration controls; retain one bounded full-tree traversal for activation and unrelated-switcher recovery.
-- Publish the versioned `settings_api.lua` consumer contract for event-driven notifications after successful durable Apply.
+- Pages open faster.
+- `settings_api.lua` delivers notifications after a successful Apply.
 
 ## v0.1.47
 
-- Add reusable parent headings for related categories through `ammParent` and `ammParentLevel`.
-- Keep subgroup ordering, navigation and page-ready rebinding intact beneath parent headings.
-- Keep parent headings independent of picker values; providers control subgroup visibility through DMM's ordinary visibility metadata.
+- `ammParent` and `ammParentLevel` give related categories a shared parent heading.
 
 ## v0.1.46
 
-- Rebind decorators after a picker changes which settings rows are visible.
-- Coalesce visibility and category-order changes into one deferred page-ready event.
-- Reuse the active dirty-label hook across same-page rebinding instead of unregistering and registering it again.
+- Changing which rows a picker shows keeps their decorations.
 
 ## v0.1.45
 
-- Bind decorations, paired Mode rows and dirty-label metadata directly by provider and setting IDs, independently of row or metadata order.
-- Remove positional and label matching fallbacks; reject missing, duplicate or mixed-provider row identities.
+- Rows are matched to their settings by id, never by position or label.
 
 ## v0.1.44
 
-- Attach provider and setting IDs to row-owned markers so grouped and repeated labels bind by identity.
-- Align paired, fixed-mode and unpaired keybindings on the same grid, reserving blank mode space without creating controls.
-- Remove per-option layout measurement when constructing mode controls.
+- Paired, fixed-mode and unpaired keybindings line up on one grid.
 
 ## v0.1.43
 
-- Add declarative numeric maps and ordered conditional source rules for migrating absent configuration keys from the original file.
-- Preserve explicit destinations and original configuration bytes; validate migrated values before transactional replacement.
-- Keep settings unavailable when a declared migration fails, preventing Apply from replacing legacy choices with defaults.
+- Missing configuration keys can be filled from an older file's values.
 
 ## v0.1.42
 
-- Dim fixed Tap/Hold labels without disabling key capture; restore normal text contrast when the paired mode becomes editable.
+- Fixed Tap/Hold labels are dimmed without disabling key capture.
 
 ## v0.1.41
 
-- Skip dirty-label row discovery for MMD's own synchronous decoration text during page binding, preserving DMM value notifications and restoring handling after construction failures.
+- Fixes unapplied-change marks while a page is built.
 
 ## v0.1.40
 
-- Add ammMode=Tap|Hold as a fixed presentation fallback for key bindings without a logically visible paired mode.
-- Follow DMM model visibility when switching between fixed labels and editable Tap/Hold controls, preserving saved modes and discarding stale clicks.
-- Retain key capture, row ownership and existing menu-scoped updates without adding timers.
+- `ammMode=Tap|Hold` shows a fixed mode for keybindings without an editable one.
 
 ## v0.1.39
 
-- Standardize metadata on ammType=tab|keybind, ammLevel=0–6 and the Deco prefix; retain legacy read compatibility.
-- Add tab pickers, six font levels, a header toggle, category help, conditional labels and category ordering through metadata.
-- Preserve row identity when categories move and use DMM's existing menu tick for new controls.
-- Keep preset-derived keys visually clean after a manual edit; select Custom automatically and skip it during preset navigation.
-- Support DefaultFrom for missing configuration values, preserving explicit values and validated legacy defaults.
+- Metadata uses `ammType=tab|keybind` and `ammLevel=0–6`.
+- Tab pickers, six font levels, a header toggle, category help, conditional labels and
+  category ordering.
+- A manual edit after a preset selects Custom.
 
 ## v0.1.38
 
-- Reduce preset refresh overhead: validate the menu owner once per value callback, ignore unrelated text after binding, and skip unchanged label styling.
-
-- Render dirty stars as separate row-owned widgets in the existing left gutter, keeping label text and position unchanged. Preserve italic styling and preset suppression.
+- Presets refresh faster; unapplied-change stars sit left of the label.
 
 ## v0.1.37
 
-- Display dirty settings with a left-hand star and italic label across recognized DMM sliders, pickers and toggles, replacing visible value-side stars.
-- Restore original label styling when changes are applied or restored; combine key and Tap/Hold dirty presentation.
-- Add panel-wide dirty-display suppression for MMD value changes, including deferred DMM refreshes, without changing Apply/Restore state.
-- Expand MappedPresetTargets/MappedPresetValues synchronously in DMM's pending model; update visible keys and modes together and select Custom after a manual target edit.
-- Hide preset-derived dirty indicators while preserving Apply/Restore state; reveal actual target differences when switching to Custom.
-- Install the mapping adapter through UE4SS's native DMM startup callback, without editing DMM files or adding gameplay polling.
+- Unapplied settings show a star and an italic label.
+- Mapped presets (`MappedPresetTargets`, `MappedPresetValues`) update several settings at
+  once and select Custom after a manual edit.
 
 ## v0.1.36
 
-- Initialize provider INI files from metadata defaults at startup, with existing values taking precedence.
-- Preserve existing configuration bytes and add missing assignments before DMM opens settings; validate with DMM and protect writes with transaction recovery.
-- Include disabled direct providers and settings without decorations; add no gameplay polling.
+- Missing config keys are added with their defaults at startup, keeping existing values.
 
 ## v0.1.35
 
-- Reject release manifests that would place a Tools directory anywhere in the ZIP, regardless of capitalization.
-- Cover nested, mixed-case and root-directory exclusions with packaging regression tests.
-- Runtime behavior is unchanged from 0.1.34.
+- Packaging changes only.
 
 ## v0.1.34
 
-- Preserve accepted row input state before rendering, so a failed label update followed by reopening cannot overwrite Restore with an old key.
-- Use a neutral capture baseline for unmapped backing values, allowing the previous key to be selected again while preserving cancellation.
-- Recover failed key, mode and dirty-label writes; display unmapped values numerically.
-- Report inactive DMM and invalid decoration metadata at startup; remove stale workspace notes and normalize changelog encoding.
+- Fixes Restore after a failed edit and reselecting the previous key.
 
 ## v0.1.33
 
-- Include the updated developer README in the downloadable package, covering features, integration examples, known limitations and documentation links.
-- Clarify that Mod Menu Decorator provides GUI upgrades and pairs with UE4SSLuaEventBridge for input behavior.
-- Runtime behavior is unchanged from 0.1.32; only the version label changes.
+- The package includes the updated README.
 
 ## v0.1.32
 
-Unreadable selected keys now count toward the existing three-failure limit, stopping updates to broken controls until the next page event. Successful reads reset consecutive failures. Deployment tooling never creates enabled.txt, including on fresh installs, and preserves existing enablement. Regression coverage verifies failure shutdown, recovery and enablement preservation. Native gameplay-impact verification remains pending.
+- Broken controls stop updating instead of retrying.
 
 ## v0.1.31
 
-Promote the rc.2 runtime fixes to stable. Runtime behavior is unchanged apart from the version label. Automated regression and packaging checks pass; native gameplay-impact verification remains pending.
+- Promotes 0.1.31-rc.2.
 
 ## v0.1.31-rc.2
 
-Fix construction failure paths: restore stock controls if initial binding bookkeeping fails; contain post-attachment receipt errors inside the transaction; restore row-owned picker metadata on rollback; and report incomplete rollback explicitly. Automated fault-injection regressions cover each case and ensure adoption failure does not dismantle existing rows. No polling, dependency or configuration changes. Native integration validation remains separate.
+- Fixes recovery when a page cannot be decorated.
 
 ## v0.1.31-rc.1
 
-Local testing release candidate including all completed work through 0.1.30: row-owned decoration state, event-driven construction, duplicate-ID handling and construction rollback improvements. Distinct RC startup/version identity; packaging validates RC suffixes. Native functional and gameplay-impact verification remain pending. No new runtime dependency or configuration migration.
+- Test release of the work through 0.1.30.
 
 ## v0.1.30
 
-Recover on the next valid page event after lifecycle callback errors. Traverse and update only the selected provider, retaining collapsed backing controls. Stop scheduling when every control is disabled. Preserve setting IDs and original construction/update errors, including the terminal disabled message. Coalesce page events and reuse discovery routes when adopting unchanged rows. Skip serialization for unchanged row state. Automated regression coverage includes each change; native gameplay impact verification remains pending.
+- Recovers after page errors; only the selected page is updated.
 
 ## v0.1.29
 
-Move persistent decoration state into a collapsed child of the decorated row. Adopt surviving controls from their subtree on page events; newly built rows decorate without any cached host/row flag. Keep WidgetTree ownership and row attachment for all created widgets. Remove periodic structural scans and discovery retries. DMM page-switch completion queues discovery after row construction; load recovery no longer depends on a specific activation callback. Construction rollback remains; periodic partial-decoration repair is removed. Native repeat-cycle validation pending.
+- Decorations survive page switches without rescanning.
 
 ## v0.1.28
 
-Skip later duplicate Mod Id manifests in sorted path order, matching DMM. Duplicate settings can neither overwrite nor merge into the first provider, including when that provider has no decorations. Emit one startup diagnostic per skipped duplicate. Eight Lua suites and three package checks pass.
+- A second mod with an already used Mod Id is skipped, as DMM does, and logged.
 
 ## v0.1.27
 
-Recover an already-active menu owner when its reflected activation was missed. Event-triggered discovery queries only the two DMM owner classes; no live owner means no polling. In-game use was reported working for this version.
+- Recovers an open menu whose opening was missed.
 
 ## v0.1.26
 
-Fix post-construction route refresh when row replacement leaves the count unchanged. Remove stale diagnostic wrappers, unused press/reset/click-epoch state, suppressed discovery-log formatting and duplicate row references. Make binding state local to its host; reject missing FKey names and avoid owner searches for foreign switcher events. Refresh current documentation.
+- Fixes refreshing a page whose rows were replaced.
 
 ## v0.1.25
 
-Gate polling on a fresh visible, active main/pause-menu owner. Retire removed-host and closed-session records; retain temporary Back-navigation state. Includes acknowledgement-wait removal. Eight Lua suites and three package checks pass; native integration pending.
+- The menu is only watched while it is open.
 
 ## v0.1.24
 
-Removed DMM acknowledgement polling, pending acknowledgement state, the 25-update timeout and its diagnostic. Key submission still writes the stock slider once. Normal slider synchronization and DMM dirty-label mirroring continue; DMM owns processing, Apply and persistence. Includes the 0.1.23 hidden/disabled-host guards.
-
-Eight Lua syntax checks and eight regression suites pass, including stale DMM text, stock Restore/Reset synchronization without resubmission, cancellation and subsequent capture. Native interaction verification remains pending.
+- Key changes no longer wait for DMM to acknowledge them.
 
 ## v0.1.23
 
-Adds visibility and enabled-state checks before host traversal or control updates. A host that remains activated and in the viewport but becomes hidden or disabled now invalidates the menu scope, clears pending clicks, and stops both scheduling chains. No new timer or hook is introduced. If no close event arrives, detection occurs on the next scheduled update; 100 ms is the nominal interval, not a latency guarantee.
-
-Retains 0.1.22 queued native picker clicks and stock DMM ownership of pending/dirty/Apply state. Basic short-click, Apply and reopen persistence passed in the prior native run. This new guard is mock-tested; native shutdown and gameplay performance acceptance remain outstanding.
-
-No debug mode is included. Native verification remains pending.
+- A hidden or disabled menu stops being updated.
 
 ## v0.1.22
 
-Replaces picker IsPressed sampling with queued native OnClicked delivery on MMD-owned proxy buttons. No polling frequency increase.
-
-Each new proxy binds OnClicked to its own inherited no-argument ForceLayoutPrepass function. A temporary native-function hook checks the fresh callback receiver against registered primitive address/full-name and active host identity, then increments a Lua count. The existing game-thread update consumes that count once through the stock mode slider. This avoids entering DMM state mutation from the click callback and does not retain callback UObject wrappers.
-
-The hook is installed only while a candidate menu scope is active. Close/load/dormancy clears pending counts and unregisters it. Native self-delegate bindings refer only to a live widget and an engine function; no pointer into a mod DLL or Lua function is bound to the delegate. Surviving widgets reuse their binding. Failed registration/attachment preserves or restores the stock mode row.
-
-The installed UE4SS DLL has AddDelegate export and delegate GetBindings/Broadcast strings; official UE4SS docs specify multicast Add(target,FName). Actual event delivery and teardown on this native runtime remain a test gate. This candidate does not require or modify the Enhanced Input bridge. No unverified ABI offsets or synthetic UFunctions are used.
-
-0.1.21 native results remain recorded separately: delayed provider opening, visible keys, key-only dirty/Apply/cancel passed; settings FPS observed about200–218 versus7–12 on0.1.20, not a controlled benchmark. Stock DMM Apply mouse-click reliability remains outside this patch.
-
-Native testing remains pending.
+- Picker clicks are delivered without extra polling.

@@ -52,10 +52,9 @@ dates for the mod browser or atomic config writes without the File Bridge, and n
 when you pick a mod's own sound file without the Sound Bridge. It does not need the Event
 Bridge.
 
-MCS renames DMM's `Scripts/main.lua` to `main.dmm.lua` and installs a launcher
-as `main.lua`. The launcher loads MCS inside DMM's Lua state, then runs DMM's
-original entry point. If DMM already started, restart when
-`DMM_RESTART_REQUIRED` is reported. Restart after metadata changes too. Reloading
+MCS keeps DMM's `Scripts/main.lua` as `main.dmm.lua` and puts its own launcher in
+its place, which starts MCS and then DMM. Restart the game after installing MCS while
+DMM was already running, and after changing a mod's settings metadata. Reloading
 UE4SS mods without restarting the game leaves MCS's menu integration off until the
 next restart.
 
@@ -67,7 +66,8 @@ next restart.
 - Apply notifications from a raw manifest page's DMM storage are numeric; menu-data and
   hooks pages also deliver text values (keys, ranges, keybinds).
 - Key capture excludes modifier chords, Escape, wheel directions and gamepads.
-- MCS depends on DMM's widget layout; offline tests do not prove live UI compatibility.
+- MCS builds on DMM's menu as it is; a DMM update that changes its layout may need an
+  MCS update.
 
 ## The Modules page
 
