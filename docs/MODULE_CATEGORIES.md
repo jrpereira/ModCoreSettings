@@ -122,7 +122,7 @@ are named without DMM's "No settings available" notice, dimmed to 50% (75% on ho
 70% when selected) without the full highlight; "and N more" entries likewise sit at 50%
 and 75% on hover.
 
-The Settings page's Modules tab chooses the listing, saved in `config.ini` under
+ModCore Settings' Settings tab chooses the listing, saved in `config.ini` under
 `[Modules]`:
 
 - **Sort by** (`SortBy`): Categories (1, the default) groups as above; Recently

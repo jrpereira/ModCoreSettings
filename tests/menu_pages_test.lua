@@ -11,6 +11,12 @@ end
 local function expect(providers,wanted,message)
     assert(ids(providers)==wanted,(message or 'order')..': '..ids(providers)..' ~= '..wanted)
 end
+-- The providers the browser lists: kept pages (mcBrowserHidden) are left out.
+local function listed(providers)
+    local out={}
+    for _,provider in ipairs(providers) do if not provider.mcBrowserHidden then out[#out+1]=provider end end
+    return out
+end
 local function parse(content)
     if content:find('broken') then error('bad manifest') end
     local out={}
@@ -263,8 +269,10 @@ do
         return list,state
     end
     local list,state=build({mod('ModCoreControls','Controls')})
-    expect(list,'ModCoreControls,ModCoreTemplates','slot available: source stays hidden')
-    assert(state.inserts.controls.visuals[1].source.id=='ModCoreTemplates.quickslots')
+    expect(listed(list),'ModCoreControls,ModCoreTemplates','slot available: source stays hidden')
+    -- It is still in the menu, unlisted, and is the rows' source.
+    expect(list,'ModCoreControls,ModCoreTemplates,ModCoreTemplates.quickslots','the source is kept')
+    assert(list[3].mcBrowserHidden and state.inserts.controls.visuals[1].source==list[3],'one kept provider')
     list,state=build({mod('Zeta')})
     expect(list,'ModCoreTemplates,ModCoreTemplates.quickslots,Zeta','no host: fallback page under its parent')
     assert(list[2].mcBrowserIndent==20 and list[2].mcManifest==manifest)
@@ -288,11 +296,45 @@ do
         {id='ModCoreSettings',pages={{id='ModCoreSettings',name='ModCore Settings',manifest=manifest,configDirectory='/s'}}}}
     local list,state={mod('EventBridge','Event Bridge'),mod('Zeta')},{}
     Pages.apply(list,rowsFirst,parse,state,report,slots)
-    expect(list,'ModCoreSettings,Zeta','a host published later still takes the rows; source and its mod stay hidden')
-    assert(state.inserts.settings.verifications[1].source.id=='LEX.Events')
+    expect(listed(list),'ModCoreSettings,Zeta','a host published later still takes the rows; source and its mod stay hidden')
+    expect(list,'LEX.Events,ModCoreSettings,Zeta','the kept source is sorted, not attached')
+    assert(list[1].mcBrowserHidden and not list[1].mcModuleEntry and state.inserts.settings.verifications[1].source==list[1])
     -- A rebuild gives the same list.
     Pages.apply(list,rowsFirst,parse,state,report,slots)
-    expect(list,'ModCoreSettings,Zeta','the same on every build')
+    expect(list,'LEX.Events,ModCoreSettings,Zeta','the same on every build')
+end
+
+-- A tab of rows from a hidden page (ModCore Controls in ModCore Settings' Controls tab):
+-- the hidden page is kept, so its inner pages open and the slot it declares takes rows,
+-- even from a contributor published before it.
+do
+    local slots={address=Menu.address,provider=Menu.provider,
+        declares=function(_,provider,name)
+            return provider.id=='ModCoreSettings' and name=='controls' or provider.id=='ModCoreControls' and name=='visuals'
+        end}
+    local templates={id='ModCoreTemplates',pages={{id='ModCoreTemplates.quickslots',name='Quickslots',visible=false,
+        manifest=manifest,configDirectory='/t'}},
+        rows={{page='ModCoreTemplates.quickslots',slot='controls:visuals',settings={'A'}}}}
+    local controls={id='ModCoreControls',pages={
+        {id='ModCoreControls',name='ModCore Controls',visible=false,manifest=manifest,configDirectory='/c'},
+        {id='ModCoreControls.keys',name='Keys',under='ModCoreControls',group='inner',manifest=manifest,configDirectory='/c'},
+        {id='ModCoreControls.entry',name='ModCore Controls',attach='2_ModCore_Controls',link='settings:controls'}},
+        rows={{page='ModCoreControls',slot='settings:controls',settings={'A'}}}}
+    local host={id='ModCoreSettings',pages={{id='ModCoreSettings',name='ModCore Settings',manifest=manifest,configDirectory='/s'}}}
+    local list,state={placeholder('2_ModCore_Controls'),mod('Zeta')},{}
+    logs={}
+    Pages.apply(list,{templates,controls,host},parse,state,report,slots)
+    assert(#logs==0,logs[1])
+    expect(listed(list),'ModCoreControls.entry,ModCoreSettings,Zeta','the entry links to the tab; nothing else is listed')
+    local byId={}
+    for _,provider in ipairs(list) do byId[provider.id]=provider end
+    assert(byId.ModCoreControls and byId.ModCoreControls.mcBrowserHidden,'the hidden page is kept')
+    assert(byId['ModCoreControls.keys'] and byId['ModCoreControls.keys'].mcBrowserHidden,'its inner page is built')
+    assert(byId['ModCoreTemplates.quickslots'].mcBrowserHidden,'the rows for its slot land: no fallback')
+    assert(byId['ModCoreControls.entry'].mcLinkSlot.host=='ModCoreSettings'
+        and byId['ModCoreControls.entry'].mcLinkSlot.slot=='controls' and byId['ModCoreControls.entry'].mcModuleEntry)
+    assert(state.inserts.controls.visuals[1].source==byId['ModCoreTemplates.quickslots']
+        and state.inserts.settings.controls[1].source==byId.ModCoreControls,'each row keeps its kept source')
 end
 
 -- The real DMM parser accepts generated manifests through the installed choices chain.

@@ -172,7 +172,7 @@ local function at(text) return assert(parsed:find(text,1,true),text) end
 assert(not parsed:find('Installed',1,true) and not parsed:find('ModCore Controls',1,true),
     'there is no Installed tab')
 assert(not parsed:find('Templates',1,true),'the Templates tab is the page\'s own slot, not an index')
-assert(at('[Category.Developer Tools]\nVisibleWhen=MCS_Page\nVisibleValues=5\n')<at('Label=Sounds Explorer')
+assert(at('[Category.Developer Tools]\nVisibleWhen=MCS_Page\nVisibleValues=3\n')<at('Label=Sounds Explorer')
     and at('mcLinkPage=ModCoreDevTools.sounds'),'Developer Tools lists the tool pages')
 local tool
 for _,provider in ipairs(indexed) do if provider.id=='ModCoreDevTools.sounds' then tool=provider end end
@@ -406,6 +406,22 @@ do
     pressedNow.controls=true;assert(pageWithTitle:tickFilter(released)==false)
     pressedNow.controls=false;assert(pageWithTitle:tickFilter(released)==true,'a click is handled')
     assert(pageWithTitle.opened[1]=='ModCoreControls','the link opens its page')
+    -- ModCore Settings' own link opens its Settings tab; its page opens on Controls.
+    local sets={}
+    local showDetail=pageWithTitle.showDetail
+    function pageWithTitle:showDetail(index)
+        showDetail(self,index)
+        local id=items[self.rows[index].providerIndex].id
+        self.controls={refresh=function() sets[#sets+1]='refresh' end,model={items=id=='ModCoreSettings'
+            and {{id='MCS_Page'}} or {{id='c'}},set=function(_,at,value) sets[#sets+1]=at..'='..value end}}
+    end
+    pressedNow.settings=true;pageWithTitle:tickFilter(released)
+    pressedNow.settings=false;assert(pageWithTitle:tickFilter(released)==true)
+    assert(pageWithTitle.opened[2]=='ModCoreSettings' and table.concat(sets,',')=='1=2,refresh',table.concat(sets,','))
+    sets={}
+    pressedNow.controls=true;pageWithTitle:tickFilter(released)
+    pressedNow.controls=false;pageWithTitle:tickFilter(released)
+    assert(pageWithTitle.opened[3]=='ModCoreControls' and #sets==0,'other links open as they are')
 end
 local rowA,indexA=rowOf(browsing,'A')
 local rowB,indexB=rowOf(browsing,'B')
@@ -547,8 +563,10 @@ local mcsMenu=require('mcs_page')
 Contributions.validate('ModCoreSettings',{pages={{id='ModCoreSettings',name='ModCore Settings',
     attach='1_ModCore_Settings',configDirectory='/x',menu=mcsMenu}}})
 local base=require('menu_data').manifest(mcsMenu)
-assert(base:find('[Category.Listing]\nVisibleWhen=MCS_Page\nVisibleValues=0\n\n',1,true)
-    and base:find('Id=SortBy\nLabel=Sort by\nGroup=Listing',1,true),'the Modules tab lists its settings under Listing')
+assert(base:find('[Category.Listing]\nVisibleWhen=MCS_Page\nVisibleValues=2\n\n',1,true)
+    and base:find('Id=SortBy\nLabel=Sort by\nGroup=Listing',1,true),'the Settings tab lists its settings under Listing')
+assert(base:find('[Category.Controls]\nmcHeading=0\nVisibleWhen=MCS_Page\nVisibleValues=0\n',1,true)
+    and base:find('mcSlot=controls\nmcSlotGroups=1',1,true),'the Controls tab is a slot that keeps its rows\' groups')
 local hostPage={{id='ModCoreSettings',name='Settings',path='/x/mod_settings.ini',mcManifest=base},
     {id='ModCoreControls',name='Controls',path='/m/2_Controls/mod_settings.ini'},
     {id='Tool',name='Sounds Explorer',mcBrowserGroup='tool'}}
@@ -557,7 +575,8 @@ Groups.arrange(hostPage,function(manifest) return Presentation.parse(manifest,Ch
 local page
 for _,provider in ipairs(hostPage) do if provider.id=='ModCoreSettings' then page=provider end end
 local items={};for _,item in ipairs(page.choices) do items[item.id]=item end
-assert(items.MCS_Page and #items.MCS_Page.values==3 and items.MCS_Page.labels[2]=='Templates'
+assert(items.MCS_Page and #items.MCS_Page.values==4 and table.concat(items.MCS_Page.labels,'|')
+        =='Controls|Templates|Settings|Developer Tools' and items.MCS_Controls and items.MCS_Controls.mcReadOnly
     and items.MCS_Index_1.mcLinkPage and items.MCS_Templates and items.MCS_Templates.mcReadOnly
     and items.SortBy.file=='config.ini' and items.SortBy.section=='Modules',
     'the tabs parse through DMM beside the page\'s own settings')

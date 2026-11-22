@@ -381,7 +381,21 @@ model=Choices.open(mcc)
 assert(not model.error and not model:dirty(),'a mirrored read-only row never dirties the page')
 logs={}
 controller.inserts={controls={visuals={{contributor='Extras',source=extras,settings={'Go'}}}}}
-assert(controller:load(mcc,read)==false and logs[1]:find('navigation and link rows cannot be inserted',1,true),logs[1])
+assert(controller:load(mcc,read)==false and logs[1]:find('navigation rows cannot be inserted',1,true),logs[1])
+-- A page link is inserted with its own keys: it opens its page from the host.
+do
+    local linking=shown:gsub('mcNavigation=1\n','mcNavigation=1\nmcLinkPage=Extras.inner\nmcType=tab\n')
+    files['/extras/mod_settings.ini']=linking
+    local links=provider('Extras','/extras/mod_settings.ini',linking,true)
+    local text
+    logs={}
+    assert(Slots.load(mcc,{visuals={{contributor='Extras',source=links,settings={'Go'}}}},read,
+        function(content) text=content;return Choices.parse(content) end,report),logs[1])
+    local go
+    for _,setting in ipairs(mcc.choices) do if setting.id=='Go' then go=setting end end
+    assert(go and go.mcNavigation and go.mcLinkPage=='Extras.inner' and go.mcSlotSource==links,'the link keeps its target')
+    assert(text:find('mcNavigation=1\nmcLinkPage=Extras.inner\nmcType=tab\n',1,true),text)
+end
 -- Under mcSlotGroups=1 inserted rows keep their source groups as the host's own groups,
 -- headed as any group and shown under the slot group's rule. A host group left empty
 -- loses its Category; a source group with a rule of its own is rejected.
@@ -561,7 +575,7 @@ do
     local list={host}
     Pages.apply(list,{hidden},Choices.parse,state,report,{address=Menu.address,provider=Menu.provider,
         declares=function(_,page,slot) return Slots.declares(page,slot,read) end})
-    assert(#list==1,'the source page stays hidden')
+    assert(#list==2 and list[2].mcBrowserHidden,'the source page is kept, listed nowhere')
     local rows=state.inserts.controls.visuals
     assert(#rows==2 and rows[1].source==rows[2].source,'one source object for every row of a page')
     files['/mct/templates.ini']='[Templates]\nMCT_Template=5\nMCT_Other=0\n'
@@ -574,5 +588,156 @@ do
     local ok,err=model:apply()
     assert(ok,tostring(err))
     assert(files['/mct/templates.ini']=='[Templates]\nMCT_Template=7\nMCT_Other=1\n',files['/mct/templates.ini'])
+end
+-- A slot among inserted rows is filled where it lands: its placeholder gives way to the
+-- rows addressed to it, which keep their own source. With mcSlotGroups on both slots, they
+-- keep their groups, in order. A failing inner entry falls back to the placeholder.
+do
+    local outer=[[
+[Category.Pages]
+mcHeading=0
+[Category.Hosted]
+mcHeading=0
+VisibleWhen=Page
+VisibleValues=1
+[Setting.Page]
+Id=Page
+Type=picker
+Label=Page
+Group=Pages
+PresetValues=0|1
+PresetLabels=Mine|Hosted
+Default=0
+mcNavigation=1
+[Setting.Hosted]
+Id=Hosted
+Type=picker
+Label=Hosted
+Group=Hosted
+PresetValues=0|1
+PresetLabels=None|None
+Default=0
+mcReadOnly=1
+mcSlot=hosted
+mcSlotGroups=1
+]]
+    local middle=[[
+[Category.Visuals]
+mcHeading=0
+[Category.Mappings]
+[Setting.Pending]
+Id=Pending
+Type=picker
+Label=Quickslots
+Group=Visuals
+PresetValues=0|1
+PresetLabels=Coming|Coming
+Default=0
+mcReadOnly=1
+mcCategory=1
+mcSlot=visuals
+mcSlotGroups=1
+[Setting.Link]
+Id=Link
+Type=picker
+Label=Keys
+Group=Mappings
+PresetValues=0|1
+PresetLabels=edit|edit
+Default=0
+mcNavigation=1
+mcLinkPage=ModCoreMiddle.keys
+mcType=tab
+[Setting.Speed]
+Id=Speed
+Type=picker
+Label=Speed
+Group=Mappings
+PresetValues=0|1
+PresetLabels=Slow|Fast
+Default=0
+ConfigFile=config.ini
+ConfigSection=Main
+ConfigKey=Speed
+]]
+    local deep=[[
+[Category.Deep]
+mcHeading=0
+[Setting.Pick]
+Id=Pick
+Type=picker
+Label=Quickslots
+Group=Deep
+PresetValues=0|1
+PresetLabels=Native|Fancy
+Default=0
+mcCategory=1
+ConfigFile=deep.ini
+ConfigSection=Deep
+ConfigKey=Pick
+[Setting.Size]
+Id=Size
+Type=picker
+Label=Size
+Group=Fancy
+PresetValues=0|1
+PresetLabels=Small|Large
+Default=0
+VisibleWhen=Pick
+VisibleValues=1
+ConfigFile=deep.ini
+ConfigSection=Deep
+ConfigKey=Size
+]]
+    files['/outer/mod_settings.ini']=outer
+    files['/middle/config.ini']='[Main]\nSpeed=1\n'
+    files['/deep/deep.ini']='[Deep]\nPick=1\nSize=0\n'
+    local host=provider('ModCoreOuter','/outer/mod_settings.ini',outer)
+    Slots.parse(outer,host.choices)
+    local mid=provider('ModCoreMiddle','/middle/mod_settings.ini',middle,true)
+    local low=provider('ModCoreDeep','/deep/mod_settings.ini',deep,true)
+    local inner={middle={visuals={{contributor='ModCoreDeep',source=low,settings={'Pick','Size'}}}}}
+    local entry={contributor='ModCoreMiddle',source=mid,settings={'Pending','Link','Speed'}}
+    local text
+    local function spy(content) text=content;return Choices.parse(content) end
+    local function nested(source) return inner[Menu.provider(source.id)] end
+    logs={}
+    assert(Slots.load(host,{hosted={entry}},read,spy,report,nested),logs[1])
+    assert(#logs==0,logs[1])
+    assert(ids(host.choices)=='Page,Pick,Size,Link,Speed',ids(host.choices))
+    local byId={}
+    for _,setting in ipairs(host.choices) do byId[setting.id]=setting end
+    assert(byId.Pick.mcSlotSource==low and byId.Size.mcSlotSource==low and byId.Link.mcSlotSource==mid
+        and byId.Speed.mcSlotSource==mid,'every row keeps its own source')
+    assert(byId.Pick.mcSlotName=='hosted' and byId.Link.mcSlotName=='hosted','the rows are the outer slot\'s')
+    assert(byId.Pick.group~=byId.Size.group and byId.Link.group==byId.Speed.group
+        and byId.Pick.group~=byId.Link.group,'each source group stays a group')
+    assert(text:find('mcLabel=Deep\nmcHeading=0\nVisibleWhen=Page',1,true)
+        and text:find('mcLabel=Mappings\nVisibleWhen=Page',1,true),text)
+    assert(text:find('VisibleWhen=Pick\nVisibleValues=1',1,true),'the inner rows keep their own gating')
+    assert(not text:find('Id=Pending',1,true) and not text:find('mcSlot=',1,true),'the placeholder gives way')
+    -- The Category sections follow the rows' order: the inner rows' groups come first.
+    assert(text:find('mcLabel=Deep',1,true)<text:find('mcLabel=Mappings',1,true),text)
+    -- Apply routes each row to its own page.
+    local model=Choices.open(host)
+    assert(not model.error,model.error)
+    model:set(1,1)
+    local visible=model:visibility()
+    assert(visible[2] and visible[3] and visible[4] and visible[5],'the hosted tab shows every row')
+    model:set(3,1);model:set(5,0)
+    assert(model:apply())
+    assert(files['/deep/deep.ini']=='[Deep]\nPick=1\nSize=1\n' and files['/middle/config.ini']=='[Main]\nSpeed=0\n',
+        files['/deep/deep.ini']..files['/middle/config.ini'])
+    -- Without inserts for the inner slot the placeholder is inserted as is.
+    assert(Slots.load(host,{hosted={entry}},read,spy,report,function() return nil end))
+    assert(ids(host.choices)=='Page,Pending,Link,Speed',ids(host.choices))
+    -- A failing inner entry is skipped and the placeholder stays; the outer rows still land.
+    inner.middle.visuals[1].settings={'Missing'}
+    logs={}
+    assert(Slots.load(host,{hosted={entry}},read,spy,report,nested))
+    assert(ids(host.choices)=='Page,Pending,Link,Speed' and #logs==1
+        and logs[1]:find('ModCoreDeep -> ModCoreMiddle/visuals in ModCoreOuter/hosted',1,true),logs[1])
+    assert(text:find('mcLabel=Visuals',1,true) and select(2,text:gsub('%[Category%.mcSlot','')) == 2,
+        'the skipped entry leaves no heading behind: '..text)
 end
 print('PASS menu slots splice contributed rows and route them to their source model')

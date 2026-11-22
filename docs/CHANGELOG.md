@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- The ModCore Settings page's tabs are Controls | Templates | Settings | Developer Tools,
+  and it opens on Controls. Controls shows ModCore Controls' page, which it fills through
+  the new slot `settings:controls`; Settings is the former Modules tab. The mod list's
+  settings link opens the Settings tab.
+- Slots take more kinds of rows: page links, which open their page from the host with
+  Back returning to it, and ModCoreSettings' range and keybind settings. A slot inside
+  inserted rows is filled where it lands (ModCore Templates' Quickslots rows inside the
+  Controls tab), its rows still stored by their own page.
+- A hidden page whose rows fill a slot stays in the menu, listed nowhere: its inner pages
+  open, the slots it declares take rows, and a link to it opens the page that shows its
+  rows. A contributor whose pages host another's rows is placed first, whatever the
+  order they publish in.
+
 - Inner pages: a contributed page with `group='inner'` and `under` is listed nowhere and
   opens through a page link. Back on any page a link opened now returns to the link's
   page with its row selected, instead of to the mod list; a chain of links unwinds in

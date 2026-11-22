@@ -273,12 +273,15 @@ only when they name a row the same contributor inserted earlier in that slot.
 DMM ANDs that rule with the Category rule. A row without its own rule takes the
 slot row's rule; a slot row with its own `VisibleWhen` rejects rows that bring
 one. Source Category rules are not carried. Only core DMM fields are copied, so
-inserted rows render as plain pickers, toggles or sliders. The exception is a
+inserted rows render as plain pickers, toggles or sliders, and ModCoreSettings' own types
+(`range`, `keybind`) keep the fields their type reads. The exception is a
 row label rule (`mcLabelWhen`/`mcLabels`): it is copied when `mcLabelWhen` names
 a row the same contributor inserted earlier, and the row is skipped otherwise. A
 row named by `mcSlotLabel=1` keeps no label rule. A picker's `mcChoiceNotes` is also
-copied. Read-only rows stay shown values that store nothing. Presets, navigation and
-link rows cannot be inserted. With no valid rows the slot row
+copied. Read-only rows stay shown values that store nothing. A [page link](#page-links)
+keeps `mcNavigation`, `mcLinkPage` and `mcType`, and opens its page from the host, and
+Back there returns to the host with the link selected. Presets and other navigation rows
+cannot be inserted. With no valid rows the slot row
 shows unchanged. Each `rows` entry is all or nothing: one invalid setting skips
 that entry, logged as `SLOT_ROW_SKIPPED`, and other entries still insert.
 
@@ -319,6 +322,16 @@ contributed picker; with no rows, the placeholder shows under the same label.
 The row stays the source's setting: storage, Apply and visibility are unchanged.
 `mcHeading` itself is not transferred; a page has at most one level-one heading.
 
+An inserted row that is a slot row of its own source page (an `mcSlot` placeholder) is
+filled where it lands: the rows addressed to that slot take its place, each still owned,
+stored and applied by its own source page, and the outer slot's rules (group visibility,
+`mcSlotLabel` on the first row) apply to them. Under `mcSlotGroups=1` they keep their
+groups when the inner slot keeps them too, and take the placeholder's group otherwise.
+An inner entry is all or nothing, as any entry; with none that fit, the placeholder is
+inserted as is. So ModCore Templates' Quickslots rows, addressed to `controls:visuals`,
+head ModCore Settings' Controls tab, where ModCore Controls' page is shown. Slots fill
+three levels deep.
+
 The page's model sees only its own settings: its configuration, initialization
 and Apply event never include inserted rows. Inserted rows edit the source
 page's model. The page's Apply commits its own settings first, then each
@@ -329,7 +342,12 @@ open leaves its rows inert. As on any page, unapplied changes are discarded
 when the page closes, so the same setting on two pages never holds two pending
 values.
 
-A `visible=false` page that is a row source shows as an ordinary page, in its
+A `visible=false` page that is a row source is kept in the menu, listed nowhere, while
+its rows have an available slot: its `group='inner'` pages open from links among its
+rows, a slot it declares takes rows as above, and a link to it or to one of its slots
+opens the page whose slot shows its rows, at those rows. It still hides the mod it
+attaches to. Contributors whose pages host other contributors' rows are placed first, so
+the order they publish in does not matter. The page shows as an ordinary page, in its
 declared place (`under`, `attach`), when none of its rows has an available
 slot: the host page is not listed or does not declare the slot. Its rows then
 work as on any page, with the same page id and storage. Build such a page to
@@ -407,7 +425,9 @@ a value, when clicked or confirmed with Enter (controller: A); Left and Right do
 on it. It requires `mcNavigation=1` and works in any manifest. With unapplied
 changes the link is refused and the page shows a status message.
 `mcLinkPage=<provider>:<slot>` opens the page that hosts that slot, sets its
-navigation pickers so the slot shows, and selects the slot's first row. With
+navigation pickers so the slot shows, and selects the slot's first row. A host listed
+nowhere whose rows another page's slot shows opens there instead, at the first row of the
+inner slot. With
 `mcType=tab`, a link shows its first choice as underlined text in a picker's value
 column, dimmed until hovered or selected. Its label lines up with the rows around it.
 `mcLevel=5` sets the row label in small (12pt) muted text, which suits a notice.
@@ -787,10 +807,10 @@ then met ones, marked `√`; each group alphabetical.
 
 ## Module categories
 
-The Settings page's Modules tab provides Sort by (Recently Added/Categories/Alphabetical/Load Order) and, with Categories, Collections valid with # modules (No/2/3) and Modules appear in a single category (Off/On), and Modules per row (1/2/3) in every sort, all under a Listing heading. Apply saves [Modules] SortBy (2/1/0/3), PreferredCategoryMinimum (0/2/3), SingleCategory (0/1) and ModulesPerRow (1/2/3) in config.ini. Defaults are Categories, 2, Off and 2. Modules per row sets the columns of every list's grid, the ungrouped Alphabetical and Load Order lists included; mod names are left-aligned in every layout. With a single category, a mod whose categories span several top categories is listed only under the one holding most of them; a tie goes to the one declared first, a preferred category counting as declared first. The mod list's title line carries settings and controls links, top right, opening ModCore Settings and ModCore Controls when they are listed. The mod list's footer button (DMM's Filter Mods, Backspace) is Sort by: each press moves to the next way, saves it the same way and re-sorts the list. Inside every group mods follow load order (in Recently added, newest first), those with settings first. Load Order lists mods in load order, each with its load-order number; mods without settings fold to the end as in every list, so the numbers shown skip them.
+ModCore Settings' Settings tab provides Sort by (Recently Added/Categories/Alphabetical/Load Order) and, with Categories, Collections valid with # modules (No/2/3) and Modules appear in a single category (Off/On), and Modules per row (1/2/3) in every sort, all under a Listing heading. Apply saves [Modules] SortBy (2/1/0/3), PreferredCategoryMinimum (0/2/3), SingleCategory (0/1) and ModulesPerRow (1/2/3) in config.ini. Defaults are Categories, 2, Off and 2. Modules per row sets the columns of every list's grid, the ungrouped Alphabetical and Load Order lists included; mod names are left-aligned in every layout. With a single category, a mod whose categories span several top categories is listed only under the one holding most of them; a tie goes to the one declared first, a preferred category counting as declared first. The mod list's title line carries settings and controls links, top right, opening ModCore Settings' page on its Settings tab and ModCore Controls (its Controls tab) when they are listed. The mod list's footer button (DMM's Filter Mods, Backspace) is Sort by: each press moves to the next way, saves it the same way and re-sorts the list. Inside every group mods follow load order (in Recently added, newest first), those with settings first. Load Order lists mods in load order, each with its load-order number; mods without settings fold to the end as in every list, so the numbers shown skip them.
 
 Recently added lists mods by their latest install or update, newest first, under Last 24 hours, Last 7 days, Last 30 days and Earlier. On each boot MCS records every active mod folder's top level in `cache/folder_info.json`: its files (name, size and, with the file bridge, creation and modification times) and folders, when the folder was added and when it was last updated. A folder it has not seen is added at the boot time; one whose top-level files or folders changed is updated at the boot time. Settings files (`.ini` other than `mod_settings.ini`), logs and `cache/` or `logs/` folders written while playing are ignored. Removed folders are forgotten, so a reinstall counts as new. Folders present when the record was first made are listed as Earlier. With [UE4SSLuaFileBridge](https://github.com/jrpereira/UE4SSLuaFileBridge) installed, the file is written atomically and a folder seen for the first time takes the newest creation time of its top-level files instead, so nothing is left as Earlier only because it was already installed; an update in place keeps old creation times, so it is still dated by the boot that noticed it. Deleting the file loses only those update dates. The module browser is rebuilt with the applied values when you return to it; so it is after any page's Apply.
 
 Browser grouping is described in [Module categories](MODULE_CATEGORIES.md#browser-behavior). Every mod, ModCore's own included, groups by the same rules. Unregistered folders and conflicting matches use Other or Specialized.
 
-ModCore Settings' own page has a Templates tab holding one slot, `settings:templates`, which ModCore Templates fills with every loaded template, one group per category (`mcSlotGroups=1`). It also carries a generated Developer Tools tab, rebuilt with the mod list, listing the `group='tool'` pages.
+ModCore Settings' own page has four tabs, `MCS_Page` values in brackets: Controls (0), Templates (1), Settings (2) and Developer Tools (3). It opens on Controls, which holds one slot, `settings:controls`, that ModCore Controls fills with its whole page: the Quickslots templates (its own slot `controls:visuals`, filled by ModCore Templates), the Mappings links to its inner pages and Behaviours, keeping their groups (`mcSlotGroups=1`). Templates holds `settings:templates`, which ModCore Templates fills with every loaded template, one group per category. Settings holds ModCore Settings' own Options, Listing and Previews. Developer Tools is generated, rebuilt with the mod list, listing the `group='tool'` pages. ModCore Controls' and ModCore Templates' mod list entries are slot links that open their tabs. Like any page it holds at most 256 settings; past that it shows without its slot rows, logged as `SLOT_ROWS_SKIPPED`. With ModCore's own modules and Fangdango's templates the four tabs hold about 55.

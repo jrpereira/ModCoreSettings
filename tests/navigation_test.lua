@@ -100,15 +100,15 @@ assert(not displayPlan.content:find('Reference',1,true),'references never receiv
 -- MCS's own page, compiled from its menu data as menu_pages compiles it.
 local visuals=require('menu_data').manifest(require('mcs_page'))
 local visualItems=Choices.parse(visuals)
-assert(#visualItems==9)
+assert(#visualItems==10)
 local byId={}
 for index,item in ipairs(visualItems) do
     byId[item.id]=index
     if item.id=='SortBy' or item.id=='PreferredCategoryMinimum' or item.id=='SingleCategory' or item.id=='CompactStyle'
         or item.id=='ModulesPerRow' or item.id=='PreviewSound' or item.id=='PreviewBackground' then
         assert(not item.mcNavigation and item.file=='config.ini' and item.section=='Modules')
-    elseif item.id=='MCS_Templates' then
-        -- The slot ModCore Templates fills: a shown value that stores nothing.
+    elseif item.id=='MCS_Templates' or item.id=='MCS_Controls' then
+        -- The slots ModCore Templates and ModCore Controls fill: shown values that store nothing.
         assert(not item.mcNavigation and not item.file)
     else assert(item.mcNavigation and not item.file) end
 end
@@ -124,6 +124,8 @@ assert(not visualModel:dirty(),'page selection remains transient')
 visualModel:set(byId.SortBy,0)
 assert(visualModel:dirty() and visualModel:apply(),'grouping preference is applied durably')
 local reopened=Choices.open(visualProvider)
+-- The page opens on its first tab, Controls.
+assert(byId.MCS_Page==1 and visualItems[1].values[1]==0 and visualItems[1].labels[1]=='Controls')
 assert(not reopened.error and reopened.pending[byId.MCS_Page]==0
     and reopened.pending[byId.SortBy]==0 and reopened.pending[byId.PreferredCategoryMinimum]==2
     and reopened.pending[byId.ModulesPerRow]==2)

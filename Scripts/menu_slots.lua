@@ -7,9 +7,12 @@ local Manifest=require('mcs_manifest')
 local groupOf=Manifest.groupOf
 -- Inserted rows render as plain DMM controls; source presentation keys are not copied,
 -- except a label rule naming an earlier inserted row, a picker's choice notes and sounds,
+-- the keys of ModCoreSettings' own setting types (range, keybind), a page link's own keys
 -- and, under mcSlotGroups, a row's mcCategory.
 local COPIED={'Id','Type','Label','Description','PresetValues','PresetLabels','Presets','Default',
-    'Minimum','Maximum','Step','Decimals','Prefix','Suffix','mcChoiceNotes','mcChoiceSounds','mcChoiceDescriptions','mcReadOnly'}
+    'Minimum','Maximum','Step','Decimals','Prefix','Suffix','mcChoiceNotes','mcChoiceSounds','mcChoiceDescriptions','mcReadOnly',
+    'Min','Max','DeltaMin','DeltaMax','LowMax','HighMin','Triggers','TriggerLabels','Optional','DefaultControl'}
+local LINK_COPIED={'mcNavigation','mcLinkPage','mcType'}
 
 -- Raw [Setting] sections with their line span, as DMM's parser reads them, and the lines.
 local function sections(content)
@@ -50,11 +53,13 @@ end
 
 local function eligible(setting)
     assert(setting,'setting not found')
-    assert(setting.kind=='picker' or setting.kind=='toggle' or setting.kind=='slider','unsupported kind')
+    assert(setting.kind=='picker' or setting.kind=='toggle' or setting.kind=='slider'
+        or setting.kind=='extension','unsupported kind')
     assert(not setting.targets and not setting.mcMapping,'presets cannot be inserted')
     -- A read-only row is copied with its mcReadOnly, so it stays a shown value: it has no
-    -- storage and is never dirty. Navigation and link rows act on their own page.
-    assert(not setting.mcNavigation and not setting.mcLinkPage,'navigation and link rows cannot be inserted')
+    -- storage and is never dirty. A page link opens its page from wherever it is shown;
+    -- other navigation rows act on their own page.
+    assert(not setting.mcNavigation or setting.mcLinkPage,'navigation rows cannot be inserted')
 end
 
 -- Section text for one inserted setting, placed in the slot's group. Its own VisibleWhen may
@@ -80,6 +85,11 @@ local function insertion(source,id,slot,number,earlier,first,grouping)
         local value=found[key]
         if named and key=='Label' then value=fields.Label end
         if value~=nil then out[#out+1]=key..'='..value end
+    end
+    if byId.mcLinkPage then
+        for _,key in ipairs(LINK_COPIED) do
+            if found[key]~=nil then out[#out+1]=key..'='..found[key] end
+        end
     end
     if named and fields.mcLevel then out[#out+1]='mcLevel='..fields.mcLevel end
     if named and fields.mcCategory then out[#out+1]='mcCategory='..fields.mcCategory end
@@ -124,10 +134,10 @@ local function categories(content)
 end
 
 -- Returns grouping(found) for one entry, which names (and records) the host group of each
--- source group, and the Category sections those groups need.
-local function regroup(source,slotName,hostRule,counter,known,hostLabel)
+-- source group, and the Category sections those groups need, appended to added (optional).
+local function regroup(source,slotName,hostRule,counter,known,hostLabel,added)
     local own=categories(source.mcManifest or '')
-    local added={}
+    added=added or {}
     local function grouping(found)
         local group=groupOf(found)
         local name=known[group]
@@ -159,9 +169,24 @@ local function regroup(source,slotName,hostRule,counter,known,hostLabel)
     return grouping,added
 end
 
+-- The raw fields of a source page's setting, or nil.
+local function sourceFields(source,id)
+    for _,section in ipairs(sections(source.mcManifest or '')) do
+        if section.fields.Id==id then return section.fields end
+    end
+end
+
+-- How deep slots in inserted rows are filled: a slot in a slot's rows, and so on.
+local NESTING=3
+
 -- Rebuild provider.choices from its unspliced base with the current inserts.
 -- inserts: slot name -> list of {contributor=id,source=provider,settings={ids}}.
-function M.load(provider,inserts,read,parse,report)
+-- nested(source) (optional) returns the inserts addressed to a source page's own slots: an
+-- inserted row that is such a slot's placeholder is replaced by that slot's rows, which
+-- stay owned by their own source page. They keep their groups when the inner slot keeps
+-- them (mcSlotGroups=1) and take the placeholder's group otherwise. With none that fit,
+-- the placeholder is inserted as is.
+function M.load(provider,inserts,read,parse,report,nested)
     if provider.choices~=provider.mcSlotChoices then
         provider.mcSlotBase={choices=provider.choices,count=provider.settingsCount}
     end
@@ -189,40 +214,100 @@ function M.load(provider,inserts,read,parse,report)
                 local grouped=section.fields.mcSlotGroups=='1'
                 local hostGroup=groupOf(section.fields)
                 local hostRule=hostCategories[hostGroup] and hostCategories[hostGroup].fields or {}
+                local hostLabel=section.fields.mcSlotLabel=='1' and section.fields.Label or nil
+                -- Groups are named per source page, so one page's chunks share them.
                 local counter,known={n=0},{}
-                for _,entry in ipairs(inserts[name]) do
-                    local rows,ids={},{}
-                    local mine=earlier[entry.contributor] or {}
-                    local seen=setmetatable({},{__index=mine})
-                    -- Groups are named per source page, so one page's chunks share them.
-                    known[entry.source]=known[entry.source] or {}
-                    local before,groupNames=counter.n,{}
-                    for group,named in pairs(known[entry.source]) do groupNames[group]=named end
-                    local grouping,headings
-                    if grouped then
-                        grouping,headings=regroup(entry.source,name,hostRule,counter,known[entry.source],
-                            section.fields.mcSlotLabel=='1' and section.fields.Label or nil)
+                -- An entry, and each slot filled inside it, is all or nothing: a failure
+                -- restores what it had added, in place, as group namers hold these tables.
+                local function snapshot(state)
+                    local groups={}
+                    for source,names in pairs(known) do
+                        local copy={}
+                        for group,named in pairs(names) do copy[group]=named end
+                        groups[source]=copy
                     end
-                    local fine,why=pcall(function()
-                        for _,id in ipairs(entry.settings) do
-                            assert(not used[id] and not ids[id],'setting id '..id..' is already on this page')
+                    return {n=counter.n,groups=groups,rows=#state.rows,headings=#state.headings,placed=#state.placed}
+                end
+                local function restore(state,saved)
+                    counter.n=saved.n
+                    for source,names in pairs(known) do
+                        local copy=saved.groups[source]
+                        if copy then
+                            for group in pairs(names) do names[group]=nil end
+                            for group,named in pairs(copy) do names[group]=named end
+                        else known[source]=nil end
+                    end
+                    for n=#state.rows,saved.rows+1,-1 do state.rows[n]=nil end
+                    for n=#state.headings,saved.headings+1,-1 do state.headings[n]=nil end
+                    for n=#state.placed,saved.placed+1,-1 do
+                        local placed=state.placed[n]
+                        state.ids[placed.id]=nil;state.seen[placed.contributor][placed.id]=nil
+                        state.placed[n]=nil
+                    end
+                end
+                local function attempt(entry,state,depth,flat)
+                    local source=entry.source
+                    local seen=state.seen[entry.contributor]
+                    if not seen then
+                        seen=setmetatable({},{__index=earlier[entry.contributor] or {}})
+                        state.seen[entry.contributor]=seen
+                    end
+                    known[source]=known[source] or {}
+                    local grouping=flat
+                    if grouped and not flat then
+                        grouping=regroup(source,name,hostRule,counter,known[source],
+                            depth==0 and hostLabel or nil,state.headings)
+                    end
+                    local inner=nested and depth<NESTING and nested(source) or nil
+                    for _,id in ipairs(entry.settings) do
+                        local fields=inner and sourceFields(source,id)
+                        local rows=fields and fields.mcSlot and inner[fields.mcSlot]
+                        local filled=false
+                        if rows and #rows>0 then
+                            local within
+                            if grouped and fields.mcSlotGroups~='1' then
+                                local group=grouping(fields)
+                                within=function() return group end
+                            end
+                            for _,sub in ipairs(rows) do
+                                local saved=snapshot(state)
+                                local fine,why=pcall(attempt,sub,state,depth+1,within)
+                                if fine then filled=true
+                                else
+                                    restore(state,saved)
+                                    report('SLOT_ROW_SKIPPED',sub.contributor..' -> '..source.id..'/'..fields.mcSlot
+                                        ..' in '..provider.id..'/'..name..': '..tostring(why))
+                                end
+                            end
+                        end
+                        if not filled then
+                            assert(not used[id] and not state.ids[id],'setting id '..id..' is already on this page')
                             serial=serial+1
-                            local first=#generated==0 and #rows==0
-                            for _,row in ipairs(insertion(entry.source,id,section,serial,seen,first,grouping)) do rows[#rows+1]=row end
-                            ids[id]=true;seen[id]=true
-                            rows[#rows+1]=''
+                            local first=#generated==0 and #state.rows==0
+                            for _,row in ipairs(insertion(source,id,section,serial,seen,first,grouping)) do
+                                state.rows[#state.rows+1]=row
+                            end
+                            state.rows[#state.rows+1]=''
+                            state.ids[id]=true;seen[id]=true
+                            state.placed[#state.placed+1]={id=id,source=source,contributor=entry.contributor}
                         end
-                    end)
-                    if not fine and grouped then counter.n,known[entry.source]=before,groupNames end
+                    end
+                end
+                for _,entry in ipairs(inserts[name]) do
+                    local state={rows={},headings={},placed={},ids={},seen={}}
+                    local saved=snapshot(state)
+                    local fine,why=pcall(attempt,entry,state,0)
                     if fine then
-                        for id in pairs(ids) do
-                            used[id]=true;sources[id]=entry.source;mine[id]=true;slotOf[id]=name
+                        for _,placed in ipairs(state.placed) do
+                            used[placed.id]=true;sources[placed.id]=placed.source;slotOf[placed.id]=name
+                            earlier[placed.contributor]=earlier[placed.contributor] or {}
+                            earlier[placed.contributor][placed.id]=true
                         end
-                        earlier[entry.contributor]=mine
-                        for _,row in ipairs(headings or {}) do generated[#generated+1]=row end
-                        for _,row in ipairs(rows) do generated[#generated+1]=row end
-                        added=added+#entry.settings
+                        for _,row in ipairs(state.headings) do generated[#generated+1]=row end
+                        for _,row in ipairs(state.rows) do generated[#generated+1]=row end
+                        added=added+#state.placed
                     else
+                        restore(state,saved)
                         report('SLOT_ROW_SKIPPED',entry.contributor..' -> '..provider.id..'/'..name..': '..tostring(why))
                     end
                 end
@@ -407,7 +492,9 @@ function M.install(choices,report,contributions,read)
     end
     controller:outermost()
     function controller:load(provider,read)
-        return M.load(provider,self.inserts[contributions.provider(provider.id)],read,choices.parse,report)
+        local inserts=self.inserts
+        return M.load(provider,inserts[contributions.provider(provider.id)],read,choices.parse,report,
+            function(source) return inserts[contributions.provider(source.id)] end)
     end
     choices.mcSlotsVersion=M.version
     return controller

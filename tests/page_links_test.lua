@@ -207,6 +207,57 @@ do
     assert(f.page.controls:tick()==true and f.texts[1]=='controls:visuals page is unavailable.')
 end
 
+-- A slot on a page listed nowhere whose rows another page's slot shows (controls:visuals
+-- inside ModCore Settings' Controls tab) opens there, at the inner slot's first row, from a
+-- slot link row and from a mod list link page alike.
+do
+    local Contributions=require('menu_contributions')
+    local calls={}
+    local templates,controls={id='ModCoreTemplates.quickslots',mcBrowserHidden=true,choices={}},nil
+    controls={id='ModCoreControls',mcBrowserHidden=true,choices={}}
+    local hostItems={
+        {id='MCS_Page',mcNavigation=true,values={0,1,2},visibility={}},
+        {id='Gone',mcSlotName='templates',visibility={{target=1,values={[1]=true}}}},
+        {id='Link',mcSlotName='controls',mcSlotSource=controls,visibility={{target=1,values={[2]=true}}}},
+        {id='MCT_Template',mcSlotName='controls',mcSlotSource=templates,visibility={{target=1,values={[2]=true}}}},
+    }
+    local host={items=hostItems,pending={0,0,0,0},sets={}}
+    function host:set(index,value) self.pending[index]=value;self.sets[#self.sets+1]=hostItems[index].id..'='..value end
+    local source={}
+    function source:set() end
+    function source:dirty() return false end
+    local providers={
+        {id='ModCoreTemplates.module.Fangdango',choices={{id='Merged',mcNavigation=true,mcLinkPage='controls:visuals'}}},
+        {id='ModCoreControls.entry',mcLinkSlot={host='ModCoreControls',slot='visuals'},choices={}},
+        {id='ModCoreSettings',choices=hostItems},controls,templates,
+    }
+    local slots={address=Contributions.address,provider=Contributions.provider,
+        inserts={settings={controls={{source=controls}}},controls={visuals={{source=templates}}}}}
+    assert(Links.placed(slots,controls)=='settings' and select(2,Links.placed(slots,controls))=='controls')
+    assert(Links.placed(slots,providers[3])==nil,'a listed page is shown where it is')
+    local page={rows={{providerIndex=1},{providerIndex=2},{providerIndex=3}},allRows={},controlStatus={}}
+    page.controls={show=function(self) self.model=source end,tick=function() return false end,
+        refresh=function() calls[#calls+1]='refresh' end,
+        select=function(_,index) calls[#calls+1]='select '..index end}
+    function page:showBrowser() calls[#calls+1]='browser' end
+    function page:showDetail(row)
+        calls[#calls+1]='detail '..row
+        self.controls.model=row==3 and host or source
+    end
+    local pages={build=function() return page end}
+    Links.install(pages,slots)
+    local built=pages.build({},providers,nil,{})
+    built.controls:show(1)
+    built.controls.model.mcActivateLink=true
+    built.controls.model:set(1,1)
+    assert(built.controls:tick()==true)
+    assert(table.concat(calls,',')=='browser,detail 3,refresh,select 4',table.concat(calls,','))
+    assert(table.concat(host.sets,',')=='MCS_Page=2','the outer tab is revealed')
+    calls,host.sets={},{}
+    built:showDetail(2)
+    assert(table.concat(calls,',')=='detail 3,refresh,select 4',table.concat(calls,','))
+end
+
 -- Back on a page a link opened returns to the link's page, revealing and selecting its row;
 -- a chain unwinds in order, and a page opened from the browser forgets the trail.
 do

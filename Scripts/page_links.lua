@@ -2,8 +2,34 @@
 -- mcLinkPage=<provider>:<slot> opens the page hosting that slot with the slot showing.
 -- Back on a page a link opened returns to the page the link was on, with the link's row
 -- showing and selected; Back there goes on as before, so a chain of links unwinds in order.
-local M={version=2}
+-- A page listed nowhere whose rows another page's slot shows (ModCore Controls' page in
+-- ModCore Settings' Controls tab) opens there, at those rows; a slot on it opens at the
+-- first of its rows.
+local M={version=3}
 local showSlot,reveal
+
+-- Where a page listed nowhere is shown: the slot address parts (provider, slot) of the slot
+-- its rows fill, or nil.
+local function placed(slots,provider)
+    if not (slots and type(slots.inserts)=='table' and provider.mcBrowserHidden) then return nil end
+    for target,named in pairs(slots.inserts) do
+        for slot,entries in pairs(named) do
+            for _,entry in ipairs(entries) do
+                if entry.source==provider then return target,slot end
+            end
+        end
+    end
+end
+-- The sources of the rows a slot of provider holds, as a set, or nil.
+local function sourcesOf(slots,provider,slot)
+    local named=slots.inserts[slots.provider(provider.id)]
+    local entries=named and slot and named[slot]
+    if not entries then return nil end
+    local set={}
+    for _,entry in ipairs(entries) do set[entry.source]=true end
+    return set
+end
+M.placed=placed
 
 -- slots (optional): the menu_slots controller, which resolves slot addresses.
 -- report(event,detail) (optional) hears a link that failed to open.
@@ -99,7 +125,7 @@ function M.wrap(page,providers,api,slots,report)
         end
         return false
     end
-    navigate=function(target)
+    navigate=function(target,prefer)
         local host,slot
         if slots then host,slot=slots.address(target) end
         for index,provider in ipairs(providers) do
@@ -107,14 +133,20 @@ function M.wrap(page,providers,api,slots,report)
             if host then
                 matched=not provider.mcLinkSlot and slots.provider(provider.id)==host
             else matched=provider.id==target end
-            if matched and not provider.noSettings and open(index) then
-                if slot then showSlot(page,slot) end
-                return true
+            if matched and not provider.noSettings then
+                local outerHost,outerSlot=placed(slots,provider)
+                if outerHost then
+                    return navigate(outerHost..':'..outerSlot,slot and sourcesOf(slots,provider,slot) or {[provider]=true})
+                end
+                if open(index) then
+                    if slot then showSlot(page,slot,prefer) end
+                    return true
+                end
             end
         end
         return false
     end
-    if type(page.showDetail)=='function' then M.slotLinks(page,providers) end
+    if type(page.showDetail)=='function' then M.slotLinks(page,providers,slots) end
     -- Back leaves a page through showBrowser. On a page a link opened, it returns to the
     -- link's page instead; a page opened from the browser forgets the trail.
     local showBrowser,showDetail=page.showBrowser,page.showDetail
@@ -160,17 +192,32 @@ function reveal(model,index,seen)
 end
 M.reveal=reveal
 
--- A link page (mcLinkSlot) opens its host page with the slot's rows showing.
-function M.slotLinks(page,providers)
+-- A link page (mcLinkSlot) opens its host page with the slot's rows showing. A host listed
+-- nowhere opens where its rows are shown (placed). slots (optional): the menu_slots controller.
+function M.slotLinks(page,providers,slots)
     local showDetail=page.showDetail
     function page:showDetail(rowIndex)
         local row=self.rows and self.rows[rowIndex]
         local link=row and providers[row.providerIndex] and providers[row.providerIndex].mcLinkSlot
         if not link or not link.host then return showDetail(self,rowIndex) end
+        local hostId,slot,prefer=link.host,link.slot,nil
+        for _,provider in ipairs(providers) do
+            if provider.id==hostId and not provider.mcLinkSlot then
+                local outerHost,outerSlot=placed(slots,provider)
+                if outerHost then
+                    prefer=sourcesOf(slots,provider,slot)
+                    for _,candidate in ipairs(providers) do
+                        if not candidate.mcLinkSlot and slots.provider(candidate.id)==outerHost then hostId=candidate.id end
+                    end
+                    slot=outerSlot
+                end
+                break
+            end
+        end
         for hostRow,candidate in ipairs(self.rows) do
-            if providers[candidate.providerIndex].id==link.host then
+            if providers[candidate.providerIndex].id==hostId then
                 local result=showDetail(self,hostRow)
-                showSlot(self,link.slot)
+                showSlot(self,slot,prefer)
                 return result
             end
         end
@@ -178,18 +225,23 @@ function M.slotLinks(page,providers)
     end
 end
 
--- On the page just shown, reveal and select the slot's first row.
-function showSlot(page,slot)
+-- On the page just shown, reveal and select the slot's first row: with prefer (a set of
+-- source pages), the first of its rows from one of them, if any.
+function showSlot(page,slot,prefer)
     local controls=page.controls
     local model=controls and controls.model
     if not model or model.error then return end
+    local first
     for index,setting in ipairs(model.items) do
         if setting.mcSlotName==slot or setting.mcSlot==slot then
-            reveal(model,index)
-            controls:refresh()
-            controls:select(index,true)
-            return
+            first=first or index
+            if not prefer or prefer[setting.mcSlotSource] then first=index;break end
         end
+    end
+    if first then
+        reveal(model,first)
+        controls:refresh()
+        controls:select(first,true)
     end
 end
 

@@ -160,24 +160,50 @@ function M.apply(providers,contributions,parse,state,report,slots,hooked,compile
     for _,contribution in ipairs(contributions) do
         if not contribution.rows or #contribution.rows==0 then ordered[#ordered+1]=contribution end
     end
+    -- Rows follow, except that a contributor whose pages host another's rows goes first:
+    -- a slot inside rows shown elsewhere (controls:visuals in the Controls tab) needs its
+    -- page built before the rows that fill it are placed.
+    local waiting={}
     for _,contribution in ipairs(contributions) do
-        if contribution.rows and #contribution.rows>0 then ordered[#ordered+1]=contribution end
+        if contribution.rows and #contribution.rows>0 then waiting[#waiting+1]=contribution end
+    end
+    local function waits(candidate)
+        for _,row in ipairs(candidate.rows) do
+            local target=address and address(row.slot)
+            for _,other in ipairs(target and waiting or {}) do
+                for _,page in ipairs(other~=candidate and other.pages or {}) do
+                    if slots.provider(page.id)==target then return true end
+                end
+            end
+        end
+        return false
+    end
+    while #waiting>0 do
+        local pick=1
+        for index,candidate in ipairs(waiting) do
+            if not waits(candidate) then pick=index;break end
+        end
+        ordered[#ordered+1]=table.remove(waiting,pick)
     end
     for _,contribution in ipairs(ordered) do
         local hidden,inserts={},{}
         local ok,err=pcall(function()
-            local built,shown,landed={},{},{}
+            local built,shown,landed,kept={},{},{},{}
             for _,row in ipairs(contribution.rows or {}) do
                 landed[row.page]=landed[row.page] or slotHost(providers,slots,row.slot)~=nil
             end
             for _,page in ipairs(contribution.pages) do
                 shown[page.id]=page.visible~=false or landed[page.id]==false
+                -- A hidden page whose rows land stays in the menu, listed nowhere, so the
+                -- pages its rows link to open and the slots it declares take rows.
+                kept[page.id]=page.visible==false and landed[page.id]==true
             end
             for _,page in ipairs(contribution.pages) do
                 assert(not ids[page.id],'page id '..page.id..' is already in the menu')
                 local parent=page.under and built[page.under]
-                if shown[page.id] and (not page.under or parent) then
+                if (shown[page.id] or kept[page.id]) and (not page.under or parent) then
                     built[page.id]={provider=generated(contribution,page,parse,hooked,compile,stored),page=page}
+                    if kept[page.id] then built[page.id].provider.mcBrowserHidden=true end
                 end
             end
             -- Validate all attachments before changing the list; a contributor is all or nothing.
@@ -186,7 +212,7 @@ function M.apply(providers,contributions,parse,state,report,slots,hooked,compile
             local claimed={}
             for _,page in ipairs(contribution.pages) do
                 local entry=built[page.id]
-                if entry and page.attach then entry.match=attached(providers,page.attach)
+                if entry and page.attach and not kept[page.id] then entry.match=attached(providers,page.attach)
                 elseif not shown[page.id] and page.attach then
                     local match=attached(providers,page.attach)
                     if match and (match.detectedKind or not match.noSettings) then claimed[#claimed+1]=match end
@@ -208,6 +234,7 @@ function M.apply(providers,contributions,parse,state,report,slots,hooked,compile
                         provider.mcBrowserLevel,provider.mcBrowserIndent=4,20
                         local ancestor=page.under
                         while ancestor do tails[ancestor]=provider;ancestor=built[ancestor].page.under end
+                    elseif kept[page.id] then insertSorted(providers,provider)
                     elseif match and match.noSettings and match.detectedKind then
                         -- The page becomes that mod's entry; the browser names it from the
                         -- mod's folder, as it would the placeholder.

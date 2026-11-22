@@ -1,21 +1,33 @@
 -- ModCoreSettings' own page, contributed like any module's page and attached to its
--- folder, so it takes the mod's name, author and icon from mod.json. The Templates tab
--- (MCS_Page 1) is a slot that ModCore Templates fills; browser_groups appends the
--- Developer Tools tab (5) on every build.
+-- folder, so it takes the mod's name, author and icon from mod.json. Its tabs, in order:
+-- Controls (MCS_Page 0, the one it opens on), a slot that ModCore Controls fills with its
+-- page; Templates (1), a slot that ModCore Templates fills; Settings (2), ModCore
+-- Settings' own; and Developer Tools (3), which browser_groups appends on every build.
 return {
     storage={file='config.ini',section='Modules'},
     groups={
         {id='Pages',style='none'},
-        -- The Modules tab's settings, under Options, Listing and Previews headings.
-        {id='Options',conditions={visible={field='MCS_Page',values={0}}}},
-        {id='Listing',conditions={visible={field='MCS_Page',values={0}}}},
-        {id='Previews',conditions={visible={field='MCS_Page',values={0}}}},
+        -- The Controls tab: one slot that ModCore Controls fills with its whole page.
+        {id='Controls',style='none',conditions={visible={field='MCS_Page',values={0}}}},
         -- The Templates tab: one slot that ModCore Templates fills with every loaded template.
         {id='Templates',style='none',conditions={visible={field='MCS_Page',values={1}}}},
+        -- The Settings tab, under Options, Listing and Previews headings.
+        {id='Options',conditions={visible={field='MCS_Page',values={2}}}},
+        {id='Listing',conditions={visible={field='MCS_Page',values={2}}}},
+        {id='Previews',conditions={visible={field='MCS_Page',values={2}}}},
     },
     fields={
         {id='MCS_Page',group='Pages',label='Page',style='title',action=true,default=0,
-            values={{value=0,label='Modules'},{value=1,label='Templates'},{value=5,label='Developer Tools'}}},
+            values={{value=0,label='Controls'},{value=1,label='Templates'},{value=2,label='Settings'},
+                {value=3,label='Developer Tools'}}},
+        -- Shown as is until ModCore Controls fills it (settings:controls); its rows keep their
+        -- own groups: the Quickslots templates, Mappings and Behaviours.
+        {id='MCS_Controls',group='Controls',label='Controls',widget='text',default=0,
+            values={{value=0,label='Not installed'}},slot='controls',slotGroups=true},
+        -- Shown as is until ModCore Templates fills it (settings:templates); its rows keep
+        -- their own groups, one heading per template category.
+        {id='MCS_Templates',group='Templates',label='Templates',widget='text',default=0,
+            values={{value=0,label='None loaded'}},slot='templates',slotGroups=true},
         -- Stored as CompactStyle; compact_style applies it each time the menu opens.
         {id='CompactStyle',group='Options',label='Use Compact Style',default='off',
             description='In a loaded game, the menu takes the pause menu\'s look: the game blurred behind it and the list in a dark panel down the left, one module per row. Index applies it to the mod list, Everywhere to every page. It shows the next time the menu opens.',
@@ -57,9 +69,5 @@ return {
                 {key='blurred',label='Blurred',description='The picture blurred.'},
                 {key='dimmed',label='Dimmed',description='The picture faded to 30%.'},
                 {key='off',label='Off',description='A plain dim light blue screen instead of the picture.'}}},
-        -- Shown as is until ModCore Templates fills it (settings:templates); its rows keep
-        -- their own groups, one heading per template category.
-        {id='MCS_Templates',group='Templates',label='Templates',widget='text',default=0,
-            values={{value=0,label='None loaded'}},slot='templates',slotGroups=true},
     },
 }

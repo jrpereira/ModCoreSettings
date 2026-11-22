@@ -75,7 +75,7 @@ Open **Mod Settings** to see the Modules page. With the UE4SS Lua Event Bridge i
 returning to the game window after editing config files by hand reloads the settings of
 every module that supports it. Its **Sort
 by** button (DMM's Filter Mods, Backspace) cycles through four ways to list your mods, and
-the ModCore Settings page sets the rest:
+the ModCore Settings page's Settings tab sets the rest:
 
 - **Categories:** mods are grouped under Gameplay, Content, Presentation, Auxiliary
   and Unclassified, from each mod's `mod.json` or MCS's own classification. Mods
@@ -98,10 +98,14 @@ A module whose `mod.json` dependencies are not all loaded at a version they acce
 carries a red ⚠ at the right of its row. Its details list each requirement after
 Author: the version it needs and the one loaded, unmet ones first.
 
-Mods without settings fold into a final "and N more" entry in each group. The
-**Templates** tab shows ModCore Templates' loaded templates by category, the active ones
-marked; **Developer Tools**
-lists tool pages.
+Mods without settings fold into a final "and N more" entry in each group.
+
+The ModCore Settings page has four tabs and opens on the first: **Controls** shows
+ModCore Controls' page (the Quickslots templates, the key mappings and the behaviours),
+**Templates** shows ModCore Templates' loaded templates by category, the active ones
+marked, **Settings** holds ModCore Settings' own options below, and **Developer Tools**
+lists tool pages. ModCore Controls' and ModCore Templates' entries in the mod list open
+their tabs.
 
 ## Logging
 
