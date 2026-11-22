@@ -381,7 +381,6 @@ do
     local items={{id='ModCoreControls',name='ModCore Controls',author='X',choices={{id='c'}},mcFolder='ModCoreControls'},
         {id='ModCoreSettings',name='ModCore Settings',author='X',choices={{id='s'}},mcFolder='ModCoreSettings'},
         {id='Other',name='Other',author='Y',choices={{id='o'}},mcFolder='Other'}}
-    local titleLinks={ModCoreControls='controls',ModCoreSettings='settings'}
     -- The page DMM builds carries its title box before the wrapper runs.
     local base=browserPages(true)
     local baseBuild=base.build
@@ -390,26 +389,23 @@ do
         made.filterButton=title
         return made
     end
-    Groups.install(base,nil,nil,nil,function(folder) return {titleLink=titleLinks[folder]} end)
+    -- A mod.json title_link is no longer read: only the settings link shows.
+    Groups.install(base,nil,nil,nil,function() return {titleLink='controls'} end)
     local pageWithTitle=base.build({},items,nil,linkApi)
     local overlay=header.children[1]
     assert(overlay and overlay.name=='/Script/UMG.Overlay' and overlay.children[1]==title,'the title stays, left')
     local line=overlay.children[2]
-    assert(line.Slot.horizontal==3 and #line.children==2 and line.children[1].text=='settings'
-        and line.children[2].text=='controls',
-        'one link per page that declares one, this page first, right of the title')
+    assert(line.Slot.horizontal==3 and #line.children==1 and line.children[1].text=='settings',
+        'one link, settings, right of the title')
     local function released(widget,previous,pointer)
         local pressed=widget:IsPressed()
         return previous and not pressed,pressed,pointer
     end
     assert(pageWithTitle:tickFilter(released)==false)
-    pressedNow.controls=true;assert(pageWithTitle:tickFilter(released)==false)
-    pressedNow.controls=false;assert(pageWithTitle:tickFilter(released)==true,'a click is handled')
-    assert(pageWithTitle.opened[1]=='ModCoreControls','the link opens its page')
-    -- ModCore Settings' own link opens its page, which starts on its Settings tab.
-    pressedNow.settings=true;pageWithTitle:tickFilter(released)
-    pressedNow.settings=false;assert(pageWithTitle:tickFilter(released)==true)
-    assert(pageWithTitle.opened[2]=='ModCoreSettings')
+    -- It opens ModCore Settings' page, which starts on its Settings tab.
+    pressedNow.settings=true;assert(pageWithTitle:tickFilter(released)==false)
+    pressedNow.settings=false;assert(pageWithTitle:tickFilter(released)==true,'a click is handled')
+    assert(pageWithTitle.opened[1]=='ModCoreSettings' and #pageWithTitle.opened==1)
 end
 local rowA,indexA=rowOf(browsing,'A')
 local rowB,indexB=rowOf(browsing,'B')

@@ -23,10 +23,9 @@ local GROUP_COLUMNS = 2
 local RECENT = {{'recent:day', 'Last 24 hours', 86400}, {'recent:week', 'Last 7 days', 7 * 86400},
     {'recent:month', 'Last 30 days', 30 * 86400}, {'recent:earlier', 'Earlier'}}
 local RECENT_ICON = '○'
--- Links to pages that ask for one, top right on the title's line: a mod's mod.json names
--- the link's text in title_link. Their text size, the gap between them, and the space
--- after the last.
-local LINK_SIZE, LINK_GAP, LINK_END = 12, 7, 5
+-- The title line's link, top right: "settings", which opens ModCore Settings' page on its
+-- Settings tab. Its text size and the space after it.
+local LINK_SIZE, LINK_END = 12, 5
 -- Load order numbers: their box width, text size, opacity and the gap before the name.
 -- Box and gap fill the row's left margin (20 in a plain list), so names start where they
 -- do in Alphabetical. Numbers are right-aligned in their box.
@@ -138,8 +137,7 @@ end
 
 -- A reader for a mod folder's mod.json fields under mods (the Mods folder, ending in a
 -- separator): preferred, its collection; settings, false when the mod has none to show;
--- name, author, version, icon, description and titleLink (the text of the mod's link on
--- the browser's title line); requires, the set of dependency ids; and dependencies, each
+-- name, author, version, icon and description; requires, the set of dependency ids; and dependencies, each
 -- {id=, version=} in declared order.
 -- mod.json is decoded as JSON, as the boot index decodes it; an unreadable one gives no
 -- fields. interface names how UE4SS starts the folder, from its files: 'Native'
@@ -173,7 +171,7 @@ function M.folderManifest(mods, open)
         end
         local fields = {preferred=text('preferred', 120), name=text('name', 200), author=text('author', 120),
             version=text('version', 64), icon=text('icon', 16), description=text('description', 4096),
-            titleLink=text('title_link', 16), requires={}, dependencies={}}
+            requires={}, dependencies={}}
         if manifest.settings == false then fields.settings = false end
         for _, dependency in ipairs(type(manifest.dependencies) == 'table' and manifest.dependencies or {}) do
             if type(dependency) == 'table' and type(dependency.id) == 'string' and dependency.id ~= '' then
@@ -297,7 +295,6 @@ function M.arrange(providers, parse, report, options)
                 local preferred = trimmed(fields.preferred)
                 provider.mcListGroup = preferred ~= 'author' and preferred or false
                 provider.mcFolderAuthor = trimmed(fields.author)
-                provider.mcTitleLink = fields.titleLink
                 -- A mod that declares it has no settings is not listed as incompatible.
                 provider.mcNoSettingsDeclared = fields.settings == false and provider.noSettings or nil
                 -- A mod found on disk, or a contributed page standing in for one, takes its
@@ -987,20 +984,17 @@ function M.install(pages, report, parse, folderVersion, folderManifest, grouping
                     quieten(self)
                 end
             end
-            -- The title's line carries links to ModCore's own pages, right-aligned. DMM asks
-            -- the page each tick whether its filter title was clicked (tickFilter); with
-            -- the title inert, that is where the links are checked. A link opens its page
-            -- as page links do, through the listed row.
+            -- The title's line carries one link, "settings", right-aligned: it opens ModCore
+            -- Settings' page, which opens on its Settings tab. DMM asks the page each tick
+            -- whether its filter title was clicked (tickFilter); with the title inert, that
+            -- is where the link is checked. It opens the page as page links do, through the
+            -- listed row.
             local links = {}
             if type(api) == 'table' and api.button and api.construct and page.filterButton then
                 local ok, err = pcall(function()
-                    -- This page's own link comes first, then the others in list order.
                     local wanted = {}
                     for _, provider in ipairs(providers) do
-                        if provider.mcTitleLink and not provider.noSettings then
-                            table.insert(wanted, provider.id == HOST and 1 or #wanted + 1,
-                                {provider.mcTitleLink, provider.id})
-                        end
+                        if provider.id == HOST and not provider.noSettings then wanted[1] = {'settings', HOST} end
                     end
                     local line = api.construct('/Script/UMG.HorizontalBox', tree)
                     for _, link in ipairs(wanted) do
@@ -1012,7 +1006,6 @@ function M.install(pages, report, parse, folderVersion, folderManifest, grouping
                         end
                         label.Slot:SetPadding({Left=6, Top=2, Right=6, Bottom=2})
                         local slot = assert(line:AddChild(widget), 'browser link')
-                        slot:SetPadding({Left=#links > 0 and LINK_GAP or 0, Top=0, Right=0, Bottom=0})
                         slot:SetVerticalAlignment(2)
                         links[#links + 1] = {widget=widget, id=link[2], pressed=false, pointer=false}
                     end

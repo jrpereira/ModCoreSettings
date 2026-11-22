@@ -6,6 +6,8 @@
   and it opens on Settings. Controls shows ModCore Controls' page, which it fills through
   the new slot `settings:controls`; Settings is the former Modules tab. The mod list's
   settings link opens the Settings tab.
+- The mod list's title line has one link, **settings**, which opens ModCore Settings'
+  page on its Settings tab. `mod.json`'s `title_link` is no longer read.
 - Slots take more kinds of rows: page links, which open their page from the host with
   Back returning to it, and ModCoreSettings' range and keybind settings. A slot inside
   inserted rows is filled where it lands (ModCore Templates' Quickslots rows inside the
