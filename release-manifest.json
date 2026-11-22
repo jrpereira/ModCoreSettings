@@ -52,7 +52,6 @@
     "Scripts/standard_controls.lua": "Scripts/standard_controls.lua",
     "README.md": "docs/README.md",
     "CHANGELOG.md": "docs/CHANGELOG.md",
-    "BUILD.md": "docs/BUILD.md",
     "DEVELOPERS.md": "docs/DEVELOPERS.md",
     "REFERENCE.md": "docs/REFERENCE.md",
     "Scripts/module_categories.lua": "Scripts/module_categories.lua",

@@ -118,5 +118,4 @@ ModCoreSettings=DEBUG`), and the global level on its Logs page.
 - [Nexus description](https://github.com/jrpereira/ModCoreSettings/blob/main/docs/NEXUS.bb): condensed, paste-ready module description in BBCode.
 - [Developer guide](DEVELOPERS.md): first setting, Apply and keybinds.
 - [Integration reference](REFERENCE.md): metadata, pages, slots and the Modules page.
-- [Build guide](BUILD.md): offline tests and in-game checks.
 - [Changelog](CHANGELOG.md): version history.

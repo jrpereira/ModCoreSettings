@@ -214,6 +214,6 @@ are the provider API; nothing else in MCS is.
 
 ## Check your integration
 
-Use the [build guide](BUILD.md) for offline checks. In game, test Apply, Restore,
+In game, test Apply, Restore,
 Reset, reopening, restart persistence, and your feature's resulting behavior.
 A visible key label alone does not prove the value was saved or activated.
