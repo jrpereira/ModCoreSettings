@@ -160,11 +160,14 @@ end
 local pages={build=function(tree,providers,status,a)
     local filterButton,filterLabel=a.button(tree,'Compatible Mods')
     local browserList=widget()
+    -- DMM's columns: the mod list's and the settings page's, each 630 wide.
+    local listColumn=widget();listColumn:SetWidthOverride(630);listColumn:SetContent(browserList)
     local filterWrapper=widget();filterWrapper:SetContent(filterButton);browserList:AddChild(filterWrapper)
     filterWrapper:SetWidthOverride(590);filterWrapper:SetHeightOverride(40)
     local parent=widget()
+    local controlColumn=widget();controlColumn:SetWidthOverride(630);controlColumn:SetContent(parent)
     local title=a.caption(tree,'Mod Settings');parent:AddChild(title)
-    local divider=widget();parent:AddChild(divider)
+    local divider=widget();divider:SetWidthOverride(572);parent:AddChild(divider)
     local status=a.caption(tree,'');parent:AddChild(status)
     status.Slot:SetPadding({Left=0,Top=4,Right=0,Bottom=0})
     -- UE4SS may return another Lua wrapper for the same UMG widget.
@@ -289,7 +292,7 @@ local lifecycleEvents={on=function(_,name,callback) lifecycle[name]=callback end
 local compactKind
 assert(M.install(choices,controls,pages,{keyColumn={key=96,keyOffset=408},
     textTable=require('menu_contributions').textTable,events=lifecycleEvents,
-    compact=function(kind) return compactKind==kind end}))
+    compact=function(kind) return compactKind==kind or compactKind=='everywhere' end}))
 assert(type(lifecycle.hostClosing)=='function','the presentation listens for the menu closing')
 assert(not M.install(choices,controls,pages))
 local browserProviders={
@@ -818,6 +821,55 @@ do
         end
     end
     assert(moved>0,'some rows were indented')
+    -- Compact, a picker row (not a tabs row) fills the mod list's column but its scrollbar,
+    -- with a narrower label column and controls and less room right of its arrows; its text
+    -- keeps its size.
+    local regular,narrow=M.layoutWidths(false),M.layoutWidths(true)
+    assert(regular.column==630 and regular.page==610 and regular.label==330 and regular.arrow==20
+        and regular.value==240 and regular.margin==24 and regular.arrowInset==17 and regular.wrapLabel==230,
+        'plain pages keep their widths')
+    assert(narrow.column==math.floor(630*0.8+0.5) and narrow.column==504 and narrow.page==narrow.column-16
+        and narrow.label==280 and narrow.arrow==12 and narrow.value==184 and narrow.margin==12
+        and narrow.arrowInset==12 and narrow.wrapLabel==190 and narrow.row==476
+        and narrow.label+2*narrow.arrow+narrow.value==narrow.page,'compact widths fill the mod list column')
+    -- The space right of the right arrow's art, to the column's edge.
+    local function rightSpace(w) return w.column-w.page+(w.arrow-10)/2+w.arrowInset end
+    assert(rightSpace(regular)==42 and rightSpace(narrow)==29,'less room right of a compact picker')
+    local pickers=0
+    for n,compactRow in ipairs(compactUi.panels[1].rows) do
+        local plain=ui.panels[1].rows[n]
+        local function widths(r)
+            local list={r.wrapper.WidthOverride}
+            if r.parts and #r.parts==3 then
+                list[2]=r.widget:GetParent().WidthOverride
+                for _,part in ipairs(r.parts) do list[#list+1]=part.widget:GetParent().WidthOverride end
+            end
+            return table.concat(list,',')
+        end
+        if plain.parts and #plain.parts==3 and not plain.mcTabs then
+            assert(widths(plain)=='610,330,20,240,20' and widths(compactRow)=='488,280,12,184,12',
+                'a compact picker row is narrower: '..widths(plain)..' -> '..widths(compactRow))
+            pickers=pickers+1
+        end
+        for _,key in ipairs({'mcLabel','value'}) do
+            local before=plain[key] and plain[key].Font.Size
+            local after=compactRow[key] and compactRow[key].Font.Size
+            assert(before==after or (before and after and before-after>=0 and before-after<=2),
+                'compact text keeps its size within 2 points: '..key..' '..tostring(before)..' -> '..tostring(after))
+        end
+    end
+    assert(pickers>0,'some picker rows were measured')
+    -- Compact everywhere, a settings page's column is the mod list's, and so is its title rule.
+    compactKind='everywhere'
+    local compactPage=pages.build(widget(),browserProviders,nil,api)
+    local listColumn=compactPage.browserList:GetParent()
+    local controlColumn=compactPage.mcTestControlArea:GetParent()
+    assert(listColumn.WidthOverride==504 and controlColumn.WidthOverride==listColumn.WidthOverride,
+        'a compact settings page is as wide as the mod list: '..tostring(controlColumn.WidthOverride))
+    assert(compactPage.mcTestDivider.WidthOverride==458
+        and compactPage.filterButton:GetParent().WidthOverride==compactPage.mcTestDivider.WidthOverride,
+        'the compact title rule is as long as the mod list title')
+    assert(compactPage.controls.mcHeaderStatus.box.WidthOverride==476,'the compact header strip is a row less 12')
     compactKind=nil
 end
 assert(textCount('Interaction: Independent')==1 and textCount('Interaction: Selective')==1,'Reuse must not duplicate parent headings')

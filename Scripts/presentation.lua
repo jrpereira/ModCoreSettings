@@ -21,12 +21,10 @@ local function boxWidth(widget,fallback)
     local ok,width=pcall(function() return widget:GetParent().WidthOverride end)
     return ok and tonumber(width) or fallback
 end
--- Settings page widths in DMM's 1280-wide page: rows and the header strip are ROW_WIDTH
--- wide; PAGE_WIDTH is the width of the page itself. DMM builds its rows 584 wide in a
--- 630-wide column; ModCoreSettings widens them to PAGE_WIDTH, leaving 20 for the column's
--- scrollbar (12 of padding and 4 of bar, read live). The mod list keeps DMM's LIST_WIDTH
--- rows and its LIST_ROW_WIDTH title.
-local ROW_WIDTH,PAGE_WIDTH,LIST_WIDTH,LIST_ROW_WIDTH=598,610,584,572
+-- Widths in DMM's 1280-wide page. DMM builds a settings page's rows 584 wide in a
+-- PAGE_COLUMN-wide column (see layoutWidths for ModCoreSettings' own). The mod list keeps
+-- DMM's LIST_WIDTH rows and its LIST_ROW_WIDTH title.
+local PAGE_COLUMN,LIST_WIDTH,LIST_ROW_WIDTH=630,584,572
 -- A mod-list group title's padding in its highlight box (set live against the game).
 local HEADER_TITLE_PADDING={Left=-2,Top=6,Right=12,Bottom=-1}
 local styles={
@@ -47,7 +45,7 @@ local noticeFrameInset=10
 -- edge (pickerValuePadding inside it), not at the row's: it is measured from the row's left
 -- edge, as the value column is, so it holds at any width the row is laid out at. Its
 -- lines sit closer than a description's.
-local noticeFrameWidth,noticeLineHeight=nil,0.85
+local noticeLineHeight=0.85
 -- A link's underline is drawn linkUnderlineLift pixels above where its row puts it, and
 -- its text linkTextDrop pixels below.
 local linkUnderlineLift,linkTextDrop=4,1
@@ -116,17 +114,8 @@ local pipOn,pipOff={R=0.95,G=0.63,B=0.08,A=0.9},{R=0.62,G=0.55,B=0.42,A=0.35}
 local sliderValueShrink,sliderShare,sliderMarkHeight,sliderMarkAbove,sliderBottom=2,0.75,10,2,2
 -- The slider's value sits sliderValueLift pixels above the control's centre.
 local sliderValueLift=3
--- A picker's value column: 330 of label and a pickerArrowWidth arrow before it,
--- pickerValueWidth wide, and the other arrow after it, filling PAGE_WIDTH. DMM builds 32,
--- 190 and 32; ModCoreSettings narrows the arrows to their art (10 wide) with 5 pixels each
--- side and gives the room to the value, whose button keeps pickerValuePadding each side
--- (DMM's 12). A toggle's value takes the same column, so every value lines up.
-local pickerLabelWidth,pickerArrowWidth,pickerValueWidth,pickerValuePadding=330,20,240,4
-local pickerValueLeft=pickerLabelWidth+pickerArrowWidth
-noticeFrameWidth=pickerValueLeft+pickerValueWidth-pickerValuePadding-categoryLeft
--- Each arrow is drawn pickerArrowInset pixels in from its box, towards the value: half the
--- space between its art and the pips (the value's margin around them, and the art's own).
-local pickerArrowInset=math.floor(((pickerValueWidth-math.floor(pickerValueWidth*0.75/2)*2)/2+(pickerArrowWidth-10)/2)/2)
+-- A picker's value button keeps pickerValuePadding each side (DMM's 12).
+local pickerValuePadding=4
 -- A one-line picker row's height (DMM's is 40), and with choice notes; row labels are drawn
 -- labelDrop pixels lower; a toggle-shell row's button starts toggleShift pixels left, so its
 -- selection background starts where headings do.
@@ -509,6 +498,34 @@ end
 -- DMM's 12-pixel button inset further left (COMPACT_INSET); a subgroup's rows keep their
 -- nestedIndent under its heading.
 local COMPACT_HEADING,COMPACT_LIST,COMPACT_INSET=0.8,0.8,12
+-- A settings page's widths. Its rows are page wide in a column wide, leaving the rest to the
+-- column's scrollbar (12 of padding and 4 of bar, read live); the header strip is 12
+-- narrower than a row. A picker row is its label column, an arrow, its value column and
+-- the other arrow (DMM builds 330, 32, 190 and 32); ModCoreSettings narrows the arrows
+-- towards their 10-wide art and gives the room to the value. A toggle's value takes the
+-- same column, so every value lines up. Rows with text end margin short of the row's
+-- right edge; a wrapped read-only row's label column is wrapLabel wide.
+-- Under Use Compact Style a page's column is the mod list's, COMPACT_LIST of DMM's, so
+-- both sides line up: the rows fill it but the scrollbar, and the label column, the
+-- controls and the space right of them are narrower. Text keeps its size.
+local REGULAR_WIDTHS={column=PAGE_COLUMN,page=610,label=330,arrow=20,value=240,margin=24,wrapLabel=230}
+local COMPACT_COLUMN=math.floor(PAGE_COLUMN*COMPACT_LIST+0.5)
+local COMPACT_WIDTHS={column=COMPACT_COLUMN,page=COMPACT_COLUMN-16,label=280,arrow=12,value=184,margin=12,wrapLabel=190}
+-- The widths for a page, compact or not, with the places they set: where a picker's value
+-- column starts (valueLeft), how wide a framed notice's outline is (noticeFrame: to the
+-- value column's right edge, pickerValuePadding inside it, from the row's left edge), and
+-- how far each arrow is drawn in from its box towards the value (arrowInset: half the
+-- space between its art and the pips, the value's margin around them and the art's own).
+local function layoutWidths(compact)
+    local w={}
+    for key,value in pairs(compact and COMPACT_WIDTHS or REGULAR_WIDTHS) do w[key]=value end
+    w.row=w.page-12
+    w.valueLeft=w.label+w.arrow
+    w.noticeFrame=w.valueLeft+w.value-pickerValuePadding-categoryLeft
+    w.arrowInset=math.floor(((w.value-math.floor(w.value*pipShare/2)*2)/2+(w.arrow-10)/2)/2)
+    return w
+end
+M.layoutWidths=layoutWidths
 
 -- Shows the label in its dirty face, or back in its base face (captured from the label
 -- the first time, and again after each restyle).
@@ -572,7 +589,6 @@ function M.install(choices,controls,pages,options)
         else api.Theme.font(label,api.theme,categorySize) end
     end
     -- Where a keybind's key box (and a cycle button) starts: centred on a picker's value column.
-    local function keyLeft() return pickerValueLeft+(pickerValueWidth-keyColumn.key)/2 end
     -- An mcTable row taller than this scrolls.
     local tableMaxHeight=360
     -- textTable(text,columns) decodes an mcTable row: menu_contributions.textTable.
@@ -633,6 +649,14 @@ function M.install(choices,controls,pages,options)
         return model
     end
     controls.build=function(tree,providers,api)
+        -- This menu's widths, compact or not, for every page it builds.
+        local widths=layoutWidths(compactSettings())
+        local PAGE_WIDTH,ROW_WIDTH,pickerLabelWidth,pickerArrowWidth,pickerValueWidth,pickerValueLeft=
+            widths.page,widths.row,widths.label,widths.arrow,widths.value,widths.valueLeft
+        local noticeFrameWidth,pickerArrowInset,pickerRightMargin,wrapLabelWidth=
+            widths.noticeFrame,widths.arrowInset,widths.margin,widths.wrapLabel
+        -- Where a keybind's key box (and a cycle button) starts: centred on a picker's value column.
+        local function keyLeft() return pickerValueLeft+(pickerValueWidth-keyColumn.key)/2 end
         local adapted={}
         -- Cached pages may be evicted; do not retain their Lua widget wrappers.
         local labels=setmetatable({},{__mode='k'})
@@ -783,6 +807,7 @@ function M.install(choices,controls,pages,options)
             return button,label
         end
         ui=build(tree,providers,adapted)
+        ui.mcWidths=widths
         local prepare,show,hide,refresh,tick,clearPresses,isPressed=ui.prepare,ui.show,ui.hide,ui.refresh,ui.tick,ui.clearPresses,ui.isPressed
         local select=ui.select
         local function new(kind) return api.construct('/Script/UMG.'..kind,tree) end
@@ -815,7 +840,6 @@ function M.install(choices,controls,pages,options)
             style.NormalPadding={Left=side,Top=0,Right=side,Bottom=bottom}
             style.PressedPadding={Left=side,Top=0,Right=side,Bottom=bottom}
         end
-        local pickerRightMargin=24
         -- Real seconds for animations, read as DMM reads its own (api.clock in tests); nil
         -- when the engine cannot answer.
         local gameplay
@@ -853,8 +877,6 @@ function M.install(choices,controls,pages,options)
                 if t>=1 then animations[key]=nil end
             end
         end
-        -- Label column of a wrapped read-only row; the value takes the rest.
-        local wrapLabelWidth=230
         -- Field-type editors are built on DMM's toggle row, whose label sits in the
         -- row content; its indent belongs on that content's slot, not the label's.
         local function toggleShell(setting) return setting.kind=='toggle' or setting.kind=='extension' end
@@ -922,11 +944,14 @@ function M.install(choices,controls,pages,options)
             return overlay,bars
         end
         -- DMM's row at ModCoreSettings' widths: the row PAGE_WIDTH wide and a picker's
-        -- arrows and value at pickerArrowWidth and pickerValueWidth, its value button padded
-        -- pickerValuePadding each side. Only sizes change; DMM's widgets stay as built.
+        -- label, arrows and value at pickerLabelWidth, pickerArrowWidth and pickerValueWidth,
+        -- its value button padded pickerValuePadding each side. Only sizes change; DMM's
+        -- widgets stay as built.
         local function widen(row)
             if row.wrapper then row.wrapper:SetWidthOverride(PAGE_WIDTH) end
             if not (row.parts and #row.parts==3) then return end
+            local labelBox=row.widget:GetParent()
+            if labelBox then labelBox:SetWidthOverride(pickerLabelWidth) end
             for n,width in ipairs({pickerArrowWidth,pickerValueWidth,pickerArrowWidth}) do
                 local box=row.parts[n].widget:GetParent()
                 if box then box:SetWidthOverride(width) end
@@ -2450,6 +2475,20 @@ function M.install(choices,controls,pages,options)
                 'MCS page header layout')
             local pageStatus=assert(page.controlStatus,'MCS page status')
             local statusName,statusPadding=pageStatus:GetFullName()
+            local widths=page.controls.mcWidths or layoutWidths(compactSettings())
+            local ROW_WIDTH=widths.row
+            -- Compact, the page's column and the boxes in it are as wide as the mod list's,
+            -- and the rule under its title as long as the mod list's.
+            if widths.column~=PAGE_COLUMN then
+                local function narrow(box)
+                    local ok,width=pcall(function() return box.WidthOverride end)
+                    if ok and (width==PAGE_COLUMN or width==LIST_ROW_WIDTH) then
+                        box:SetWidthOverride(math.floor(width*COMPACT_LIST+0.5))
+                    end
+                end
+                narrow(parent:GetParent())
+                for _,child in ipairs(children) do narrow(child.widget) end
+            end
             parent:ClearChildren()
             -- A header picker's choices hang as tabs from the divider under the
             -- title. The page status shares that row, so it stays beneath the

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- With **Use Compact Style** set to Everywhere, settings pages are as wide as the mod
+  list: a narrower label column and controls, less space right of them, the same text size.
 - The ModCore Settings page's tabs are Settings | Controls | Templates | Extensions |
   Developer Tools, and it opens on Settings. Controls shows ModCore Controls' page;
   Extensions shows the UE4SS Lua Extensions' page; Settings is the former Modules tab.
