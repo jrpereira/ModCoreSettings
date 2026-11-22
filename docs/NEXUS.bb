@@ -1,5 +1,9 @@
 [b]ModCore Settings[/b]
 
+[center][b]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/b]
+[size=4][b]Tested for The Blood of Dawnwalker 1.2[/b][/size]
+[b]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/b][/center]
+
 ModCore Settings (MCS) extends Dawnwalker Mod Menu (DMM) with richer controls and shared menu integration. Mod authors declare settings; DMM manages pending edits and Apply; the consuming mod implements their gameplay behavior.
 
 [b]Features and benefits[/b]
