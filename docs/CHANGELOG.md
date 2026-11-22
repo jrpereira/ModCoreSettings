@@ -1,16 +1,30 @@
 # Changelog
 
-## Unreleased
+## v1.10.0
 
-- With **Use Compact Style** set to Everywhere, settings pages are as wide as the mod
-  list: a narrower label column and controls, less space right of them, the same text size.
 - The ModCore Settings page's tabs are Settings | Controls | Templates | Extensions |
-  Developer Tools, and it opens on Settings. Controls shows ModCore Controls' page;
-  Extensions shows the UE4SS Lua Extensions' page; Settings is the former Modules tab.
-  Slot `settings:controls` holds ModCore Controls' page and slot `settings:extensions`
-  the UE4SS Lua Extensions' page.
+  Developer Tools, and it opens on Settings. Settings is the former Modules tab; Controls
+  shows ModCore Controls' page and Extensions the UE4SS Lua Extensions' page. Slot
+  `settings:controls` holds ModCore Controls' page and slot `settings:extensions` the
+  UE4SS Lua Extensions' page.
 - The mod list's title line has one link, **settings**, which opens ModCore Settings'
   page on its Settings tab. `mod.json`'s `title_link` is no longer read.
+- With **Use Compact Style** set to Everywhere, settings pages are as wide as the mod
+  list: a narrower label column and controls, less space right of them, the same text size.
+- The live preview's Focus button is replaced by **Background**: On (the picture as it
+  is), Blurred, Dimmed (the default) or Off (a plain dim screen instead of the picture).
+- The ModCore Settings page's Previews section: Play sound in previews (Auto, On or Off)
+  and Background in previews (On, Blurred, Dimmed or Off) are the live preview's buttons,
+  saved in config.ini; a click on a button saves it too.
+- Config reload: returning to the game window (with the UE4SS Lua Event Bridge 1.4.0 or
+  later) silently reloads every module that subscribed through `settings_api` 3's
+  `onReload`; any mod may trigger the same with the console command `MC_ConfigReload_v1`.
+- A setting may leave out `ConfigFile`, `ConfigSection` and `ConfigKey`: it is stored in
+  the page's `config.ini`, in the section named by `[Mod] ConfigSection` (else, when it
+  also leaves out `ConfigFile`, by `[Mod] Id`), under its own `Id`. Settings that state
+  them are stored as before.
+- A menu-data field may store under its own section, key and file,
+  `storage={section=,key=,file=}`; two fields at one file, section and key reject the page.
 - Slots take more kinds of rows: page links, which open their page from the host with
   Back returning to it, and ModCoreSettings' range and keybind settings. A slot among
   inserted rows is filled too (ModCore Templates' Quickslots rows inside the Controls
@@ -45,20 +59,8 @@
 - A setting's title above its description is white, as the mod list names its mods.
 - A picker choice may have a description: the side panel shows it after the setting's own
   while that choice is the value.
-- A live preview's buttons read '<name>: <value>'. Background is On (the picture as it
-  is), Blurred, Dimmed (the default) or Off (a plain dim screen instead of the picture).
-- The ModCore Settings page's Previews section: Play sound in previews (Auto, On or Off)
-  and Background in previews (On, Blurred, Dimmed or Off) are the live preview's buttons,
-  saved in config.ini; a click on a button saves it too.
-- Config reload: returning to the game window (with the UE4SS Lua Event Bridge 1.4.0 or
-  later) silently reloads every module that subscribed through `settings_api` 3's
-  `onReload`; any mod may trigger the same with the console command `MC_ConfigReload_v1`.
-- A menu-data field may store under its own section, key and file,
-  `storage={section=,key=,file=}`; two fields at one file, section and key reject the page.
-- A setting may leave out `ConfigFile`, `ConfigSection` and `ConfigKey`: it is stored in
-  the page's `config.ini`, in the section named by `[Mod] ConfigSection` (else, when it
-  also leaves out `ConfigFile`, by `[Mod] Id`), under its own `Id`. Settings that state
-  them are stored as before.
+- A live preview's buttons read '<name>: <value>'; Focus, left of Sound, blurs the
+  background picture while on.
 - A config file that repeats a section opens: the repeats count as one section, and
   missing keys are added at the end of its last occurrence.
 - The mod list opens faster when pickers list their choices from files.
