@@ -6,30 +6,48 @@ edits and Apply; your mod applies the saved values to gameplay.
 
 ## Features and benefits
 
+For players:
+
+- **One ModCore Settings page:** tabs **Settings | Controls | Templates | Extensions |
+  Developer Tools**, opened from the **settings** link on the mod list's title line.
+  ModCore Controls', ModCore Templates' and the UE4SS Lua Extensions' settings appear in
+  their own tabs, still saved by each module.
+- **Browse your mods:** the Modules page lists every installed mod by category, by when
+  it was added, alphabetically or in load order, with collections and 1 to 3 mods per
+  row. Mods whose requirements are missing or at the wrong version are marked.
+- **Compact Style:** an optional pause-menu look for the mod menu in a loaded game, on
+  the mod list only or on every page.
+- **Live previews:** pages that offer one show a 16:9 preview beside their settings,
+  drawn from the current values, applied or not, with **Sound** and **Background**
+  buttons.
+- **Config reload:** returning to the game window after editing config files by hand
+  reloads the settings of every module that supports it (needs the Event Bridge).
+
+For mod authors:
+
 - **Declare your menu:** add settings through metadata or generated pages; MCS
   handles their presentation inside DMM.
 - **Edit keyboard and mouse bindings:** capture keys, choose Tap/Hold triggers,
   clear optional bindings and display inherited game controls. Your mod supplies
   text storage and input behavior.
-- **Organize larger menus:** use tabs, cycling pickers, two-handle ranges,
-  conditional rows, shared headings and navigation that does not change saved
+- **Organize larger menus:** tabs, cycling pickers, two-handle ranges, conditional
+  rows, shared headings, choice descriptions and navigation that does not change saved
   settings.
+- **Inner pages and page links:** a link opens another page, optionally on one of its
+  rows, and Back returns to the link.
 - **List choices from files:** a keyed picker can list its choices from a mod's
   own files, refreshed each time the menu opens; a choice may play a WAV file when
   selected.
-- **Show a live preview:** a page can reserve a 16:9 preview in the side panel, which
-  its provider (ModCore Templates for template pages) draws from the page's current
-  values, applied or not.
+- **Offer a live preview:** a page can reserve the preview in the side panel, which
+  its provider (ModCore Templates for template pages) draws from the page's values.
 - **Offer coordinated presets:** one choice updates several settings in DMM's
   pending model; individual edits can return the selection to Custom.
 - **Share menu space:** contribute pages or insert settings into another mod's
   declared slot while retaining ownership of storage and Apply.
 - **React to saved changes:** receive Apply notifications, numbers and text, after a
-  successful save, without watching or polling configuration files.
+  successful save, and reload requests, without watching or polling configuration files.
 - **Preserve configuration:** add missing numeric defaults while keeping existing
   choices and unrelated content.
-- **Browse your mods:** the Modules page lists every installed mod, sorted by
-  category, by when it was added, alphabetically or in load order, with collections.
 
 ## Choose the right module
 
@@ -49,8 +67,8 @@ Use Dawnwalker, UE4SS with Lua 5.4, DMM 1.0.7.1 (the declared minimum) and the U
 Extensions' File Bridge and Sound Bridge, 1.1.0 or newer. Install and enable MCS under
 `Mods/1_ModCore_Settings`. MCS still runs without the two bridges, with less: no file
 dates for the mod browser or atomic config writes without the File Bridge, and no sound
-when you pick a mod's own sound file without the Sound Bridge. It does not need the Event
-Bridge.
+when you pick a mod's own sound file without the Sound Bridge. The Event Bridge (1.4.0 or
+newer) is optional: with it, returning to the game window reloads edited config files.
 
 MCS keeps DMM's `Scripts/main.lua` as `main.dmm.lua` and puts its own launcher in
 its place, which starts MCS and then DMM. Restart the game after installing MCS while
@@ -105,7 +123,7 @@ ModCore Settings' own options below, **Controls** shows ModCore Controls' page (
 Quickslots templates, the key mappings and the behaviours), **Templates** shows ModCore
 Templates' loaded templates by category, the active ones marked, **Extensions** shows the
 UE4SS Lua Extensions' page (how many are installed, then each extension's settings), and
-**Developer Tools** lists tool pages. ModCore Controls', ModCore Templates' and ModCore Lua
+**Developer Tools** lists tool pages. ModCore Controls', ModCore Templates' and the UE4SS Lua
 Extensions' entries in the mod list open their tabs.
 
 ## Logging
