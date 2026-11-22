@@ -13,7 +13,7 @@ local QUIET_OPACITY, QUIET_HOVER_OPACITY, QUIET_SELECTED_OPACITY = 0.5, 0.75, 0.
 -- The page that carries the index tab (Developer Tools): MCS's own.
 local HOST = 'ModCoreSettings'
 -- The MCS_Page value of the index tab (mcs_page).
-local TABS = {tools=3}
+local TABS = {tools=4}
 local COLLECTION_ICON = '⁂'
 -- Every list is a grid of this many columns unless options.columns (1-3, [Modules]
 -- ModulesPerRow) says otherwise, the ungrouped Alphabetical and Load Order lists included.

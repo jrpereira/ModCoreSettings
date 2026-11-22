@@ -100,15 +100,16 @@ assert(not displayPlan.content:find('Reference',1,true),'references never receiv
 -- MCS's own page, compiled from its menu data as menu_pages compiles it.
 local visuals=require('menu_data').manifest(require('mcs_page'))
 local visualItems=Choices.parse(visuals)
-assert(#visualItems==10)
+assert(#visualItems==11)
 local byId={}
 for index,item in ipairs(visualItems) do
     byId[item.id]=index
     if item.id=='SortBy' or item.id=='PreferredCategoryMinimum' or item.id=='SingleCategory' or item.id=='CompactStyle'
         or item.id=='ModulesPerRow' or item.id=='PreviewSound' or item.id=='PreviewBackground' then
         assert(not item.mcNavigation and item.file=='config.ini' and item.section=='Modules')
-    elseif item.id=='MCS_Templates' or item.id=='MCS_Controls' then
-        -- The slots ModCore Templates and ModCore Controls fill: shown values that store nothing.
+    elseif item.id=='MCS_Templates' or item.id=='MCS_Controls' or item.id=='MCS_Extensions' then
+        -- The slots ModCore Templates, ModCore Controls and the UE4SS Lua Extensions fill:
+        -- shown values that store nothing.
         assert(not item.mcNavigation and not item.file)
     else assert(item.mcNavigation and not item.file) end
 end
@@ -119,7 +120,7 @@ files[mcsPath]='[Modules]\nCompactStyle=1\nSortBy=1\nPreferredCategoryMinimum=2\
 local visualProvider={id='ModCoreSettings',path='/mods/1_ModCore_Settings/mod_settings.ini',choices=visualItems}
 local visualModel=Choices.open(visualProvider)
 assert(not visualModel.error and not visualModel:dirty())
-visualModel:set(byId.MCS_Page,3)
+visualModel:set(byId.MCS_Page,4)
 assert(not visualModel:dirty(),'page selection remains transient')
 visualModel:set(byId.SortBy,0)
 assert(visualModel:dirty() and visualModel:apply(),'grouping preference is applied durably')

@@ -798,9 +798,12 @@ is rebuilt with the applied values when you return to it, after any page's Apply
 
 Browser grouping is described in [Module categories](MODULE_CATEGORIES.md#browser-behavior). Every mod, ModCore's own included, groups by the same rules.
 
-ModCore Settings' own page has four tabs and opens on Settings: Settings holds ModCore
+ModCore Settings' own page has five tabs and opens on Settings: Settings holds ModCore
 Settings' own Options, Listing and Previews; Controls shows ModCore Controls' page, which
 fills the slot `settings:controls`; Templates holds the slot `settings:templates`, which
-ModCore Templates fills with every loaded template, one group per category; and Developer
-Tools lists the `group='tool'` pages. ModCore Controls' and ModCore Templates' mod list
-entries open their tabs.
+ModCore Templates fills with every loaded template, one group per category; Extensions
+shows the UE4SS Lua Extensions' page, which fills the slot `settings:extensions`, each
+extension's settings in its own section; and Developer Tools lists the `group='tool'`
+pages, or shows None installed. ModCore Controls', ModCore Templates' and ModCore Lua
+Extensions' mod list entries open their tabs. Each slot shows Not installed (None loaded
+for Templates) until its module fills it.

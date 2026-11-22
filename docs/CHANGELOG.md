@@ -2,9 +2,11 @@
 
 ## Unreleased
 
-- The ModCore Settings page's tabs are Settings | Controls | Templates | Developer Tools,
-  and it opens on Settings. Controls shows ModCore Controls' page; Settings is the former
-  Modules tab. Slot `settings:controls` holds ModCore Controls' page.
+- The ModCore Settings page's tabs are Settings | Controls | Templates | Extensions |
+  Developer Tools, and it opens on Settings. Controls shows ModCore Controls' page;
+  Extensions shows the UE4SS Lua Extensions' page; Settings is the former Modules tab.
+  Slot `settings:controls` holds ModCore Controls' page and slot `settings:extensions`
+  the UE4SS Lua Extensions' page.
 - The mod list's title line has one link, **settings**, which opens ModCore Settings'
   page on its Settings tab. `mod.json`'s `title_link` is no longer read.
 - Slots take more kinds of rows: page links, which open their page from the host with
