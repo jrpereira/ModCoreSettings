@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- The ModCore Settings page's tabs are Controls | Templates | Settings | Developer Tools,
+- The ModCore Settings page's tabs are Settings | Controls | Templates | Developer Tools,
   and it opens on Settings. Controls shows ModCore Controls' page, which it fills through
   the new slot `settings:controls`; Settings is the former Modules tab. The mod list's
   settings link opens the Settings tab.

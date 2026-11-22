@@ -551,9 +551,9 @@ local mcsMenu=require('mcs_page')
 Contributions.validate('ModCoreSettings',{pages={{id='ModCoreSettings',name='ModCore Settings',
     attach='1_ModCore_Settings',configDirectory='/x',menu=mcsMenu}}})
 local base=require('menu_data').manifest(mcsMenu)
-assert(base:find('[Category.Listing]\nVisibleWhen=MCS_Page\nVisibleValues=2\n\n',1,true)
+assert(base:find('[Category.Listing]\nVisibleWhen=MCS_Page\nVisibleValues=0\n\n',1,true)
     and base:find('Id=SortBy\nLabel=Sort by\nGroup=Listing',1,true),'the Settings tab lists its settings under Listing')
-assert(base:find('[Category.Controls]\nmcHeading=0\nVisibleWhen=MCS_Page\nVisibleValues=0\n',1,true)
+assert(base:find('[Category.Controls]\nmcHeading=0\nVisibleWhen=MCS_Page\nVisibleValues=1\n',1,true)
     and base:find('mcSlot=controls\nmcSlotGroups=1',1,true),'the Controls tab is a slot that keeps its rows\' groups')
 local hostPage={{id='ModCoreSettings',name='Settings',path='/x/mod_settings.ini',mcManifest=base},
     {id='ModCoreControls',name='Controls',path='/m/2_Controls/mod_settings.ini'},
@@ -564,7 +564,7 @@ local page
 for _,provider in ipairs(hostPage) do if provider.id=='ModCoreSettings' then page=provider end end
 local items={};for _,item in ipairs(page.choices) do items[item.id]=item end
 assert(items.MCS_Page and #items.MCS_Page.values==4 and table.concat(items.MCS_Page.labels,'|')
-        =='Controls|Templates|Settings|Developer Tools' and items.MCS_Controls and items.MCS_Controls.mcReadOnly
+        =='Settings|Controls|Templates|Developer Tools' and items.MCS_Controls and items.MCS_Controls.mcReadOnly
     and items.MCS_Index_1.mcLinkPage and items.MCS_Templates and items.MCS_Templates.mcReadOnly
     and items.SortBy.file=='config.ini' and items.SortBy.section=='Modules',
     'the tabs parse through DMM beside the page\'s own settings')

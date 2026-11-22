@@ -1,24 +1,24 @@
 -- ModCoreSettings' own page, contributed like any module's page and attached to its
 -- folder, so it takes the mod's name, author and icon from mod.json. Its tabs, in order:
--- Controls (MCS_Page 0), a slot that ModCore Controls fills with its
--- page; Templates (1), a slot that ModCore Templates fills; Settings (2), ModCore
--- Settings' own and the one it opens on; and Developer Tools (3), which browser_groups appends on every build.
+-- Settings (MCS_Page 0), ModCore Settings' own and the one it opens on; Controls (1), a
+-- slot that ModCore Controls fills with its page; Templates (2), a slot that ModCore
+-- Templates fills; and Developer Tools (3), which browser_groups appends on every build.
 return {
     storage={file='config.ini',section='Modules'},
     groups={
         {id='Pages',style='none'},
         -- The Controls tab: one slot that ModCore Controls fills with its whole page.
-        {id='Controls',style='none',conditions={visible={field='MCS_Page',values={0}}}},
+        {id='Controls',style='none',conditions={visible={field='MCS_Page',values={1}}}},
         -- The Templates tab: one slot that ModCore Templates fills with every loaded template.
-        {id='Templates',style='none',conditions={visible={field='MCS_Page',values={1}}}},
+        {id='Templates',style='none',conditions={visible={field='MCS_Page',values={2}}}},
         -- The Settings tab, under Options, Listing and Previews headings.
-        {id='Options',conditions={visible={field='MCS_Page',values={2}}}},
-        {id='Listing',conditions={visible={field='MCS_Page',values={2}}}},
-        {id='Previews',conditions={visible={field='MCS_Page',values={2}}}},
+        {id='Options',conditions={visible={field='MCS_Page',values={0}}}},
+        {id='Listing',conditions={visible={field='MCS_Page',values={0}}}},
+        {id='Previews',conditions={visible={field='MCS_Page',values={0}}}},
     },
     fields={
-        {id='MCS_Page',group='Pages',label='Page',style='title',action=true,default=2,
-            values={{value=0,label='Controls'},{value=1,label='Templates'},{value=2,label='Settings'},
+        {id='MCS_Page',group='Pages',label='Page',style='title',action=true,default=0,
+            values={{value=0,label='Settings'},{value=1,label='Controls'},{value=2,label='Templates'},
                 {value=3,label='Developer Tools'}}},
         -- Shown as is until ModCore Controls fills it (settings:controls); its rows keep their
         -- own groups: the Quickslots templates, Mappings and Behaviours.
