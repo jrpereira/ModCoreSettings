@@ -6,8 +6,6 @@
 /data/mod_catalog.json
 diagnostics/
 evidence/
-/tools/runtime_evidence.py
-/tests/test_runtime_evidence.py
 /docs/RECONSTRUCTED_HISTORY.json
 __pycache__/
 *.pyc
@@ -15,7 +13,7 @@ __pycache__/
 *.dmp
 *.bak
 
-# Shared repository hygiene (generated/local files are not source)
+# Generated and local files
 build/
 dist/
 artifacts/

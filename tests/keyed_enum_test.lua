@@ -1,6 +1,6 @@
 package.path='Scripts/?.lua;Scripts/vendor/?.lua;'..package.path
 -- Keyed enums end to end: menu data, DMM's parser and model, hooks storage, Apply events and
--- slot rows. Needs the real DMM parser, which CI does not have; skip without it.
+-- slot rows. Needs the real DMM parser; skips without it.
 local choicesPath=os.getenv('DMM_CHOICES_PATH')
 if not choicesPath then print('SKIP keyed enums: DMM_CHOICES_PATH is not set');return end
 local Choices=dofile(choicesPath)
