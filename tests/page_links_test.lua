@@ -342,4 +342,58 @@ do
     assert(table.concat(calls,',')=='browser','the trail is dropped after a failed return')
 end
 
+-- mcLinkPage=<page>#<row id> opens the page on the tab that shows that row, the row selected;
+-- Back returns to the link's row as for any link. An unknown row just opens the page.
+do
+    local calls={}
+    local providers={
+        {id='Main',choices={{id='ToA',mcNavigation=true,mcLinkPage='Main.inner#B1',visibility={}},
+            {id='ToNone',mcNavigation=true,mcLinkPage='Main.inner#Nope',visibility={}},
+            {id='ToGone',mcNavigation=true,mcLinkPage='Gone#B1',visibility={}}}},
+        {id='Main.inner',mcBrowserHidden=true,choices={
+            {id='Tab',mcNavigation=true,values={0,1},visibility={}},
+            {id='A1',visibility={{target=1,values={[0]=true}}}},
+            {id='B1',visibility={{target=1,values={[1]=true}}}}}},
+    }
+    local page={rows={{providerIndex=1}},allRows={{providerIndex=1},{providerIndex=2}},controlStatus={},mode='browser'}
+    local models,texts={},{}
+    page.controls={tick=function() return false end,
+        show=function(self,index)
+            local model={items=providers[index].choices,pending={0,0,0},sets={}}
+            function model:set(i,value) self.pending[i]=value;self.sets[#self.sets+1]=self.items[i].id..'='..value end
+            function model:dirty() return false end
+            self.model=model;models[index]=model
+        end,
+        refresh=function() calls[#calls+1]='refresh' end,
+        select=function(_,index) calls[#calls+1]='select '..index end}
+    function page:showBrowser() self.mode='browser';calls[#calls+1]='browser' end
+    function page:showDetail(row)
+        local index=self.rows[row].providerIndex
+        self.mode='detail';calls[#calls+1]='detail '..providers[index].id
+        self.controls:show(index)
+    end
+    local built=Links.wrap(page,providers,{setText=function(_,copy) texts[#texts+1]=copy end})
+    local function follow(at)
+        local model=built.controls.model
+        model.mcActivateLink=true;model:set(at,0)
+        assert(built.controls:tick()==true)
+    end
+    built:showDetail(1)
+    calls={}
+    follow(1)
+    assert(built.controls.model==models[2] and table.concat(models[2].sets,',')=='Tab=1'
+        and table.concat(calls,',')=='browser,detail Main.inner,refresh,select 3',table.concat(calls,','))
+    calls={}
+    built:showBrowser();built.controls:tick()
+    assert(built.controls.model==models[1] and table.concat(calls,',')=='browser,browser,detail Main,refresh,select 1',
+        table.concat(calls,','))
+    calls={}
+    follow(2)
+    assert(built.controls.model==models[2] and #models[2].sets==0
+        and table.concat(calls,',')=='browser,detail Main.inner',table.concat(calls,','))
+    built:showBrowser();built.controls:tick()
+    follow(3)
+    assert(texts[#texts]=='Gone#B1 page is unavailable.',tostring(texts[#texts]))
+end
+
 print('PASS page links open targets through the browser and refuse dirty pages')

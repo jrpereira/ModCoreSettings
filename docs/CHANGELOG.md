@@ -19,6 +19,9 @@
   opens through a page link. Back on any page a link opened now returns to the link's
   page with its row selected, instead of to the mod list; a chain of links unwinds in
   order. The vendored `menu_contributions.lua` is version 9.
+- A page link may end in `#<row id>` (`mcLinkPage=<page id>#<row id>`): the page opens
+  with that row showing and selected, its navigation pickers set as needed, so a link can
+  open a page on one of its tabs.
 
 - A slot whose rows keep their groups (`slotGroups`) also keeps a row that stands in for
   its group's heading (`mcCategory`), so a contributed picker can head the rows after it.

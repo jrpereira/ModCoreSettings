@@ -1,12 +1,14 @@
 -- A navigation picker with mcLinkPage=<page id> opens that page instead of saving a value.
 -- mcLinkPage=<provider>:<slot> opens the page hosting that slot with the slot showing.
+-- Either form may end in #<row id>: the page opens with that row showing and selected,
+-- its navigation pickers set as needed, so a link can open a page on one of its tabs.
 -- Back on a page a link opened returns to the page the link was on, with the link's row
 -- showing and selected; Back there goes on as before, so a chain of links unwinds in order.
 -- A page listed nowhere whose rows another page's slot shows (ModCore Controls' page in
 -- ModCore Settings' Controls tab) opens there, at those rows; a slot on it opens at the
 -- first of its rows.
 local M={version=3}
-local showSlot,reveal
+local showSlot,showRow,reveal
 
 -- Where a page listed nowhere is shown: the slot address parts (provider, slot) of the slot
 -- its rows fill, or nil.
@@ -126,6 +128,12 @@ function M.wrap(page,providers,api,slots,report)
         return false
     end
     navigate=function(target,prefer)
+        local base,row=target:match('^(.-)#([^#]+)$')
+        if base and base~='' then
+            local opened=navigate(base,prefer)
+            if opened then showRow(page,row) end
+            return opened
+        end
         local host,slot
         if slots then host,slot=slots.address(target) end
         for index,provider in ipairs(providers) do
@@ -242,6 +250,21 @@ function showSlot(page,slot,prefer)
         reveal(model,first)
         controls:refresh()
         controls:select(first,true)
+    end
+end
+
+-- On the page just shown, reveal and select the row with that id, if it has one.
+function showRow(page,id)
+    local controls=page.controls
+    local model=controls and controls.model
+    if not model or model.error or not model.items then return end
+    for index,setting in ipairs(model.items) do
+        if setting.id==id then
+            reveal(model,index)
+            if type(controls.refresh)=='function' then controls:refresh() end
+            if type(controls.select)=='function' then controls:select(index,true) end
+            return
+        end
     end
 end
 

@@ -427,7 +427,10 @@ changes the link is refused and the page shows a status message.
 `mcLinkPage=<provider>:<slot>` opens the page that hosts that slot, sets its
 navigation pickers so the slot shows, and selects the slot's first row. A host listed
 nowhere whose rows another page's slot shows opens there instead, at the first row of the
-inner slot. With
+inner slot. Either form may end in `#<row id>`, naming a setting of the page it opens:
+the page opens with that row showing and selected, its navigation pickers set as needed,
+so a link can open a page on one of its tabs (`mcLinkPage=ExampleMod.keys#Example_Pad`).
+A row the page lacks leaves it as it opens. With
 `mcType=tab`, a link shows its first choice as underlined text in a picker's value
 column, dimmed until hovered or selected. Its label lines up with the rows around it.
 `mcLevel=5` sets the row label in small (12pt) muted text, which suits a notice.
@@ -813,4 +816,4 @@ Recently added lists mods by their latest install or update, newest first, under
 
 Browser grouping is described in [Module categories](MODULE_CATEGORIES.md#browser-behavior). Every mod, ModCore's own included, groups by the same rules. Unregistered folders and conflicting matches use Other or Specialized.
 
-ModCore Settings' own page has four tabs, `MCS_Page` values in brackets: Controls (0), Templates (1), Settings (2) and Developer Tools (3). It opens on Settings. Controls holds one slot, `settings:controls`, that ModCore Controls fills with its whole page: the Quickslots templates (its own slot `controls:visuals`, filled by ModCore Templates), the Mappings links to its inner pages and Behaviours, keeping their groups (`mcSlotGroups=1`). Templates holds `settings:templates`, which ModCore Templates fills with every loaded template, one group per category. Settings holds ModCore Settings' own Options, Listing and Previews. Developer Tools is generated, rebuilt with the mod list, listing the `group='tool'` pages. ModCore Controls' and ModCore Templates' mod list entries are slot links that open their tabs. Like any page it holds at most 256 settings; past that it shows without its slot rows, logged as `SLOT_ROWS_SKIPPED`. With ModCore's own modules and Fangdango's templates the four tabs hold about 55.
+ModCore Settings' own page has four tabs, `MCS_Page` values in brackets: Controls (0), Templates (1), Settings (2) and Developer Tools (3). It opens on Settings. Controls holds one slot, `settings:controls`, that ModCore Controls fills with its whole page: the Quickslots templates (its own slot `controls:visuals`, filled by ModCore Templates), the Mappings links to its Mappings page and Behaviours, keeping their groups (`mcSlotGroups=1`). Templates holds `settings:templates`, which ModCore Templates fills with every loaded template, one group per category. Settings holds ModCore Settings' own Options, Listing and Previews. Developer Tools is generated, rebuilt with the mod list, listing the `group='tool'` pages. ModCore Controls' and ModCore Templates' mod list entries are slot links that open their tabs. Like any page it holds at most 256 settings; past that it shows without its slot rows, logged as `SLOT_ROWS_SKIPPED`. With ModCore's own modules and Fangdango's templates the four tabs hold about 55.
